@@ -1,0 +1,72 @@
+import { useState, type ReactNode } from 'react'
+import { Maximize, ZoomIn, ZoomOut } from 'lucide-react'
+
+const STEPS = [0.6, 0.8, 1, 1.25, 1.6, 2]
+
+/**
+ * Scrollable, zoomable canvas surface for the 2D plan.
+ * The grid is pure CSS so it scales with the zoom level.
+ */
+export function PlanCanvas({
+  zoom,
+  children,
+  className = '',
+}: {
+  zoom: number
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      className={`relative overflow-auto scroll-thin bg-canvas-soft/70 ${className}`}
+      style={{
+        backgroundImage:
+          'linear-gradient(to right, rgba(100,116,139,0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(100,116,139,0.10) 1px, transparent 1px)',
+        backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
+      }}
+    >
+      <div className="flex min-h-full min-w-full items-center justify-center p-6" style={{ width: `${zoom * 100}%` }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+export function ZoomControls({ zoom, setZoom }: { zoom: number; setZoom: (z: number) => void }) {
+  const index = STEPS.indexOf(zoom)
+  return (
+    <div className="flex items-center gap-1 rounded-lg border border-line bg-surface p-1 shadow-sm">
+      <button
+        onClick={() => setZoom(STEPS[Math.max(0, (index === -1 ? 2 : index) - 1)])}
+        disabled={zoom <= STEPS[0]}
+        className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-canvas-soft hover:text-ink-text disabled:opacity-40"
+        aria-label="Zoom out"
+      >
+        <ZoomOut className="h-3.5 w-3.5" />
+      </button>
+      <span className="w-11 text-center text-[11.5px] font-medium tabular-nums text-muted">
+        {Math.round(zoom * 100)}%
+      </span>
+      <button
+        onClick={() => setZoom(STEPS[Math.min(STEPS.length - 1, (index === -1 ? 2 : index) + 1)])}
+        disabled={zoom >= STEPS[STEPS.length - 1]}
+        className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-canvas-soft hover:text-ink-text disabled:opacity-40"
+        aria-label="Zoom in"
+      >
+        <ZoomIn className="h-3.5 w-3.5" />
+      </button>
+      <button
+        onClick={() => setZoom(1)}
+        className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-canvas-soft hover:text-ink-text"
+        aria-label="Reset zoom"
+        title="Fit"
+      >
+        <Maximize className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
+
+export function useZoom() {
+  return useState(1)
+}

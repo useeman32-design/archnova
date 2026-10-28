@@ -1,0 +1,22 @@
+# Dependencies & build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.local
+
+# Sandbox caches (not part of the project)
+.arena/
+.cache/
+.local/
+.npm/
