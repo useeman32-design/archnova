@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Compass, Frame, Info, Tag } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Compass, Frame, Info, Minimize, Tag } from 'lucide-react'
 import { useWorkspace } from './WorkspaceLayout'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
 import { PlanCanvas, ZoomControls, useZoom } from '@/components/floor-plan/PlanCanvas'
@@ -55,6 +56,14 @@ export function FloorPlanEditorPage() {
           onChange={setUnits}
         />
         <ZoomControls zoom={zoom} setZoom={setZoom} />
+        <Link
+          to=""
+          title="Back to the split 2D + 3D view"
+          className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-medium text-muted shadow-sm transition-colors hover:bg-canvas-soft hover:text-ink-text"
+        >
+          <Minimize className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Split view</span>
+        </Link>
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
           <IconToggle active={showLabels} onClick={() => setShowLabels(v => !v)} label="Labels" icon={<Tag className="h-3.5 w-3.5" />} />
           <IconToggle active={showDimensions} onClick={() => setShowDimensions(v => !v)} label="Dims" icon={<Frame className="h-3.5 w-3.5" />} />
@@ -74,7 +83,7 @@ export function FloorPlanEditorPage() {
           showBoundary
           selectedId={selectedRoomId}
           onSelectRoom={(room) => selectRoom(room.id === selectedRoomId ? null : room.id)}
-          className="w-full max-w-[720px] drop-shadow-sm"
+          className="min-h-0 min-w-0 drop-shadow-sm"
         />
       </PlanCanvas>
 

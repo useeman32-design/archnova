@@ -97,8 +97,10 @@ export function FloorPlanDiagram({
         return (
           <g
             key={room.id}
-            className="cursor-pointer"
+            className="room-hit cursor-pointer"
             onClick={() => onSelectRoom?.(room)}
+            role={onSelectRoom ? 'button' : undefined}
+            aria-label={onSelectRoom ? `Select ${room.name}` : undefined}
           >
             <rect
               x={room.rect.x}

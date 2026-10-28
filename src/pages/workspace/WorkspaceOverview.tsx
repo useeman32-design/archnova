@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUpRight, Box, Ruler } from 'lucide-react'
+import { ArrowUpRight, Box, Expand, Ruler } from 'lucide-react'
 import { useWorkspace } from './WorkspaceLayout'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
 import { PlanCanvas, ZoomControls, useZoom } from '@/components/floor-plan/PlanCanvas'
@@ -40,6 +40,14 @@ export function WorkspaceOverview() {
               onChange={setUnits}
             />
             <ZoomControls zoom={zoom} setZoom={setZoom} />
+            <Link
+              to="../floor-plan"
+              title="Open the focused floor-plan editor"
+              className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-medium text-muted shadow-sm transition-colors hover:bg-canvas-soft hover:text-ink-text"
+            >
+              <Expand className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Focus</span>
+            </Link>
           </div>
         </div>
 
@@ -52,7 +60,7 @@ export function WorkspaceOverview() {
             showCompass
             selectedId={selectedRoomId}
             onSelectRoom={(room) => selectRoom(room.id === selectedRoomId ? null : room.id)}
-            className="w-full max-w-[560px] drop-shadow-sm"
+            className="min-h-0 min-w-0"
           />
         </PlanCanvas>
 
@@ -108,7 +116,7 @@ export function WorkspaceOverview() {
                 units={units}
                 showBoundary
                 showCompass
-                className="w-full max-w-[420px]"
+                className="min-h-0 min-w-0"
               />
             </div>
           )}

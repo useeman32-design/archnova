@@ -20,3 +20,6 @@ pnpm-debug.log*
 .cache/
 .local/
 .npm/
+
+# Local git credentials — never commit
+.git-credentials

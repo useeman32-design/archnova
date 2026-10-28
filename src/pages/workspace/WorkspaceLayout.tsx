@@ -47,12 +47,13 @@ export function useWorkspace(): WorkspaceContext {
   return useOutletContext<WorkspaceContext>()
 }
 
+/** Mirrors the reference mockup's workspace sidebar, in order. */
 const RAIL = [
-  { to: '', label: 'Overview', icon: Home, end: true },
-  { to: 'floor-plan', label: 'Floor Plan', icon: DraftingCompass, end: false },
-  { to: '3d', label: '3D View', icon: Box, end: false },
-  { to: 'drawings', label: 'Drawings', icon: FileDown, end: false },
-]
+  { key: 'home', to: '/', label: 'Home', icon: Home },
+  { key: 'floor', to: '', label: 'Floor Plan', icon: DraftingCompass },
+  { key: '3d', to: '3d', label: '3D View', icon: Box },
+  { key: 'drawings', to: 'drawings', label: 'Drawings', icon: FileDown },
+] as const
 
 export function WorkspaceLayout() {
   const { id = '' } = useParams()
@@ -64,7 +65,7 @@ export function WorkspaceLayout() {
 
   const [rooms, setRooms] = useState<Room[]>([])
   const [units, setUnits] = useState<Units>('ft')
-  const [selectedRoomId, selectRoom] = useState<string | null>(null)
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [placed, setPlaced] = useState<Record<string, string[]>>({})
   const [assistantOpen, setAssistantOpen] = useState(searchParams.get('assistant') === '1')
   const [propsOpen, setPropsOpen] = useState(false)
@@ -76,6 +77,14 @@ export function WorkspaceLayout() {
     setUnits(project.plot.units)
     selectRoom(null)
   }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Selecting a room on a phone opens the properties drawer so the edit is visible. */
+  const selectRoom = useCallback((roomId: string | null) => {
+    setSelectedRoomId(roomId)
+    if (roomId && window.matchMedia('(max-width: 1023px)').matches) {
+      setPropsOpen(true)
+    }
+  }, [])
 
   const resizeRoom = useCallback((roomId: string, width: number, length: number) => {
     setRooms((prev) =>
@@ -130,6 +139,18 @@ export function WorkspaceLayout() {
 
   const showProperties = !location.pathname.endsWith('/3d') && !location.pathname.endsWith('/drawings')
   const view: '2D' | '3D' = location.pathname.endsWith('/3d') ? '3D' : '2D'
+
+  /** Current workspace segment: '' | 'floor-plan' | '3d' | 'drawings' */
+  const segment = location.pathname
+    .slice(`/workspace/${id}`.length)
+    .replace(/^\/+/, '')
+    .split('/')[0]
+  const isActive = (key: (typeof RAIL)[number]['key']) => {
+    if (key === 'floor') return segment === '' || segment === 'floor-plan'
+    if (key === '3d') return segment === '3d'
+    if (key === 'drawings') return segment === 'drawings'
+    return false
+  }
 
   const context: WorkspaceContext = {
     project,
@@ -223,14 +244,14 @@ export function WorkspaceLayout() {
         <nav className="hidden w-52 shrink-0 flex-col border-r border-ink-700/40 bg-ink-900 py-3 lg:flex">
           {RAIL.map((item) => (
             <NavLink
-              key={item.label}
+              key={item.key}
               to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `mx-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium transition-colors ${
-                  isActive ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/30' : 'text-white/60 hover:bg-ink-800/60 hover:text-white'
-                }`
-              }
+              end={item.key === 'home'}
+              className={`mx-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium transition-colors ${
+                isActive(item.key)
+                  ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/30'
+                  : 'text-white/60 hover:bg-ink-800/60 hover:text-white'
+              }`}
             >
               <item.icon className="h-[18px] w-[18px] shrink-0" />
               {item.label}
@@ -260,20 +281,23 @@ export function WorkspaceLayout() {
 
         {/* Mobile workspace tabs */}
         <div className="absolute inset-x-0 top-0 z-20 flex gap-1 overflow-x-auto border-b border-line bg-surface px-2 py-1.5 scroll-thin lg:hidden">
-          {RAIL.map((item) => (
+          {RAIL.filter((item) => item.key !== 'home').map((item) => (
             <NavLink
-              key={item.label}
+              key={item.key}
               to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium ${
-                  isActive ? 'bg-brand-600 text-white' : 'bg-canvas-soft text-muted'
-                }`
-              }
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium ${
+                isActive(item.key) ? 'bg-brand-600 text-white' : 'bg-canvas-soft text-muted'
+              }`}
             >
               {item.label}
             </NavLink>
           ))}
+          <button
+            onClick={() => setAssistantOpen(true)}
+            className="shrink-0 rounded-full bg-canvas-soft px-3 py-1.5 text-[12.5px] font-medium text-muted"
+          >
+            Assistant
+          </button>
         </div>
 
         <main className="min-w-0 flex-1 pt-11 lg:pt-0">

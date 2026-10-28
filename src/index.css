@@ -139,6 +139,14 @@ body {
   animation: slide-in-right 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Interactive floor-plan rooms: hover affordance for selection */
+.room-hit rect {
+  transition: filter 0.15s ease, stroke 0.15s ease, opacity 0.15s ease;
+}
+.room-hit:hover rect {
+  filter: brightness(0.955) saturate(1.05);
+}
+
 /* Blueprint-style grid used behind floor plans */
 .bg-blueprint {
   background-color: #fbfcfe;

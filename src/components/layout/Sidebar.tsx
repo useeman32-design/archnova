@@ -1,8 +1,7 @@
 import { NavLink } from 'react-router-dom'
-import { Home, FolderKanban, PencilLine, DraftingCompass, Settings, Sparkles } from 'lucide-react'
+import { Home, FolderKanban, PencilLine, DraftingCompass, Settings } from 'lucide-react'
 import { Logo } from './Logo'
 import { Button } from '@/components/ui/Button'
-import { useProjects } from '@/hooks/useProjects'
 
 const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
@@ -12,9 +11,6 @@ const NAV = [
 ]
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { projects } = useProjects()
-  const latest = projects[0]
-  const assistantTo = latest ? `/workspace/${latest.id}?assistant=1` : '/projects'
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col bg-ink-900 text-white">
       <div className="flex h-16 items-center px-5">
@@ -30,10 +26,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <PencilLine className="h-4 w-4" />
           New Project
         </NavLink>
-
-        <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">
-          Workspace
-        </p>
 
         {NAV.map((item) => (
           <NavLink
@@ -53,17 +45,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             {item.label}
           </NavLink>
         ))}
-
-        <div className="mt-4 border-t border-ink-700/60 pt-4">
-          <NavLink
-            to={assistantTo}
-            onClick={onNavigate}
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] font-medium text-white/60 transition-colors hover:bg-ink-800/50 hover:text-white"
-          >
-            <Sparkles className="h-[18px] w-[18px] shrink-0" />
-            AI Assistant
-          </NavLink>
-        </div>
       </nav>
 
       <div className="border-t border-ink-700/60 p-3">

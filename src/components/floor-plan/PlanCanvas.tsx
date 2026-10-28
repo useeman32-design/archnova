@@ -25,7 +25,12 @@ export function PlanCanvas({
         backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
       }}
     >
-      <div className="flex min-h-full min-w-full items-center justify-center p-6" style={{ width: `${zoom * 100}%` }}>
+      {/* The inner box has an explicit size on BOTH axes so the SVG letterboxes
+          into the pane instead of overflowing it; zoom scales both axes. */}
+      <div
+        className="flex items-center justify-center p-4"
+        style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }}
+      >
         {children}
       </div>
     </div>
