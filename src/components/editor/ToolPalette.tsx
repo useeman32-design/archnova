@@ -13,7 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { FinishOption, RoomCategory } from '@/types'
-import { useWorkspace, type ToolId } from '@/pages/workspace/WorkspaceLayout'
+import type { ToolId, WorkspaceContext } from '@/pages/workspace/WorkspaceLayout'
 import { ROOM_OPTIONS, ROOF_TYPES, EXTERIOR_FINISHES, INTERIOR_FINISHES } from '@/data/catalog'
 import { ASSETS } from '@/data/assets'
 
@@ -34,8 +34,7 @@ const TOOLS: { id: ToolId; icon: LucideIcon; label: string; hint: string; planOn
 
 const GROUP_BREAKS = new Set<ToolId>(['room', 'interior', 'finish', 'measure'])
 
-export function ToolPalette() {
-  const ctx = useWorkspace()
+export function ToolPalette({ ctx }: { ctx: WorkspaceContext }) {
   const [picker, setPicker] = useState<ToolId | null>(null)
   const is2D = ctx.canvasView === '2D' && ctx.showProperties
 

@@ -392,7 +392,7 @@ export function WorkspaceLayout() {
       </div>
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <ToolPalette />
+        <ToolPalette ctx={context} />
 
         <main className="min-w-0 flex-1">
           <Outlet context={context} />
