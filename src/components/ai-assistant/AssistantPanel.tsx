@@ -65,6 +65,9 @@ export function AssistantPanel({
   }, [open, messages.length])
 
   useEffect(() => {
+    /* Only auto-scroll while the panel is actually open — scrolling a closed
+       (off-screen) panel into view would drag the workspace sideways. */
+    if (!open) return
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, open, bootStage])
 
