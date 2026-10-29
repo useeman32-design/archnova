@@ -204,6 +204,7 @@ export function FloorPlanDiagram({
             role={onSelectRoom && !measure ? 'button' : undefined}
             aria-label={onSelectRoom ? `Select ${room.name}` : undefined}
           >
+            <title>{`${room.name} — ${formatArea(room.rect.w, room.rect.h, units)}`}</title>
             <rect
               x={room.rect.x}
               y={room.rect.y}
@@ -250,6 +251,8 @@ export function FloorPlanDiagram({
                 {fmt(room.rect.w)} × {fmt(room.rect.h)}
               </text>
             ) : null}
+            {rw >= 70 && rh >= 48 ? <RoomFurniture room={room} u={u} color={palette.text} /> : null}
+            {rw >= 60 && rh >= 40 ? <RoomOpenings room={room} u={u} stroke={palette.stroke} /> : null}
           </g>
         )
       })}
@@ -382,4 +385,155 @@ function pickScaleBar(s: number, units: Units): { units: number } | null {
   const candidates = units === 'ft' ? [2, 5, 10, 20, 40] : [1, 2, 5, 10]
   const target = candidates.find((c) => c * s >= 56 && c * s <= 160)
   return target ? { units: target } : null
+}
+
+/**
+ * Schematic furniture glyphs, drawn in plan units (real-world size) with
+ * screen-constant stroke weight — the way drafted plans show FF&E.
+ */
+function RoomFurniture({ room, u, color }: { room: Room; u: (px: number) => number; color: string }) {
+  const { x, y, w, h } = room.rect
+  const common = {
+    fill: 'none',
+    stroke: color,
+    strokeWidth: u(1),
+    opacity: 0.5,
+    strokeLinecap: 'round' as const,
+  }
+  const min = Math.min
+
+  switch (room.category) {
+    case 'bedroom': {
+      const bw = min(6, w - 2)
+      const bh = min(7.5, h - 2)
+      return (
+        <g {...common}>
+          <rect x={x + 1.5} y={y + 1.5} width={bw} height={bh} rx={u(2)} />
+          <line x1={x + 1.5} y1={y + 3} x2={x + 1.5 + bw} y2={y + 3} />
+        </g>
+      )
+    }
+    case 'living': {
+      const sw = min(7, w - 3)
+      const sx = x + (w - sw) / 2
+      const sy = y + h - 3.4
+      return (
+        <g {...common}>
+          <rect x={sx} y={sy} width={sw} height={2.4} rx={u(2)} />
+          <line x1={sx} y1={sy + 0.7} x2={sx + sw} y2={sy + 0.7} />
+          <rect x={x + w / 2 - 1.4} y={sy - 2.6} width={2.8} height={1.5} rx={u(2)} />
+        </g>
+      )
+    }
+    case 'dining': {
+      const r = min(w, h) * 0.2
+      const cx = x + w / 2
+      const cy = y + h / 2
+      return (
+        <g {...common}>
+          <circle cx={cx} cy={cy} r={r} />
+          <rect x={cx - 0.7} y={cy - r - 1.7} width={1.4} height={1.2} />
+          <rect x={cx - 0.7} y={cy + r + 0.5} width={1.4} height={1.2} />
+          <rect x={cx - r - 1.7} y={cy - 0.7} width={1.2} height={1.4} />
+          <rect x={cx + r + 0.5} y={cy - 0.7} width={1.2} height={1.4} />
+        </g>
+      )
+    }
+    case 'kitchen':
+      return (
+        <g {...common}>
+          <rect x={x + 1} y={y + 1} width={w - 2} height={2} />
+          <rect x={x + 1} y={y + 1} width={2} height={min(h - 2, 6)} />
+          <circle cx={x + w / 2} cy={y + 2} r={0.7} />
+        </g>
+      )
+    case 'bathroom':
+    case 'laundry':
+      return (
+        <g {...common}>
+          <rect x={x + 1.2} y={y + 1.2} width={1.7} height={1.3} />
+          <circle cx={x + 2.05} cy={y + 3.4} r={0.85} />
+          <rect x={x + w - 3.2} y={y + 1.2} width={2} height={1.6} />
+        </g>
+      )
+    case 'garage': {
+      const cw = min(6.5, w - 3)
+      const ch = min(12, h - 3)
+      const cx = x + (w - cw) / 2
+      const cy = y + (h - ch) / 2
+      return (
+        <g {...common}>
+          <rect x={cx} y={cy} width={cw} height={ch} rx={u(6)} />
+          <line x1={cx} y1={cy + ch * 0.28} x2={cx + cw} y2={cy + ch * 0.28} />
+          <line x1={cx} y1={cy + ch * 0.72} x2={cx + cw} y2={cy + ch * 0.72} />
+        </g>
+      )
+    }
+    case 'study':
+      return (
+        <g {...common}>
+          <rect x={x + (w - min(6, w - 3)) / 2} y={y + 1.5} width={min(6, w - 3)} height={2.5} />
+          <circle cx={x + w / 2} cy={y + 5.4} r={0.9} />
+        </g>
+      )
+    case 'storage':
+      return (
+        <g {...common}>
+          <line x1={x + 1} y1={y + 2} x2={x + w - 1} y2={y + 2} />
+          <line x1={x + 1} y1={y + 3.4} x2={x + w - 1} y2={y + 3.4} />
+        </g>
+      )
+    case 'pool':
+      return (
+        <g {...common}>
+          {[0.3, 0.5, 0.7].map((t) => (
+            <path
+              key={t}
+              d={`M ${x + 1.5} ${y + h * t} q ${(w - 3) / 4} -1 ${(w - 3) / 2} 0 q ${(w - 3) / 4} 1 ${(w - 3) / 2} 0`}
+            />
+          ))}
+        </g>
+      )
+    case 'garden':
+      return (
+        <g {...common}>
+          <circle cx={x + w * 0.25} cy={y + h * 0.5} r={1.7} />
+          <circle cx={x + w * 0.6} cy={y + h * 0.35} r={1.4} />
+          <circle cx={x + w * 0.78} cy={y + h * 0.65} r={1.6} />
+        </g>
+      )
+    case 'porch':
+    case 'balcony':
+      return (
+        <g {...common}>
+          <line x1={x + 0.6} y1={y + h - 0.6} x2={x + w - 0.6} y2={y + h - 0.6} strokeDasharray={`${u(4)} ${u(3)}`} />
+        </g>
+      )
+    default:
+      return null
+  }
+}
+
+/** Door swing + window glyph on the room envelope (drafting convention). */
+function RoomOpenings({ room, u, stroke }: { room: Room; u: (px: number) => number; stroke: string }) {
+  if (['circulation', 'garden', 'pool', 'balcony'].includes(room.category)) return null
+  const { x, y, w, h } = room.rect
+  const hinge = x + Math.min(2.5, w * 0.25)
+  const leaf = Math.min(3, h * 0.5)
+  const wl = Math.min(4, w * 0.5)
+  const wx = x + (w - wl) / 2
+  return (
+    <g fill="none" strokeWidth={u(1)} opacity={0.75}>
+      {/* door leaf + swing arc on the bottom wall */}
+      <g stroke={stroke}>
+        <line x1={hinge} y1={y + h} x2={hinge} y2={y + h - leaf} />
+        <path d={`M ${hinge} ${y + h - leaf} A ${leaf} ${leaf} 0 0 1 ${hinge + leaf} ${y + h}`} />
+      </g>
+      {/* window band on the top wall */}
+      <g stroke={stroke}>
+        <rect x={wx} y={y - 0.35} width={wl} height={0.7} fill="#ffffff" />
+        <line x1={wx} y1={y} x2={wx + wl} y2={y} />
+      </g>
+    </g>
+  )
 }

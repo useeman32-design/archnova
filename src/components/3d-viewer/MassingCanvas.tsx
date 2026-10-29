@@ -25,6 +25,16 @@ export const WALL_COLORS: Record<FinishOption, string> = {
   glass: '#bcd6e2',
 }
 
+/** Floor surface colours used by the interior preview, per interior finish. */
+export const FLOOR_COLORS: Record<FinishOption, string> = {
+  render: '#d9d4c9',
+  paint: '#e4ded2',
+  brick: '#b98d6f',
+  stone: '#cfc8b8',
+  wood: '#c9a97f',
+  glass: '#d7e2e8',
+}
+
 const FLAT_CATEGORIES = new Set(['garden', 'pool', 'circulation'])
 
 export default function MassingCanvas({
@@ -37,7 +47,10 @@ export default function MassingCanvas({
   if (mode === 'interior') {
     return (
       <Canvas shadows dpr={[1, 1.75]} camera={{ position: [0, 0.5, 0.01], fov: 70 }}>
-        <InteriorScene rooms={project.floors.flatMap((floor) => floor.rooms)} />
+        <InteriorScene
+          rooms={project.floors.flatMap((floor) => floor.rooms)}
+          floorFinish={project.preferences.interiorFinish}
+        />
         <OrbitControls enablePan={false} minDistance={0.01} maxDistance={6} />
       </Canvas>
     )
@@ -175,7 +188,7 @@ function Roof({ form, y, width, length }: { form: string; y: number; width: numb
   )
 }
 
-function InteriorScene({ rooms }: { rooms: Room[] }) {
+function InteriorScene({ rooms, floorFinish }: { rooms: Room[]; floorFinish: FinishOption }) {
   const room = useMemo(() => {
     const candidates = rooms.filter((r) => r.category === 'living' || r.category === 'bedroom')
     const pool = candidates.length > 0 ? candidates : rooms
@@ -196,7 +209,7 @@ function InteriorScene({ rooms }: { rooms: Room[] }) {
       <pointLight position={[0, WALL_H * 0.7, 0]} intensity={1.4} distance={6} />
       <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[w, l]} />
-        <meshStandardMaterial color="#c9a97f" roughness={0.6} />
+        <meshStandardMaterial color={FLOOR_COLORS[floorFinish] ?? FLOOR_COLORS.wood} roughness={0.55} />
       </mesh>
       <mesh position={[0, WALL_H / 2, 0]}>
         <boxGeometry args={[w, WALL_H, l]} />

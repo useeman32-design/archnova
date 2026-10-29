@@ -6,7 +6,7 @@ import { useWorkspace } from './WorkspaceLayout'
 import { MassingViewerSafe } from '@/components/3d-viewer/MassingViewer'
 import { SegmentedControl } from '@/components/ui/FormControls'
 import { Button } from '@/components/ui/Button'
-import { EXTERIOR_FINISHES, ROOF_TYPES } from '@/data/catalog'
+import { EXTERIOR_FINISHES, INTERIOR_FINISHES, ROOF_TYPES } from '@/data/catalog'
 
 const FINISH_ICONS: Record<FinishOption, React.ReactNode> = {
   render: <Layers className="h-4 w-4" />,
@@ -30,11 +30,12 @@ export function ThreeDPage() {
   const [mode, setMode] = useState<'exterior' | 'interior'>('exterior')
   const [roof, setRoof] = useState(project.roof)
   const [finish, setFinish] = useState<FinishOption>(project.preferences.exteriorFinish)
+  const [interior, setInterior] = useState<FinishOption>(project.preferences.interiorFinish)
 
   const previewProject = {
     ...project,
     roof,
-    preferences: { ...project.preferences, exteriorFinish: finish },
+    preferences: { ...project.preferences, exteriorFinish: finish, interiorFinish: interior },
   }
 
   return (
@@ -108,6 +109,27 @@ export function ThreeDPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-[12px] font-medium text-ink-text">Interior finish</p>
+            <div className="grid grid-cols-3 gap-2">
+              {INTERIOR_FINISHES.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setInterior(option.value)}
+                  className={`flex flex-col items-center gap-1.5 rounded-lg border p-2.5 text-[11.5px] font-medium transition-colors ${
+                    interior === option.value
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : 'border-line text-muted hover:bg-canvas-soft'
+                  }`}
+                >
+                  {FINISH_ICONS[option.value]}
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[11.5px] text-faint">Applies to the interior preview floor.</p>
           </div>
 
           <div>
