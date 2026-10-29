@@ -103,7 +103,7 @@ export function ReviewStep({
               <Badge tone="brand">Preview</Badge>
             </div>
             <p className="mt-2 text-[12px] leading-relaxed text-muted">
-              Pixel Studios will use this brief to produce a starting floor plan and 3D preview. This
+              ArchNova will use this brief to produce a starting floor plan and 3D preview. This
               prototype creates a demonstration project only — no design is actually generated yet.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">

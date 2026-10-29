@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Compass, Frame, Info, Minimize, Tag } from 'lucide-react'
-import { useWorkspace } from './WorkspaceLayout'
+import { Compass, Crosshair, Frame, Info, Tag } from 'lucide-react'
+import { useWorkspace } from '@/pages/workspace/WorkspaceLayout'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
 import { PlanCanvas, ZoomControls, useZoom } from '@/components/floor-plan/PlanCanvas'
 import { SegmentedControl } from '@/components/ui/FormControls'
@@ -35,13 +34,18 @@ function IconToggle({
   )
 }
 
-export function FloorPlanEditorPage() {
+/**
+ * The 2D design canvas: grid, zoom, measure, level-of-detail toggles and
+ * room selection. Embedded as the "2D" tab of the workspace canvas.
+ */
+export function PlanEditor() {
   const { project, rooms, units, setUnits, selectedRoomId, selectRoom, selectedRoom } = useWorkspace()
   const [zoom, setZoom] = useZoom()
   const [showLabels, setShowLabels] = useState(true)
   const [showDimensions, setShowDimensions] = useState(true)
-  const [showAreas, setShowAreas] = useState(false)
+  const [showAreas, setShowAreas] = useState(true)
   const [showCompass, setShowCompass] = useState(true)
+  const [measure, setMeasure] = useState(false)
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -56,19 +60,17 @@ export function FloorPlanEditorPage() {
           onChange={setUnits}
         />
         <ZoomControls zoom={zoom} setZoom={setZoom} />
-        <Link
-          to=""
-          title="Back to the split 2D + 3D view"
-          className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-medium text-muted shadow-sm transition-colors hover:bg-canvas-soft hover:text-ink-text"
-        >
-          <Minimize className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Split view</span>
-        </Link>
+        <IconToggle
+          active={measure}
+          onClick={() => setMeasure((v) => !v)}
+          label="Measure"
+          icon={<Crosshair className="h-3.5 w-3.5" />}
+        />
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
-          <IconToggle active={showLabels} onClick={() => setShowLabels(v => !v)} label="Labels" icon={<Tag className="h-3.5 w-3.5" />} />
-          <IconToggle active={showDimensions} onClick={() => setShowDimensions(v => !v)} label="Dims" icon={<Frame className="h-3.5 w-3.5" />} />
-          <IconToggle active={showAreas} onClick={() => setShowAreas(v => !v)} label="Areas" icon={<Info className="h-3.5 w-3.5" />} />
-          <IconToggle active={showCompass} onClick={() => setShowCompass(v => !v)} label="North" icon={<Compass className="h-3.5 w-3.5" />} />
+          <IconToggle active={showLabels} onClick={() => setShowLabels((v) => !v)} label="Labels" icon={<Tag className="h-3.5 w-3.5" />} />
+          <IconToggle active={showDimensions} onClick={() => setShowDimensions((v) => !v)} label="Dims" icon={<Frame className="h-3.5 w-3.5" />} />
+          <IconToggle active={showAreas} onClick={() => setShowAreas((v) => !v)} label="Areas" icon={<Info className="h-3.5 w-3.5" />} />
+          <IconToggle active={showCompass} onClick={() => setShowCompass((v) => !v)} label="North" icon={<Compass className="h-3.5 w-3.5" />} />
         </div>
       </div>
 
@@ -81,6 +83,7 @@ export function FloorPlanEditorPage() {
           showAreas={showAreas}
           showCompass={showCompass}
           showBoundary
+          measure={measure}
           selectedId={selectedRoomId}
           onSelectRoom={(room) => selectRoom(room.id === selectedRoomId ? null : room.id)}
           className="min-h-0 min-w-0 drop-shadow-sm"
@@ -89,8 +92,9 @@ export function FloorPlanEditorPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-surface px-3 py-2">
         <p className="text-[11.5px] text-muted">
-          Demonstration editor — rooms can be selected and resized for preview only. Geometrically
-          accurate editing arrives with the geometry engine.
+          {measure
+            ? 'Measure: click two points to read a distance · click again to start over.'
+            : 'Select a room to edit it in Properties. Detail levels adapt to zoom, like a CAD viewport.'}
         </p>
         <p className="text-[11.5px] font-medium text-ink-text">
           {selectedRoom

@@ -1,5 +1,5 @@
 /**
- * Shared domain types for Pixel Studios AI House Design.
+ * Shared domain types for ArchNova (Pixel Studios AI House Design).
  *
  * These types are intentionally framework-agnostic so that the same business
  * logic can be reused later from a React Native / Expo client and from the

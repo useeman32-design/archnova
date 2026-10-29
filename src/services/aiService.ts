@@ -8,7 +8,7 @@ import { uid } from '@/lib/id'
  * handful of keywords and returns canned, clearly-labelled suggestions. It
  * does not generate designs, measurements or feasibility verdicts.
  *
- * The real implementation will be a thin client for the Pixel Studios design
+ * The real implementation will be a thin client for the ArchNova design
  * API, e.g.:
  *
  *   async interpret(prompt, project) {

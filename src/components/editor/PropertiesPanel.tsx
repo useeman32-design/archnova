@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Sofa, Ruler, Check } from 'lucide-react'
+import { ChevronsRight, X, Sofa, Ruler, Check } from 'lucide-react'
 import type { Room, Units } from '@/types'
 import { roomArea } from '@/lib/floorPlan'
 import { NumberField } from '@/components/ui/Field'
@@ -19,6 +19,8 @@ export interface PropertiesPanelProps {
   /** Furniture currently placed per room id. */
   placed?: Record<string, string[]>
   onToggleFurniture?: (roomId: string, item: string) => void
+  /** Desktop: collapse the panel to a slim strip. */
+  onCollapse?: () => void
 }
 
 export function PropertiesPanel({
@@ -29,6 +31,7 @@ export function PropertiesPanel({
   onResize,
   placed = {},
   onToggleFurniture,
+  onCollapse,
 }: PropertiesPanelProps) {
   const [tab, setTab] = useState<PropertyTab>('room')
   const placedHere = room ? (placed[room.id] ?? []) : []
@@ -37,15 +40,27 @@ export function PropertiesPanel({
     <div className="flex h-full flex-col bg-surface">
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <h2 className="text-[14px] font-semibold text-ink-text">Properties</h2>
-        {onClose ? (
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text"
-            aria-label="Close properties"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        ) : null}
+        <div className="flex items-center gap-1">
+          {onCollapse ? (
+            <button
+              onClick={onCollapse}
+              className="hidden h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text lg:flex"
+              aria-label="Collapse properties panel"
+              title="Collapse panel"
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </button>
+          ) : null}
+          {onClose ? (
+            <button
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text"
+              aria-label="Close properties"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="border-b border-line px-4 py-2.5">

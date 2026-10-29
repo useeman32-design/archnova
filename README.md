@@ -1,6 +1,6 @@
-# Pixel Studios AI House Design — Frontend Prototype
+# ArchNova — AI House Design (Frontend Prototype)
 
-Frontend-first prototype of the Pixel Studios AI house design & visualisation SaaS.
+Frontend-first prototype of **ArchNova**, the AI house design & visualisation studio by Pixel Studios.
 Built with **React 19 + TypeScript + Vite + Tailwind CSS v4 + React Router + React Three Fiber**,
 following the supplied reference mockup.
 
@@ -36,14 +36,17 @@ demo data is seeded into `localStorage` on first load.
 | `/projects/new`         | B — 11-step new-project questionnaire (draft auto-saved)   |
 | `/projects`             | H — My Projects (search, status filter, open/duplicate)    |
 | `/drawings`             | G — Drawings & exports across projects                     |
+| `/assets`               | Asset library: 3D objects, textures & materials, interior, trees |
 | `/settings`             | I — Settings & account (profile, units, currency, theme)   |
-| `/workspace/:id`        | C — Design workspace overview (2D plan + interactive 3D massing + properties) |
-| `/workspace/:id/floor-plan` | E — 2D floor-plan editor (select/resize rooms, zoom, units, toggles)     |
+| `/workspace/:id`        | C/E — Design canvas: 2D Plan / 3D Preview tabs, zoom + measure, properties panel |
+| `/workspace/:id/assets` | Asset library inside the workspace (objects, textures, interior, trees)  |
 | `/workspace/:id/3d`     | F — 3D preview (orbit/zoom, exterior/interior, roof & finish switches)   |
 | `/workspace/:id/drawings` | G — Drawing set for one project                            |
 
 The workspace also hosts the **D — AI Assistant** slide-over panel (toolbar button or
-`?assistant=1`), clearly labelled as a simulated demonstration.
+`?assistant=1`), clearly labelled as a simulated demonstration. Both side panels (workspace
+rail and properties) collapse with arrow buttons; the 2D canvas switches to 3D with a tab so
+only one preview is on screen at a time.
 
 ## Folder structure
 

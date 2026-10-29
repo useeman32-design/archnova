@@ -49,7 +49,7 @@ export function SettingsPage() {
           <CardHeader
             icon={<User className="h-4 w-4" />}
             title="Profile"
-            subtitle="How you appear across Pixel Studios."
+            subtitle="How you appear across ArchNova."
           />
           <div className="mt-4 space-y-4">
             <TextField

@@ -3,6 +3,9 @@ import { NavLink, Outlet, useLocation, useNavigate, useParams, useOutletContext,
 import {
   ArrowLeft,
   Box,
+  Boxes,
+  ChevronsLeft,
+  ChevronsRight,
   DraftingCompass,
   FileDown,
   Home,
@@ -14,6 +17,7 @@ import {
 } from 'lucide-react'
 import type { Project, Room, Units } from '@/types'
 import { useProjects } from '@/hooks/useProjects'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { Logo } from '@/components/layout/Logo'
 import { Button } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/FormControls'
@@ -38,6 +42,8 @@ export interface WorkspaceContext {
   setAssistantOpen: (open: boolean) => void
   propsOpen: boolean
   setPropsOpen: (open: boolean) => void
+  canvasView: '2D' | '3D'
+  setCanvasView: (view: '2D' | '3D') => void
   save: () => void
   saved: boolean
   showProperties: boolean
@@ -47,13 +53,16 @@ export function useWorkspace(): WorkspaceContext {
   return useOutletContext<WorkspaceContext>()
 }
 
-/** Mirrors the reference mockup's workspace sidebar, in order. */
+/** Mirrors the reference workspace sidebar, plus the Assets library. */
 const RAIL = [
   { key: 'home', to: '/', label: 'Home', icon: Home },
   { key: 'floor', to: '', label: 'Floor Plan', icon: DraftingCompass },
   { key: '3d', to: '3d', label: '3D View', icon: Box },
   { key: 'drawings', to: 'drawings', label: 'Drawings', icon: FileDown },
+  { key: 'assets', to: 'assets', label: 'Assets', icon: Boxes },
 ] as const
+
+type RailKey = (typeof RAIL)[number]['key']
 
 export function WorkspaceLayout() {
   const { id = '' } = useParams()
@@ -70,12 +79,15 @@ export function WorkspaceLayout() {
   const [assistantOpen, setAssistantOpen] = useState(searchParams.get('assistant') === '1')
   const [propsOpen, setPropsOpen] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [canvasView, setCanvasView] = useState<'2D' | '3D'>('2D')
+  const [propsCollapsed, setPropsCollapsed] = useState(false)
+  const [railCollapsed, setRailCollapsed] = useLocalStorage<boolean>('ui.railCollapsed', false)
 
   useEffect(() => {
     if (!project) return
     setRooms(structuredClone(project.floors.find((f) => f.level === 1)?.rooms ?? []))
     setUnits(project.plot.units)
-    selectRoom(null)
+    setSelectedRoomId(null)
   }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Selecting a room on a phone opens the properties drawer so the edit is visible. */
@@ -137,19 +149,23 @@ export function WorkspaceLayout() {
     return <NotFoundPage />
   }
 
-  const showProperties = !location.pathname.endsWith('/3d') && !location.pathname.endsWith('/drawings')
-  const view: '2D' | '3D' = location.pathname.endsWith('/3d') ? '3D' : '2D'
-
-  /** Current workspace segment: '' | 'floor-plan' | '3d' | 'drawings' */
+  /** Current workspace segment: '' | '3d' | 'drawings' | 'assets' */
   const segment = location.pathname
     .slice(`/workspace/${id}`.length)
     .replace(/^\/+/, '')
     .split('/')[0]
-  const isActive = (key: (typeof RAIL)[number]['key']) => {
+  const showProperties = segment === '' || segment === 'floor-plan'
+  const isActive = (key: RailKey) => {
     if (key === 'floor') return segment === '' || segment === 'floor-plan'
     if (key === '3d') return segment === '3d'
     if (key === 'drawings') return segment === 'drawings'
+    if (key === 'assets') return segment === 'assets'
     return false
+  }
+
+  const handleViewChange = (next: '2D' | '3D') => {
+    setCanvasView(next)
+    if (segment !== '') navigate('')
   }
 
   const context: WorkspaceContext = {
@@ -168,10 +184,21 @@ export function WorkspaceLayout() {
     setAssistantOpen,
     propsOpen,
     setPropsOpen,
+    canvasView,
+    setCanvasView,
     save,
     saved,
     showProperties,
   }
+
+  const railItemClass = (key: RailKey) =>
+    `mx-2 flex items-center gap-3 rounded-lg py-2.5 text-[13.5px] font-medium transition-colors ${
+      railCollapsed ? 'justify-center px-0' : 'px-3'
+    } ${
+      isActive(key)
+        ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/30'
+        : 'text-white/60 hover:bg-ink-800/60 hover:text-white'
+    }`
 
   return (
     <div className="flex h-dvh flex-col bg-canvas">
@@ -204,8 +231,8 @@ export function WorkspaceLayout() {
               { value: '2D', label: '2D' },
               { value: '3D', label: '3D' },
             ]}
-            value={view}
-            onChange={(next) => navigate(next === '3D' ? '3d' : 'floor-plan')}
+            value={segment === '3d' ? '3D' : canvasView}
+            onChange={handleViewChange}
           />
         </div>
 
@@ -240,42 +267,59 @@ export function WorkspaceLayout() {
       </header>
 
       <div className="relative flex min-h-0 flex-1">
-        {/* Workspace rail */}
-        <nav className="hidden w-52 shrink-0 flex-col border-r border-ink-700/40 bg-ink-900 py-3 lg:flex">
+        {/* Workspace rail (collapsible) */}
+        <nav
+          className={`hidden shrink-0 flex-col border-r border-ink-700/40 bg-ink-900 py-3 transition-all lg:flex ${
+            railCollapsed ? 'w-[56px]' : 'w-52'
+          }`}
+        >
           {RAIL.map((item) => (
             <NavLink
               key={item.key}
               to={item.to}
               end={item.key === 'home'}
-              className={`mx-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium transition-colors ${
-                isActive(item.key)
-                  ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/30'
-                  : 'text-white/60 hover:bg-ink-800/60 hover:text-white'
-              }`}
+              title={railCollapsed ? item.label : undefined}
+              className={railItemClass(item.key)}
             >
               <item.icon className="h-[18px] w-[18px] shrink-0" />
-              {item.label}
+              {railCollapsed ? null : item.label}
             </NavLink>
           ))}
           <button
             onClick={() => setAssistantOpen(true)}
-            className="mx-2 mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13.5px] font-medium text-white/60 transition-colors hover:bg-ink-800/60 hover:text-white"
+            title={railCollapsed ? 'AI Assistant' : undefined}
+            className={`mx-2 mt-1 flex items-center gap-3 rounded-lg py-2.5 text-left text-[13.5px] font-medium text-white/60 transition-colors hover:bg-ink-800/60 hover:text-white ${
+              railCollapsed ? 'justify-center px-0' : 'px-3'
+            }`}
           >
             <Sparkles className="h-[18px] w-[18px] shrink-0" />
-            AI Assistant
+            {railCollapsed ? null : 'AI Assistant'}
           </button>
-          <div className="mx-4 my-3 border-t border-ink-700/60" />
+          <div className={`my-3 border-t border-ink-700/60 ${railCollapsed ? 'mx-3' : 'mx-4'}`} />
           <NavLink
             to="/settings"
-            className="mx-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium text-white/60 transition-colors hover:bg-ink-800/60 hover:text-white"
+            title={railCollapsed ? 'Settings' : undefined}
+            className={`mx-2 flex items-center gap-3 rounded-lg py-2.5 text-[13.5px] font-medium text-white/60 transition-colors hover:bg-ink-800/60 hover:text-white ${
+              railCollapsed ? 'justify-center px-0' : 'px-3'
+            }`}
           >
             <Settings className="h-[18px] w-[18px] shrink-0" />
-            Settings
+            {railCollapsed ? null : 'Settings'}
           </NavLink>
-          <div className="mt-auto px-5 pb-2">
-            <p className="text-[10.5px] leading-relaxed text-white/35">
-              Prototype workspace. Geometry and 3D model services connect later.
-            </p>
+          <div className="mt-auto flex flex-col items-center gap-2 px-3 pb-2">
+            {!railCollapsed ? (
+              <p className="px-2 text-[10.5px] leading-relaxed text-white/35">
+                ArchNova prototype. Geometry and 3D model services connect later.
+              </p>
+            ) : null}
+            <button
+              onClick={() => setRailCollapsed(!railCollapsed)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/50 hover:bg-ink-800/60 hover:text-white"
+              aria-label={railCollapsed ? 'Expand menu' : 'Collapse menu'}
+              title={railCollapsed ? 'Expand menu' : 'Collapse menu'}
+            >
+              {railCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+            </button>
           </div>
         </nav>
 
@@ -305,16 +349,33 @@ export function WorkspaceLayout() {
         </main>
 
         {showProperties ? (
-          <aside className="hidden w-80 shrink-0 border-l border-line lg:block">
-            <PropertiesPanel
-              room={selectedRoom}
-              units={units}
-              onRename={renameRoom}
-              onResize={resizeRoom}
-              placed={placed}
-              onToggleFurniture={toggleFurniture}
-            />
-          </aside>
+          propsCollapsed ? (
+            <aside className="hidden w-10 shrink-0 flex-col items-center border-l border-line bg-surface pt-3 lg:flex">
+              <button
+                onClick={() => setPropsCollapsed(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text"
+                aria-label="Expand properties panel"
+                title="Expand properties"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </button>
+              <span className="mt-3 text-[11px] font-medium text-faint [writing-mode:vertical-rl]">
+                Properties
+              </span>
+            </aside>
+          ) : (
+            <aside className="hidden w-80 shrink-0 border-l border-line lg:block">
+              <PropertiesPanel
+                room={selectedRoom}
+                units={units}
+                onRename={renameRoom}
+                onResize={resizeRoom}
+                placed={placed}
+                onToggleFurniture={toggleFurniture}
+                onCollapse={() => setPropsCollapsed(true)}
+              />
+            </aside>
+          )
         ) : null}
 
         <AssistantPanel
@@ -345,7 +406,6 @@ export function WorkspaceLayout() {
           </div>
         </div>
       ) : null}
-
     </div>
   )
 }

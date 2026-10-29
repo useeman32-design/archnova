@@ -1,9 +1,9 @@
 {
-  "name": "pixel-studios-ai-house-design",
+  "name": "archnova",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Pixel Studios AI House Design — frontend-first prototype",
+  "description": "ArchNova — AI house design & visualisation studio (Pixel Studios). Frontend-first prototype.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

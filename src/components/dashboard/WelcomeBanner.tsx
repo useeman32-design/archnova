@@ -41,7 +41,7 @@ export function WelcomeBanner({
             Design Your Dream Home with AI
           </h2>
           <p className="mt-2.5 max-w-xl text-[13.5px] leading-relaxed text-white/65">
-            Tell us about your plot and your taste. Pixel Studios turns a short brief into a
+            Tell us about your plot and your taste. ArchNova turns a short brief into a
             prop layout, a rendered preview and a full drawing set — reviewed by you before anything
             is built.
           </p>

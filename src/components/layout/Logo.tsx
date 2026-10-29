@@ -33,8 +33,8 @@ export function Logo({
       <LogoMark />
       {showWordmark ? (
         <div className="leading-tight">
-          <div className={`text-[14px] font-bold ${onDark ? 'text-white' : 'text-ink-text'}`}>
-            Pixel Studios
+          <div className={`text-[15px] font-bold tracking-tight ${onDark ? 'text-white' : 'text-ink-text'}`}>
+            ArchNova
           </div>
           <div className={`text-[10px] font-medium uppercase tracking-[0.16em] ${onDark ? 'text-white/45' : 'text-faint'}`}>
             AI House Design

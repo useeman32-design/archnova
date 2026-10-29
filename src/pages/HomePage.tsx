@@ -43,7 +43,7 @@ export function HomePage() {
             <EmptyState
               icon={<FolderPlus className="h-5 w-5" />}
               title="No projects yet"
-              description="Create your first project and Pixel Studios will draft a starting layout from your brief."
+              description="Create your first project and ArchNova will draft a starting layout from your brief."
               action={
                 <Button variant="primary" icon={<FolderPlus className="h-4 w-4" />} onClick={() => navigate('/projects/new')}>
                   Start your first project
