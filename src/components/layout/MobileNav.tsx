@@ -1,10 +1,9 @@
 import { NavLink } from 'react-router-dom'
-import { Home, FolderKanban, PencilLine, DraftingCompass, Settings } from 'lucide-react'
+import { Home, FolderKanban, PencilLine, Settings } from 'lucide-react'
 
 const TABS = [
   { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/projects', label: 'Projects', icon: FolderKanban, end: false },
-  { to: '/drawings', label: 'Drawings', icon: DraftingCompass, end: false },
   { to: '/settings', label: 'Settings', icon: Settings, end: false },
 ]
 

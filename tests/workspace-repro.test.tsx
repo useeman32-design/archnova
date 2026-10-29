@@ -11,6 +11,7 @@ import { MemoryRouter } from 'react-router-dom'
 import App from '@/App'
 import { ASSETS } from '@/data/assets'
 import { variantFromAsset } from '@/data/toolLibrary'
+import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
 
 const captured: unknown[] = []
 
@@ -86,6 +87,13 @@ function fmt(errs: unknown[]): string {
 }
 
 describe('workspace opens', () => {
+  it('renders an empty plot boundary for a start-from-scratch plan', () => {
+    render(<FloorPlanDiagram rooms={[]} units="ft" plot={{ width: 40, length: 60 }} showBoundary />)
+    expect(document.body.textContent).toContain('Empty plot')
+    expect(document.body.textContent).toContain('Choose Rooms')
+    cleanup()
+  })
+
   it('home seeds projects, then /workspace/:id renders without the crash fallback', async () => {
     // Pass 1: home page — seeds localStorage via projectService.list()
     render(

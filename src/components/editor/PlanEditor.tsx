@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Compass, Crosshair, Frame, Info, Tag } from 'lucide-react'
 import type { Room, Vec2 } from '@/types'
 import { useWorkspace } from '@/pages/workspace/WorkspaceLayout'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
 import { PlanCanvas, ZoomControls, useZoom } from '@/components/floor-plan/PlanCanvas'
 import { SegmentedControl } from '@/components/ui/FormControls'
+import { NumberField } from '@/components/ui/Field'
 import type { PendingPlacement } from '@/data/toolLibrary'
 
 function IconToggle({
@@ -54,6 +55,21 @@ export function PlanEditor() {
   const [showDimensions, setShowDimensions] = useState(true)
   const [showAreas, setShowAreas] = useState(true)
   const [showCompass, setShowCompass] = useState(true)
+  const [plotWidth, setPlotWidth] = useState(String(project.plot.width))
+  const [plotLength, setPlotLength] = useState(String(project.plot.length))
+  useEffect(() => {
+    setPlotWidth(String(project.plot.width))
+    setPlotLength(String(project.plot.length))
+  }, [project.plot.width, project.plot.length])
+  const applyPlotSize = () => {
+    const width = Number(plotWidth)
+    const length = Number(plotLength)
+    if (width >= 5 && length >= 5) ctx.setPlotDimensions(width, length)
+    else {
+      setPlotWidth(String(project.plot.width))
+      setPlotLength(String(project.plot.length))
+    }
+  }
   const clientToPlan = useRef<((x: number, y: number) => Vec2 | null) | null>(null)
 
   const measure = ctx.tool === 'measure'
@@ -81,16 +97,16 @@ export function PlanEditor() {
     }
     const room = roomAt(point)
     if (!room) return
-    if (tool === 'door') ctx.addOpening(room.id, 'door', variant.label)
-    if (tool === 'window') ctx.addOpening(room.id, 'window', variant.label)
+    if (tool === 'door') ctx.addOpening(room.id, 'door', variant.label, { width: variant.w, height: variant.h })
+    if (tool === 'window') ctx.addOpening(room.id, 'window', variant.label, { width: variant.w, height: variant.h })
     if (tool === 'interior' && variant.item) ctx.placeInterior(room.id, variant.item)
   }
 
   const handleRoomClick = (room: Room) => {
     if (ctx.pending) {
       const { tool, variant } = ctx.pending
-      if (tool === 'door') return ctx.addOpening(room.id, 'door', variant.label)
-      if (tool === 'window') return ctx.addOpening(room.id, 'window', variant.label)
+      if (tool === 'door') return ctx.addOpening(room.id, 'door', variant.label, { width: variant.w, height: variant.h })
+      if (tool === 'window') return ctx.addOpening(room.id, 'window', variant.label, { width: variant.w, height: variant.h })
       if (tool === 'interior' && variant.item) return ctx.placeInterior(room.id, variant.item)
     }
     ctx.selectRoom(room.id === selectedRoomId ? null : room.id)
@@ -125,6 +141,15 @@ export function PlanEditor() {
           value={units}
           onChange={setUnits}
         />
+        <div className="flex items-end gap-1.5 border-l border-line pl-2">
+          <div className="w-[76px]">
+            <NumberField label="Plot W" min={5} max={1000} step={1} suffix={units} value={plotWidth} onChange={(event) => setPlotWidth(event.target.value)} onBlur={applyPlotSize} onKeyDown={(event) => event.key === 'Enter' && applyPlotSize()} />
+          </div>
+          <span className="pb-2 text-xs text-faint">×</span>
+          <div className="w-[76px]">
+            <NumberField label="Plot L" min={5} max={1000} step={1} suffix={units} value={plotLength} onChange={(event) => setPlotLength(event.target.value)} onBlur={applyPlotSize} onKeyDown={(event) => event.key === 'Enter' && applyPlotSize()} />
+          </div>
+        </div>
         <ZoomControls zoom={zoom} setZoom={setZoom} />
         <IconToggle
           active={measure}
@@ -154,6 +179,7 @@ export function PlanEditor() {
           <FloorPlanDiagram
             rooms={rooms}
             units={units}
+            plot={{ width: project.plot.width, length: project.plot.length }}
             showLabels={showLabels}
             showDimensions={showDimensions}
             showAreas={showAreas}

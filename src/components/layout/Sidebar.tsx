@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Home, FolderKanban, PencilLine, DraftingCompass, Settings, Boxes } from 'lucide-react'
+import { Home, FolderKanban, PencilLine, Settings, Boxes } from 'lucide-react'
 import { Logo } from './Logo'
 import { Button } from '@/components/ui/Button'
 
@@ -7,7 +7,6 @@ const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/projects', label: 'My Projects', icon: FolderKanban, end: false },
   { to: '/assets', label: 'Assets', icon: Boxes, end: false },
-  { to: '/drawings', label: 'Drawings', icon: DraftingCompass, end: false },
   { to: '/settings', label: 'Settings', icon: Settings, end: false },
 ]
 

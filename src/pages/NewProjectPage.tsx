@@ -34,7 +34,7 @@ const STEP_DEFS: (Step & { label: string })[] = [
 
 export function NewProjectPage() {
   const navigate = useNavigate()
-  const { createProject } = useProjects()
+  const { createProject, updateProject } = useProjects()
   const [form, setForm] = useLocalStorage(storageKeys.questionnaire, defaultNewProjectForm)
   const [step, setStep] = useState(0)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -80,6 +80,17 @@ export function NewProjectPage() {
 
   const back = () => goTo(Math.max(0, step - 1))
 
+  const createBlank = async () => {
+    setSubmitting(true)
+    const blankForm = { ...defaultNewProjectForm(), name: 'Untitled project' }
+    const project = await createProject(blankForm)
+    await updateProject(project.id, {
+      floors: project.floors.map((floor) => ({ ...floor, rooms: [] })),
+    })
+    setSubmitting(false)
+    navigate(`/workspace/${project.id}`)
+  }
+
   const submit = async () => {
     const found = validate(9)
     if (Object.keys(found).length > 0) {
@@ -113,6 +124,16 @@ export function NewProjectPage() {
           <Save className="h-3.5 w-3.5" />
           Draft saved
         </span>
+      </div>
+
+      <div className="mb-5 flex flex-col gap-2 rounded-xl border border-brand-200 bg-brand-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[13px] font-semibold text-ink-text">Prefer to design from scratch?</p>
+          <p className="mt-0.5 text-[12px] text-muted">Start with an empty plot, set its dimensions in the studio, then build room by room.</p>
+        </div>
+        <Button variant="secondary" onClick={createBlank} disabled={submitting}>
+          {submitting ? 'Preparing…' : 'Open blank studio'}
+        </Button>
       </div>
 
       <div className="mb-6 overflow-x-auto scroll-thin">

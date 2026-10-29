@@ -87,6 +87,8 @@ export interface Room {
   level: number
   /** Optional furniture swatches for the properties panel. */
   furniture: string[]
+  /** Optional per-room interior finish override. */
+  finish?: FinishOption
   elements: Element[]
 }
 
@@ -94,6 +96,9 @@ export interface Element {
   id: string
   type: ElementType
   label?: string
+  /** Nominal opening size in the project plot units. */
+  width?: number
+  height?: number
 }
 
 export interface Floor {

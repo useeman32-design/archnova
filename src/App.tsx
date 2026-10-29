@@ -4,14 +4,12 @@ import { ThreeErrorBoundary } from '@/components/3d-viewer/MassingViewer'
 import { HomePage } from '@/pages/HomePage'
 import { NewProjectPage } from '@/pages/NewProjectPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
-import { DrawingsPage } from '@/pages/DrawingsPage'
 import { AssetsPage } from '@/pages/AssetsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { WorkspaceLayout } from '@/pages/workspace/WorkspaceLayout'
 import { WorkspaceOverview } from '@/pages/workspace/WorkspaceOverview'
 import { ThreeDPage } from '@/pages/workspace/ThreeDPage'
-import { WorkspaceDrawingsPage } from '@/pages/workspace/WorkspaceDrawingsPage'
 import { WorkspaceAssetsPage } from '@/pages/workspace/WorkspaceAssetsPage'
 
 export default function App() {
@@ -45,7 +43,7 @@ export default function App() {
       {/* These pages render their own <AppShell> — do not wrap them again. */}
       <Route path="/projects" element={<ProjectsPage />} />
       <Route path="/projects/new" element={<AppShell><NewProjectPage /></AppShell>} />
-      <Route path="/drawings" element={<DrawingsPage />} />
+      <Route path="/drawings" element={<Navigate to="/" replace />} />
       <Route path="/assets" element={<AssetsPage />} />
       <Route path="/settings" element={<SettingsPage />} />
 
@@ -54,7 +52,7 @@ export default function App() {
         {/* The focused editor now lives inside the canvas's 2D tab. */}
         <Route path="floor-plan" element={<Navigate to="." replace />} />
         <Route path="3d" element={<ThreeDPage />} />
-        <Route path="drawings" element={<WorkspaceDrawingsPage />} />
+        <Route path="drawings" element={<Navigate to="." replace />} />
         <Route path="assets" element={<WorkspaceAssetsPage />} />
       </Route>
 

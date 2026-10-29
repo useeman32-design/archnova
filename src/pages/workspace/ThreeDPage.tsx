@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Box, Brush, Layers, Mountain, Move, Plane, Scale, Sofa, Square } from 'lucide-react'
 import type { FinishOption } from '@/types'
 import { useWorkspace } from './WorkspaceLayout'
@@ -8,6 +8,7 @@ import { SegmentedControl } from '@/components/ui/FormControls'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { EXTERIOR_FINISHES, INTERIOR_FINISHES, ROOF_TYPES } from '@/data/catalog'
+import type { PendingPlacement } from '@/data/toolLibrary'
 
 const FINISH_ICONS: Record<FinishOption, React.ReactNode> = {
   render: <Layers className="h-4 w-4" />,
@@ -27,6 +28,8 @@ const CATEGORIES = [
 
 export function ThreeDPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const roomParam = searchParams.get('room')
   const ctx = useWorkspace()
   const {
     previewProject,
@@ -41,15 +44,44 @@ export function ThreeDPage() {
   const [mode, setMode] = useState<'exterior' | 'interior'>('exterior')
   const [transformMode, setTransformMode] = useState<'translate' | 'scale'>('translate')
 
+  useEffect(() => {
+    if (roomParam && ctx.rooms.some((room) => room.id === roomParam)) {
+      ctx.selectRoom(roomParam)
+      setMode('interior')
+    }
+  }, [roomParam, ctx.rooms, ctx.selectRoom])
+
+  const placeDropped = (event: React.DragEvent) => {
+    const raw = event.dataTransfer.getData('application/x-archnova')
+    if (!raw) return
+    event.preventDefault()
+    try {
+      const placement = JSON.parse(raw) as PendingPlacement
+      const target = ctx.selectedRoom ?? ctx.rooms[0]
+      if (placement.tool === 'interior' && placement.variant.item && target) {
+        ctx.placeInterior(target.id, placement.variant.item)
+      } else if (placement.tool === 'door' && target) {
+        ctx.addOpening(target.id, 'door', placement.variant.label ?? placement.variant.name, { width: placement.variant.w, height: placement.variant.h })
+      } else if (placement.tool === 'window' && target) {
+        ctx.addOpening(target.id, 'window', placement.variant.label ?? placement.variant.name, { width: placement.variant.w, height: placement.variant.h })
+      } else if (placement.tool === 'trees') {
+        const bounds = event.currentTarget.getBoundingClientRect()
+        const x = ((event.clientX - bounds.left) / Math.max(bounds.width, 1)) * ctx.project.plot.width
+        const y = ((event.clientY - bounds.top) / Math.max(bounds.height, 1)) * ctx.project.plot.length
+        ctx.addTreeAt({ x: Math.max(0, Math.min(ctx.project.plot.width, x)), y: Math.max(0, Math.min(ctx.project.plot.length, y)) }, placement.variant.kind)
+      }
+    } catch { /* ignore invalid library payload */ }
+  }
+
   return (
     <div className="grid h-full min-h-0 grid-rows-[1fr_auto] lg:grid-cols-[minmax(0,1fr)_300px] lg:grid-rows-1">
-      <section className="relative min-h-0">
+      <section className="relative min-h-0" onDragOver={(event) => { if (event.dataTransfer.types.includes('application/x-archnova')) event.preventDefault() }} onDrop={placeDropped}>
         <MassingViewerSafe
           project={previewProject}
           mode={mode}
           className="h-full w-full"
-          selectedId={mode === 'exterior' ? ctx.selectedRoomId : null}
-          onSelectRoom={mode === 'exterior' ? ctx.selectRoom : undefined}
+          selectedId={ctx.selectedRoomId}
+          onSelectRoom={ctx.selectRoom}
           transformMode={transformMode}
           onMoveLive={(id, x, y) =>
             ctx.liveEdit((state) => ({
@@ -71,6 +103,12 @@ export function ThreeDPage() {
           onEditEnd={ctx.endEdit}
           ornaments={ctx.ornaments}
           placed={ctx.placed}
+          pendingItem={mode === 'interior' && ctx.pending?.tool === 'interior' ? ctx.pending.variant.item ?? null : null}
+          onPlaceInterior={(item) => {
+            const target = ctx.selectedRoom ?? ctx.rooms[0]
+            if (target) ctx.placeInterior(target.id, item)
+            ctx.setPending(null)
+          }}
         />
 
         <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2">
@@ -83,7 +121,7 @@ export function ThreeDPage() {
             value={mode}
             onChange={setMode}
           />
-          {mode === 'exterior' && selectedRoom ? (
+          {selectedRoom ? (
             <SegmentedControl<'translate' | 'scale'>
               size="sm"
               options={[
@@ -96,13 +134,13 @@ export function ThreeDPage() {
           ) : null}
         </div>
 
-        {mode === 'exterior' && selectedRoom ? (
+        {selectedRoom ? (
           <div className="absolute left-3 top-14 flex items-center gap-2 rounded-lg bg-surface/95 px-3 py-2 shadow-sm ring-1 ring-line">
             <span className="text-[12.5px] font-medium text-ink-text">{selectedRoom.name}</span>
             <span className="text-[11.5px] text-muted">
               {selectedRoom.width} × {selectedRoom.length} {ctx.units}
             </span>
-            <Badge tone="brand">{transformMode === 'translate' ? 'Dragging moves' : 'Dragging resizes'}</Badge>
+            <Badge tone="brand">{mode === 'interior' ? 'Room selected' : transformMode === 'translate' ? 'Dragging moves' : 'Dragging resizes'}</Badge>
           </div>
         ) : null}
 
@@ -121,6 +159,37 @@ export function ThreeDPage() {
           <Box className="h-4 w-4 text-brand-600" />
           <h2 className="text-[14px] font-semibold text-ink-text">Materials & view</h2>
         </div>
+
+        {selectedRoom ? (
+          <div className="mb-5 rounded-xl border border-brand-200 bg-brand-50/50 p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-semibold text-ink-text">{selectedRoom.name}</p>
+                <p className="mt-0.5 text-[11px] text-muted capitalize">{selectedRoom.category} · {selectedRoom.width} × {selectedRoom.length} {ctx.units} · {(selectedRoom.width * selectedRoom.length).toLocaleString()} sq {ctx.units}</p>
+              </div>
+              {mode === 'exterior' ? <button onClick={() => setMode('interior')} className="shrink-0 rounded-lg bg-brand-600 px-2.5 py-1.5 text-[11px] font-semibold text-white">Enter room</button> : null}
+            </div>
+            <p className="mb-1.5 mt-3 text-[11px] font-semibold text-muted">Room finish</p>
+            <div className="flex flex-wrap gap-1">
+              {INTERIOR_FINISHES.map((option) => <button key={option.value} onClick={() => ctx.setRoomFinish(selectedRoom.id, option.value)} className={`rounded-full px-2 py-1 text-[10.5px] font-medium ${ (selectedRoom.finish ?? interior) === option.value ? 'bg-brand-600 text-white' : 'bg-white text-muted ring-1 ring-line' }`}>{option.label}</button>)}
+            </div>
+            {ctx.placed[selectedRoom.id]?.length ? <p className="mt-2 text-[11px] text-muted">Placed: {ctx.placed[selectedRoom.id].join(' · ')}</p> : null}
+          </div>
+        ) : null}
+
+        {mode === 'interior' ? (
+          <div className="mb-5">
+            <p className="mb-2 text-[12px] font-medium text-ink-text">Navigate rooms</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {ctx.rooms.map((room) => (
+                <button key={room.id} onClick={() => ctx.selectRoom(room.id)} className={`truncate rounded-lg border px-2.5 py-2 text-left text-[11.5px] font-medium ${selectedRoom?.id === room.id ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-line text-muted hover:bg-canvas-soft'}`}>
+                  {room.name}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-muted">Drag on the view to orbit, scroll to zoom, and select a room to move through the home. Drag a library item over the room to add it.</p>
+          </div>
+        ) : null}
 
         <div className="space-y-5">
           <div>
@@ -204,9 +273,7 @@ export function ThreeDPage() {
               ))}
             </div>
             <p className="mt-2 text-[11.5px] leading-relaxed text-faint">
-              Everything you place with the left-hand tools appears here: rooms as volumes, trees
-              on the site, furniture in the interior. Full object libraries plug in with the 3D
-              model service.
+              Drag library tiles from the left palette onto this view to add objects to the selected room or site. The current catalog uses editable schematic 3D models; richer manufacturer models can be connected later.
             </p>
           </div>
         </div>

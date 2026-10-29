@@ -6,7 +6,6 @@ import {
   Boxes,
   ChevronsLeft,
   DraftingCompass,
-  FileDown,
   Loader2,
   Save,
   SlidersHorizontal,
@@ -64,6 +63,8 @@ export interface WorkspaceContext {
   resizeRoom: (id: string, width: number, length: number) => void
   renameRoom: (id: string, name: string) => void
   toggleFurniture: (roomId: string, item: string) => void
+  setRoomFinish: (roomId: string, finish: FinishOption) => void
+  setPlotDimensions: (width: number, length: number) => void
   assistantOpen: boolean
   setAssistantOpen: (open: boolean) => void
   propsOpen: boolean
@@ -77,7 +78,7 @@ export interface WorkspaceContext {
   pending: PendingPlacement | null
   setPending: (pending: PendingPlacement | null) => void
   addRoomAt: (point: Vec2, variant: ToolVariant) => void
-  addOpening: (roomId: string, type: ElementType, label?: string) => void
+  addOpening: (roomId: string, type: ElementType, label?: string, size?: { width?: number; height?: number }) => void
   placeInterior: (roomId: string, item: string) => void
   addTreeAt: (point: Vec2, kind?: string) => void
   /* Editing with history */
@@ -105,7 +106,6 @@ export function useWorkspace(): WorkspaceContext {
 const VIEW_TABS = [
   { key: 'floor', to: '', label: 'Floor Plan', icon: DraftingCompass },
   { key: '3d', to: '3d', label: '3D View', icon: Box },
-  { key: 'drawings', to: 'drawings', label: 'Drawings', icon: FileDown },
   { key: 'assets', to: 'assets', label: 'Assets', icon: Boxes },
 ] as const
 
@@ -120,7 +120,7 @@ export function WorkspaceLayout() {
   const project = projects.find((p) => p.id === id)
 
   const [editor, setEditor] = useState<EditorState>(EMPTY_EDITOR)
-  const [units, setUnits] = useState<Units>('ft')
+  const [units, setUnitsState] = useState<Units>('ft')
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [propsOpen, setPropsOpen] = useState(false)
@@ -131,6 +131,12 @@ export function WorkspaceLayout() {
   const [previewRoof, setPreviewRoof] = useState('flat')
   const [previewExt, setPreviewExt] = useState<FinishOption>('render')
   const [previewInt, setPreviewInt] = useState<FinishOption>('wood')
+  const setUnits = useCallback((next: Units) => {
+    setUnitsState(next)
+    if (project && project.plot.units !== next) {
+      void updateProject(project.id, { plot: { ...project.plot, units: next } })
+    }
+  }, [project, updateProject])
 
   /* ---- undo / redo history ---- */
   const past = useRef<EditorState[]>([])
@@ -255,10 +261,10 @@ export function WorkspaceLayout() {
   const addRoomAt = useCallback(
     (point: Vec2, variant: ToolVariant) => {
       commit((state) => {
-        const w = variant.w ?? 10
-        const h = variant.h ?? 10
         const plotW = project?.plot.width ?? 50
         const plotL = project?.plot.length ?? 50
+        const w = Math.min(plotW, variant.w ?? 10)
+        const h = Math.min(plotL, variant.h ?? 10)
         const x = Math.max(0, Math.min(plotW - w, point.x - w / 2))
         const y = Math.max(0, Math.min(plotL - h, point.y - h / 2))
         const category = variant.id.startsWith('rm_')
@@ -291,7 +297,7 @@ export function WorkspaceLayout() {
   )
 
   const addOpening = useCallback(
-    (roomId: string, type: ElementType, label?: string) => {
+    (roomId: string, type: ElementType, label?: string, size?: { width?: number; height?: number }) => {
       commit((state) => ({
         ...state,
         rooms: state.rooms.map((room) =>
@@ -300,7 +306,7 @@ export function WorkspaceLayout() {
                 ...room,
                 elements: [
                   ...room.elements,
-                  { id: uid('el'), type, label: label ?? (type === 'door' ? 'Door' : 'Window') },
+                  { id: uid('el'), type, label: label ?? (type === 'door' ? 'Door' : 'Window'), width: size?.width, height: size?.height },
                 ],
               }
             : room,
@@ -314,7 +320,6 @@ export function WorkspaceLayout() {
     (roomId: string, item: string) => {
       commit((state) => {
         const current = state.placed[roomId] ?? []
-        if (current.includes(item)) return state
         return { ...state, placed: { ...state.placed, [roomId]: [...current, item] } }
       })
     },
@@ -354,6 +359,21 @@ export function WorkspaceLayout() {
     },
     [commit],
   )
+
+  const setRoomFinish = useCallback(
+    (roomId: string, finish: FinishOption) => {
+      commit((state) => ({
+        ...state,
+        rooms: state.rooms.map((room) => room.id === roomId ? { ...room, finish } : room),
+      }))
+    },
+    [commit],
+  )
+
+  const setPlotDimensions = useCallback((width: number, length: number) => {
+    if (!project || !(width > 0) || !(length > 0)) return
+    void updateProject(project.id, { plot: { ...project.plot, width, length } })
+  }, [project, updateProject])
 
   const toggleFurniture = useCallback(
     (roomId: string, item: string) => {
@@ -439,6 +459,8 @@ export function WorkspaceLayout() {
     resizeRoom,
     renameRoom,
     toggleFurniture,
+    setRoomFinish,
+    setPlotDimensions,
     assistantOpen,
     setAssistantOpen,
     propsOpen,
@@ -586,6 +608,8 @@ export function WorkspaceLayout() {
                 onResize={resizeRoom}
                 placed={editor.placed}
                 onToggleFurniture={toggleFurniture}
+                onSetFinish={setRoomFinish}
+                onViewIn3D={(roomId) => navigate(`/workspace/${id}/3d?room=${encodeURIComponent(roomId)}`)}
                 onCollapse={() => setPropsCollapsed(true)}
               />
             </aside>
@@ -614,6 +638,8 @@ export function WorkspaceLayout() {
                 onResize={resizeRoom}
                 placed={editor.placed}
                 onToggleFurniture={toggleFurniture}
+                onSetFinish={setRoomFinish}
+                onViewIn3D={(roomId) => navigate(`/workspace/${id}/3d?room=${encodeURIComponent(roomId)}`)}
               />
             </div>
           </div>

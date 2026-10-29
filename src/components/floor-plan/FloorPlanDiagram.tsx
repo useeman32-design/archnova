@@ -36,6 +36,8 @@ const SMALL_PX = 10
 export interface FloorPlanDiagramProps {
   rooms: Room[]
   units: Units
+  /** Plot extents keep an empty, start-from-scratch project drawable. */
+  plot?: { width: number; length: number }
   className?: string
   showLabels?: boolean
   showDimensions?: boolean
@@ -63,6 +65,7 @@ export interface FloorPlanDiagramProps {
 export function FloorPlanDiagram({
   rooms,
   units,
+  plot,
   className = '',
   showLabels = true,
   showDimensions = false,
@@ -86,10 +89,11 @@ export function FloorPlanDiagram({
   const [measurePts, setMeasurePts] = useState<Vec2[]>([])
 
   const hasRooms = rooms.length > 0
-  const minX = hasRooms ? Math.min(...rooms.map((r) => r.rect.x)) : 0
-  const minY = hasRooms ? Math.min(...rooms.map((r) => r.rect.y)) : 0
-  const maxX = hasRooms ? Math.max(...rooms.map((r) => r.rect.x + r.rect.w)) : 1
-  const maxY = hasRooms ? Math.max(...rooms.map((r) => r.rect.y + r.rect.h)) : 1
+  const hasContent = hasRooms || Boolean(plot)
+  const minX = plot ? 0 : hasRooms ? Math.min(...rooms.map((r) => r.rect.x)) : 0
+  const minY = plot ? 0 : hasRooms ? Math.min(...rooms.map((r) => r.rect.y)) : 0
+  const maxX = plot ? plot.width : hasRooms ? Math.max(...rooms.map((r) => r.rect.x + r.rect.w)) : 1
+  const maxY = plot ? plot.length : hasRooms ? Math.max(...rooms.map((r) => r.rect.y + r.rect.h)) : 1
 
   const padX = 8
   const padY = 13
@@ -99,7 +103,7 @@ export function FloorPlanDiagram({
   const vbH = maxY - minY + padY * 2
 
   useLayoutEffect(() => {
-    if (!hasRooms) return
+    if (!hasContent) return
     const svg = svgRef.current
     if (!svg) return
     const update = () => {
@@ -111,7 +115,7 @@ export function FloorPlanDiagram({
     const observer = new ResizeObserver(update)
     observer.observe(svg)
     return () => observer.disconnect()
-  }, [vbW, vbH, hasRooms])
+  }, [vbW, vbH, hasContent])
 
   /** Pixels per plan unit at the current render size (includes zoom). */
   const s = scale ?? 6
@@ -153,7 +157,7 @@ export function FloorPlanDiagram({
 
   /* Early return AFTER every hook — changing hook order between renders
      crashes React ("Rendered more hooks than during the previous render"). */
-  if (!hasRooms) {
+  if (!hasContent) {
     return (
       <div className={`flex items-center justify-center text-[13px] text-muted ${className}`}>
         No rooms to display yet.
@@ -232,16 +236,27 @@ export function FloorPlanDiagram({
     >
       {showBoundary ? (
         <rect
-          x={minX - 2}
-          y={minY - 2}
-          width={maxX - minX + 4}
-          height={maxY - minY + 4}
+          x={plot ? 0 : minX - 2}
+          y={plot ? 0 : minY - 2}
+          width={plot ? plot.width : maxX - minX + 4}
+          height={plot ? plot.length : maxY - minY + 4}
           fill="none"
           stroke="#9aa7b8"
           strokeWidth={u(1)}
           strokeDasharray={`${u(6)} ${u(5)}`}
           opacity="0.7"
         />
+      ) : null}
+
+      {!hasRooms ? (
+        <g pointerEvents="none">
+          <text x={maxX / 2} y={maxY / 2 - u(2)} textAnchor="middle" fontSize={u(13)} fontWeight={600} fill="#617083">
+            Empty plot · {fmt(maxX)} × {fmt(maxY)} {units}
+          </text>
+          <text x={maxX / 2} y={maxY / 2 + u(2)} textAnchor="middle" fontSize={u(9)} fill="#8792a2">
+            Choose Rooms from the left tool palette to begin
+          </text>
+        </g>
       ) : null}
 
       {/* Overall dimension lines (top + left), shown once there is room */}

@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { ChevronsRight, X, Sofa, Ruler, Check } from 'lucide-react'
-import type { Room, Units } from '@/types'
+import type { FinishOption, Room, Units } from '@/types'
 import { roomArea } from '@/lib/floorPlan'
 import { NumberField } from '@/components/ui/Field'
 import { SegmentedControl } from '@/components/ui/FormControls'
 import { EmptyState } from '@/components/ui/Feedback'
+import { INTERIOR_FINISHES } from '@/data/catalog'
+import { Button } from '@/components/ui/Button'
+import { Box } from 'lucide-react'
 
 export type PropertyTab = 'room' | 'wall' | 'door' | 'window'
 
@@ -19,6 +22,8 @@ export interface PropertiesPanelProps {
   /** Furniture currently placed per room id. */
   placed?: Record<string, string[]>
   onToggleFurniture?: (roomId: string, item: string) => void
+  onSetFinish?: (roomId: string, finish: FinishOption) => void
+  onViewIn3D?: (roomId: string) => void
   /** Desktop: collapse the panel to a slim strip. */
   onCollapse?: () => void
 }
@@ -31,6 +36,8 @@ export function PropertiesPanel({
   onResize,
   placed = {},
   onToggleFurniture,
+  onSetFinish,
+  onViewIn3D,
   onCollapse,
 }: PropertiesPanelProps) {
   const [tab, setTab] = useState<PropertyTab>('room')
@@ -126,6 +133,32 @@ export function PropertiesPanel({
                   onResize?.(room.id, room.width, Number(event.target.value))
                 }
               />
+            </div>
+
+            <div className="space-y-2.5 rounded-xl border border-line p-3">
+              <div>
+                <p className="text-[12px] font-semibold text-ink-text">Room finish</p>
+                <p className="mt-0.5 text-[11px] text-muted">Choose a floor material for this room.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {INTERIOR_FINISHES.map((finish) => (
+                  <button
+                    key={finish.value}
+                    type="button"
+                    onClick={() => onSetFinish?.(room.id, finish.value)}
+                    className={`rounded-lg border px-2 py-2 text-left text-[11px] font-medium ${
+                      (room.finish ?? 'wood') === finish.value
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-line text-muted hover:bg-canvas-soft'
+                    }`}
+                  >
+                    {finish.label}
+                  </button>
+                ))}
+              </div>
+              <Button size="sm" variant="secondary" className="w-full" onClick={() => onViewIn3D?.(room.id)} icon={<Box className="h-3.5 w-3.5" />}>
+                View this room in 3D
+              </Button>
             </div>
 
             <div className="flex items-center justify-between rounded-lg bg-canvas-soft px-3.5 py-3">
@@ -226,7 +259,7 @@ function ElementList({ tab, room, units }: { tab: PropertyTab; room: Room; units
               {element.label ?? type} {index + 1}
             </span>
             <span className="text-[12px] text-muted">
-              {type === 'door' ? '3 ft × 7 ft' : '4 ft × 4 ft'}
+              {element.width ?? (type === 'door' ? 3 : 4)} {units} × {element.height ?? (type === 'door' ? 7 : 4)} {units}
             </span>
           </div>
           <p className="mt-1 text-[11.5px] text-faint">

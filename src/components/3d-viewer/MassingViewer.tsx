@@ -27,6 +27,8 @@ export interface MassingProps {
   onEditEnd?: () => void
   ornaments?: { x: number; y: number; kind?: string }[]
   placed?: Record<string, string[]>
+  pendingItem?: string | null
+  onPlaceInterior?: (item: string) => void
 }
 
 export function MassingViewer({ project, mode = 'exterior', className = '', ...rest }: MassingProps) {
