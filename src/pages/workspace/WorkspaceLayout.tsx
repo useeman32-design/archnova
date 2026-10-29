@@ -371,9 +371,19 @@ export function WorkspaceLayout() {
   )
 
   const setPlotDimensions = useCallback((width: number, length: number) => {
-    if (!project || !(width > 0) || !(length > 0)) return
+    if (!project || !(width > 0) || !(length > 0) || (width === project.plot.width && length === project.plot.length)) return
+    commit((state) => ({
+      ...state,
+      rooms: state.rooms.map((room) => {
+        const w = Math.min(room.rect.w, width)
+        const h = Math.min(room.rect.h, length)
+        const x = Math.max(0, Math.min(width - w, room.rect.x))
+        const y = Math.max(0, Math.min(length - h, room.rect.y))
+        return { ...room, width: w, length: h, rect: { x, y, w, h } }
+      }),
+    }))
     void updateProject(project.id, { plot: { ...project.plot, width, length } })
-  }, [project, updateProject])
+  }, [commit, project, updateProject])
 
   const toggleFurniture = useCallback(
     (roomId: string, item: string) => {
