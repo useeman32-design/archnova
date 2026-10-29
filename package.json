@@ -3,14 +3,15 @@
   "private": true,
   "version": "0.2.0",
   "type": "module",
-  "description": "ArchNova — AI house design & visualisation studio (Pixel Studios). Frontend-first prototype.",
+  "description": "ArchNova \u2014 AI house design & visualisation studio (Pixel Studios). Frontend-first prototype.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:pages": "tsc -b && BASE_PATH=/archnova/ vite build && cp dist/index.html dist/404.html",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "lint": "tsc -b"
+    "lint": "tsc -b",
+    "test": "vitest run"
   },
   "dependencies": {
     "@react-three/drei": "^10.0.6",
@@ -23,13 +24,17 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.169.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^4.1.12"
   }
 }

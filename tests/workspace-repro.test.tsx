@@ -1,0 +1,155 @@
+/**
+ * Headless repro: renders the real App through MemoryRouter the same way the
+ * browser does — first the home page (which seeds sample projects into
+ * localStorage), then navigates into the workspace of a seeded project.
+ * If the top-level error boundary fallback appears, the captured window
+ * errors are thrown with full stacks.
+ */
+import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { render, waitFor, cleanup } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import App from '@/App'
+import { ASSETS } from '@/data/assets'
+import { variantFromAsset } from '@/data/toolLibrary'
+
+const captured: unknown[] = []
+
+beforeAll(() => {
+  // --- jsdom polyfills the real browser provides ---
+  if (!window.matchMedia) {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    })
+  }
+  if (!(globalThis as any).ResizeObserver) {
+    ;(globalThis as any).ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  }
+  if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = function () {}
+    Element.prototype.releasePointerCapture = function () {}
+    Element.prototype.hasPointerCapture = function () {
+      return false
+    }
+  }
+  if (!window.scrollTo) window.scrollTo = (() => {}) as any
+
+  window.addEventListener('error', (event) => {
+    captured.push(event.error ?? event.message)
+  })
+  window.addEventListener('unhandledrejection', (event: any) => {
+    captured.push(event.reason)
+  })
+  const origError = console.error
+  vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+    captured.push(args.map(String).join(' '))
+    origError(...(args as []))
+  })
+})
+
+function projectIdsFromStorage(): string[] {
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key && key.endsWith('projects')) {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) ?? '[]')
+        if (Array.isArray(parsed)) return parsed.map((p: any) => p.id)
+      } catch {
+        /* keep scanning */
+      }
+    }
+  }
+  return []
+}
+
+function fmt(errs: unknown[]): string {
+  return errs
+    .map((e) => {
+      if (e instanceof Error) return `${e.name}: ${e.message}\n${e.stack ?? ''}`
+      return String(e)
+    })
+    .filter((s) => !s.includes('Not implemented: HTMLFormElement'))
+    .join('\n=====\n')
+}
+
+describe('workspace opens', () => {
+  it('home seeds projects, then /workspace/:id renders without the crash fallback', async () => {
+    // Pass 1: home page — seeds localStorage via projectService.list()
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    )
+    await waitFor(() => {
+      expect(projectIdsFromStorage().length).toBeGreaterThan(0)
+    }, { timeout: 5000 })
+    const ids = projectIdsFromStorage()
+    cleanup()
+
+    // Pass 2: the workspace route the user says crashes
+    captured.length = 0
+    render(
+      <MemoryRouter initialEntries={[`/workspace/${ids[0]}`]}>
+        <App />
+      </MemoryRouter>,
+    )
+    await waitFor(() => {
+      const text = document.body.textContent ?? ''
+      if (text.includes('Something went wrong rendering ArchNova')) {
+        throw new Error(`WORKSPACE CRASH REPRODUCED for ${ids[0]}:\n${fmt(captured)}`)
+      }
+      // success looks like the project header + plan editor mounted
+      expect(text).toMatch(/Floor Plan|Save|Assistant/)
+    }, { timeout: 8000 })
+    cleanup()
+  }, 30000)
+
+  it('workspace sub-routes and asset deep-link render without the crash fallback', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    )
+    await waitFor(() => expect(projectIdsFromStorage().length).toBeGreaterThan(0), { timeout: 5000 })
+    const id = projectIdsFromStorage()[0]
+    cleanup()
+
+    const placeable = ASSETS.find((a) => variantFromAsset(a))
+    const routes = [
+      `/workspace/${id}/assets`,
+      `/workspace/${id}/drawings`,
+      `/workspace/${id}/3d`,
+      `/assets`,
+    ]
+    if (placeable) routes.push(`/workspace/${id}?add=${placeable.id}`)
+
+    for (const route of routes) {
+      captured.length = 0
+      render(
+        <MemoryRouter initialEntries={[route]}>
+          <App />
+        </MemoryRouter>,
+      )
+      // give lazy/effects a tick
+      await new Promise((r) => setTimeout(r, 120))
+      const text = document.body.textContent ?? ''
+      if (text.includes('Something went wrong rendering ArchNova')) {
+        throw new Error(`CRASH at ${route}:\n${fmt(captured)}`)
+      }
+      cleanup()
+    }
+  }, 60000)
+})

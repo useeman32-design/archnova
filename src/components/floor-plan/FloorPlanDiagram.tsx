@@ -113,14 +113,6 @@ export function FloorPlanDiagram({
     return () => observer.disconnect()
   }, [vbW, vbH, hasRooms])
 
-  if (!hasRooms) {
-    return (
-      <div className={`flex items-center justify-center text-[13px] text-muted ${className}`}>
-        No rooms to display yet.
-      </div>
-    )
-  }
-
   /** Pixels per plan unit at the current render size (includes zoom). */
   const s = scale ?? 6
   /** Convert everything visual into screen-constant sizes. */
@@ -158,6 +150,16 @@ export function FloorPlanDiagram({
     startY: number
     orig: { x: number; y: number; w: number; h: number }
   } | null>(null)
+
+  /* Early return AFTER every hook — changing hook order between renders
+     crashes React ("Rendered more hooks than during the previous render"). */
+  if (!hasRooms) {
+    return (
+      <div className={`flex items-center justify-center text-[13px] text-muted ${className}`}>
+        No rooms to display yet.
+      </div>
+    )
+  }
 
   const startDrag = (
     event: ReactPointerEvent<SVGGElement>,
