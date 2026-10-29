@@ -1,182 +1,294 @@
-import { useState } from 'react'
+import { useState, type DragEvent } from 'react'
 import {
   AppWindow,
+  Armchair,
+  Bath,
+  BedDouble,
+  Box,
+  Car,
+  ChevronLeft,
   Crosshair,
+  DoorClosed,
   DoorOpen,
+  Fence,
+  Flower2,
   Hand,
   Home,
+  Lamp,
+  Laptop,
+  Monitor,
   MousePointer2,
   Paintbrush,
+  Refrigerator,
   Sofa,
-  SquarePlus,
+  Sprout,
+  TreePalm,
   TreePine,
+  Trees,
+  Umbrella,
+  Utensils,
+  UtensilsCrossed,
+  Waves,
   type LucideIcon,
 } from 'lucide-react'
-import type { FinishOption, RoomCategory } from '@/types'
+import type { FinishOption } from '@/types'
 import type { ToolId, WorkspaceContext } from '@/pages/workspace/WorkspaceLayout'
-import { ROOM_OPTIONS, ROOF_TYPES, EXTERIOR_FINISHES, INTERIOR_FINISHES } from '@/data/catalog'
-import { ASSETS } from '@/data/assets'
+import { TOOL_GROUPS, type ToolVariant } from '@/data/toolLibrary'
+import { ROOF_TYPES, EXTERIOR_FINISHES, INTERIOR_FINISHES } from '@/data/catalog'
 
-const INTERIOR_ITEMS = ASSETS.filter((a) => a.category === 'interior').map((a) => a.name)
+const ICONS: Record<string, LucideIcon> = {
+  BedDouble, Sofa, Laptop, UtensilsCrossed, Utensils, Box, Bath, Car, Umbrella, Waves,
+  DoorOpen, DoorClosed, Fence, AppWindow, Armchair, Monitor, Lamp, Refrigerator,
+  TreePalm, TreePine, Sprout, Flower2, Trees,
+}
 
-const TOOLS: { id: ToolId; icon: LucideIcon; label: string; hint: string; planOnly?: boolean }[] = [
-  { id: 'select', icon: MousePointer2, label: 'Select', hint: 'Select rooms to inspect and edit' },
+const PALETTE: { id: ToolId; icon: LucideIcon; label: string; hint: string; planOnly?: boolean; group?: boolean }[] = [
+  { id: 'select', icon: MousePointer2, label: 'Select / move', hint: 'Select, drag and resize rooms' },
   { id: 'pan', icon: Hand, label: 'Pan', hint: 'Drag to move around the plan', planOnly: true },
-  { id: 'room', icon: SquarePlus, label: 'Add room', hint: 'Pick a room type, then click the plan to place it', planOnly: true },
-  { id: 'door', icon: DoorOpen, label: 'Door', hint: 'Click a room to add a door opening', planOnly: true },
-  { id: 'window', icon: AppWindow, label: 'Window', hint: 'Click a room to add a window', planOnly: true },
-  { id: 'roof', icon: Home, label: 'Roof', hint: 'Choose the roof form for the 3D preview' },
-  { id: 'interior', icon: Sofa, label: 'Interior', hint: 'Pick an item, then click a room to place it', planOnly: true },
-  { id: 'trees', icon: TreePine, label: 'Trees', hint: 'Click the plan to plant a tree', planOnly: true },
-  { id: 'finish', icon: Paintbrush, label: 'Finishes', hint: 'Exterior & interior materials for the preview' },
+  { id: 'room', icon: Box, label: 'Rooms', hint: 'Room library — click or drag onto the plan', planOnly: true, group: true },
+  { id: 'door', icon: DoorOpen, label: 'Doors & gates', hint: 'Door and gate library', planOnly: true, group: true },
+  { id: 'window', icon: AppWindow, label: 'Windows', hint: 'Window library', planOnly: true, group: true },
+  { id: 'interior', icon: Sofa, label: 'Interior', hint: 'Furniture library — also shows in 3D interior', planOnly: true, group: true },
+  { id: 'trees', icon: TreePine, label: 'Trees', hint: 'Planting library', planOnly: true, group: true },
+  { id: 'roof', icon: Home, label: 'Roof', hint: 'Roof forms for the 3D preview', group: true },
+  { id: 'finish', icon: Paintbrush, label: 'Finishes', hint: 'Exterior & interior materials', group: true },
   { id: 'measure', icon: Crosshair, label: 'Measure', hint: 'Click two points to read a distance', planOnly: true },
 ]
 
-const GROUP_BREAKS = new Set<ToolId>(['room', 'interior', 'finish', 'measure'])
+const BREAKS = new Set<ToolId>(['room', 'interior', 'roof', 'measure'])
 
 export function ToolPalette({ ctx }: { ctx: WorkspaceContext }) {
-  const [picker, setPicker] = useState<ToolId | null>(null)
-  const is2D = ctx.canvasView === '2D' && ctx.showProperties
+  const [drawer, setDrawer] = useState<ToolId | null>(null)
+  const planActive = ctx.showProperties
 
-  const activate = (tool: ToolId) => {
-    if (tool === 'room' || tool === 'roof' || tool === 'interior' || tool === 'finish') {
-      setPicker(picker === tool ? null : tool)
-      ctx.setTool(tool)
-      return
-    }
-    setPicker(null)
-    ctx.setTool(tool)
+  const click = (entry: (typeof PALETTE)[number]) => {
+    if (entry.planOnly && !planActive) return
+    ctx.setTool(entry.id)
+    setDrawer(entry.group ? entry.id : null)
   }
 
   return (
-    <div className="relative flex shrink-0 flex-col items-center gap-1 border-r border-line bg-surface py-2 w-12">
-      {TOOLS.map((tool) => {
-        const disabled = tool.planOnly && !is2D
-        const active = ctx.tool === tool.id
-        return (
-          <div key={tool.id} className="contents">
-            {GROUP_BREAKS.has(tool.id) ? (
-              <span className="my-1 h-px w-6 bg-line" aria-hidden />
-            ) : null}
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => activate(tool.id)}
-              title={`${tool.label} — ${tool.hint}${disabled ? ' (2D view only)' : ''}`}
-              aria-pressed={active}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
-                active
-                  ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/30'
-                  : disabled
-                    ? 'text-line'
-                    : 'text-muted hover:bg-canvas-soft hover:text-ink-text'
-              }`}
-            >
-              <tool.icon className="h-[18px] w-[18px]" />
-            </button>
-          </div>
-        )
-      })}
-
-      {picker ? (
-        <div className="absolute left-full top-8 z-40 ml-2 w-60 rounded-xl border border-line bg-surface p-3 shadow-xl animate-fade-in">
-          {picker === 'room' ? (
-            <PickerList
-              title="Room type"
-              options={ROOM_OPTIONS.map((r) => ({ value: r.value as string, label: r.label }))}
-              onPick={(value) => {
-                ctx.setPendingRoom(value as RoomCategory)
-                setPicker(null)
-              }}
-            />
-          ) : null}
-          {picker === 'roof' ? (
-            <PickerList
-              title="Roof form"
-              options={ROOF_TYPES.map((r) => ({ value: r.value, label: r.label }))}
-              current={ctx.previewRoof}
-              onPick={(value) => {
-                ctx.setPreviewRoof(value)
-                ctx.setTool('select')
-                setPicker(null)
-              }}
-            />
-          ) : null}
-          {picker === 'interior' ? (
-            <PickerList
-              title="Interior item"
-              options={INTERIOR_ITEMS.map((name) => ({ value: name, label: name }))}
-              onPick={(value) => {
-                ctx.setPendingInterior(value)
-                setPicker(null)
-              }}
-            />
-          ) : null}
-          {picker === 'finish' ? (
-            <div className="space-y-3">
-              <SwatchRow
-                title="Exterior"
-                options={EXTERIOR_FINISHES}
-                current={ctx.previewExt}
-                onPick={(value) => ctx.setPreviewExt(value as FinishOption)}
-              />
-              <SwatchRow
-                title="Interior"
-                options={INTERIOR_FINISHES}
-                current={ctx.previewInt}
-                onPick={(value) => ctx.setPreviewInt(value as FinishOption)}
-              />
+    <>
+      <div className="relative z-30 flex w-12 shrink-0 flex-col items-center gap-1 border-r border-line bg-surface py-2">
+        {PALETTE.map((entry) => {
+          const disabled = entry.planOnly && !planActive
+          const active = ctx.tool === entry.id
+          return (
+            <div key={entry.id} className="contents">
+              {BREAKS.has(entry.id) ? <span className="my-1 h-px w-6 bg-line" aria-hidden /> : null}
               <button
-                onClick={() => {
-                  ctx.setTool('select')
-                  setPicker(null)
-                }}
-                className="w-full rounded-lg bg-canvas-soft px-3 py-1.5 text-[12px] font-medium text-muted hover:text-ink-text"
+                type="button"
+                disabled={disabled}
+                onClick={() => click(entry)}
+                title={`${entry.label} — ${entry.hint}${disabled ? ' (Floor Plan view only)' : ''}`}
+                aria-pressed={active}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+                  active
+                    ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/30'
+                    : disabled
+                      ? 'text-line'
+                      : 'text-muted hover:bg-canvas-soft hover:text-ink-text'
+                }`}
               >
-                Done
+                <entry.icon className="h-[18px] w-[18px]" />
               </button>
             </div>
-          ) : null}
+          )
+        })}
+        <div className="mt-auto flex flex-col items-center gap-1 pb-1">
+          <button
+            type="button"
+            onClick={ctx.undo}
+            disabled={!ctx.canUndo}
+            title="Undo (Ctrl+Z)"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text disabled:opacity-35"
+          >
+            <UndoIcon />
+          </button>
+          <button
+            type="button"
+            onClick={ctx.redo}
+            disabled={!ctx.canRedo}
+            title="Redo (Ctrl+Shift+Z)"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text disabled:opacity-35"
+          >
+            <UndoIcon flip />
+          </button>
+        </div>
+      </div>
+
+      {drawer ? (
+        <ToolDrawer ctx={ctx} tool={drawer} onClose={() => setDrawer(null)} />
+      ) : null}
+    </>
+  )
+}
+
+function UndoIcon({ flip = false }: { flip?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`h-[18px] w-[18px] ${flip ? '-scale-x-100' : ''}`}
+    >
+      <path d="M3 7v6h6" />
+      <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+    </svg>
+  )
+}
+
+function ToolDrawer({
+  ctx,
+  tool,
+  onClose,
+}: {
+  ctx: WorkspaceContext
+  tool: ToolId
+  onClose: () => void
+}) {
+  const group = TOOL_GROUPS.find((g) => g.tool === tool)
+
+  return (
+    <div className="absolute inset-y-0 left-12 z-30 flex w-64 flex-col border-r border-line bg-surface shadow-xl animate-slide-in-left">
+      <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+        <button
+          onClick={onClose}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text"
+          aria-label="Collapse library"
+          title="Back"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-semibold text-ink-text">
+            {group?.title ?? (tool === 'roof' ? 'Roof forms' : 'Finishes')}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto scroll-thin p-3">
+        {group ? (
+          <>
+            <p className="mb-3 text-[11.5px] leading-relaxed text-muted">{group.blurb}</p>
+            {group.categories.map((category) => (
+              <div key={category.id} className="mb-4">
+                <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">
+                  {category.label}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {category.variants.map((variant) => (
+                    <VariantTile
+                      key={variant.id}
+                      variant={variant}
+                      armed={ctx.pending?.variant.id === variant.id}
+                      onArm={() =>
+                        ctx.setPending(
+                          ctx.pending?.variant.id === variant.id ? null : { tool: group.tool, variant },
+                        )
+                      }
+                      onDragStart={(event) => {
+                        event.dataTransfer.setData('application/x-archnova', JSON.stringify({ tool: group.tool, variant }))
+                        event.dataTransfer.effectAllowed = 'copy'
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </>
+        ) : tool === 'roof' ? (
+          <div className="grid grid-cols-2 gap-2">
+            {ROOF_TYPES.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => {
+                  ctx.setPreviewRoof(option.value)
+                  onClose()
+                }}
+                className={`rounded-lg border p-2.5 text-left text-[12px] font-medium transition-colors ${
+                  ctx.previewRoof === option.value
+                    ? 'border-brand-500 bg-brand-50 text-brand-700'
+                    : 'border-line text-muted hover:bg-canvas-soft'
+                }`}
+              >
+                <Home className="mb-1.5 h-4 w-4" />
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <SwatchSection
+              title="Exterior finish"
+              options={EXTERIOR_FINISHES}
+              current={ctx.previewExt}
+              onPick={(v) => ctx.setPreviewExt(v as FinishOption)}
+            />
+            <SwatchSection
+              title="Interior finish"
+              options={INTERIOR_FINISHES}
+              current={ctx.previewInt}
+              onPick={(v) => ctx.setPreviewInt(v as FinishOption)}
+            />
+          </div>
+        )}
+      </div>
+
+      {ctx.pending ? (
+        <div className="border-t border-line bg-brand-50/60 px-3 py-2">
+          <p className="text-[11.5px] text-brand-800">
+            Placing <span className="font-semibold">{ctx.pending.variant.name}</span> — click the
+            plan{group?.tool === 'room' || group?.tool === 'trees' ? '' : ' on a room'}, or drag a
+            tile.{' '}
+            <button className="underline underline-offset-2" onClick={() => ctx.setPending(null)}>
+              Cancel
+            </button>
+          </p>
         </div>
       ) : null}
     </div>
   )
 }
 
-function PickerList({
-  title,
-  options,
-  current,
-  onPick,
+function VariantTile({
+  variant,
+  armed,
+  onArm,
+  onDragStart,
 }: {
-  title: string
-  options: { value: string; label: string }[]
-  current?: string
-  onPick: (value: string) => void
+  variant: ToolVariant
+  armed: boolean
+  onArm: () => void
+  onDragStart: (event: DragEvent) => void
 }) {
+  const Icon = ICONS[variant.icon] ?? Box
   return (
-    <div>
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">{title}</p>
-      <div className="grid max-h-64 grid-cols-2 gap-1.5 overflow-y-auto scroll-thin">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            onClick={() => onPick(option.value)}
-            className={`rounded-lg px-2 py-1.5 text-left text-[12px] font-medium transition-colors ${
-              current === option.value
-                ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300'
-                : 'bg-canvas-soft text-muted hover:text-ink-text'
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
+    <button
+      type="button"
+      draggable
+      onDragStart={onDragStart}
+      onClick={onArm}
+      title={`${variant.name}${variant.w ? ` · ${variant.w} × ${variant.h}` : ''} — click to arm, or drag onto the plan`}
+      className={`group flex cursor-grab flex-col items-start gap-1.5 rounded-lg border p-2 text-left transition-colors active:cursor-grabbing ${
+        armed ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-300' : 'border-line hover:border-brand-300 hover:bg-canvas-soft'
+      }`}
+    >
+      <span className="flex h-12 w-full items-center justify-center rounded-md border border-line-soft bg-canvas-soft/70">
+        <Icon className="h-5 w-5 text-ink-500" strokeWidth={1.6} />
+      </span>
+      <span className="w-full truncate text-[11.5px] font-medium text-ink-text">{variant.name}</span>
+      {variant.w ? (
+        <span className="text-[10px] text-faint">{variant.w} × {variant.h}</span>
+      ) : null}
+    </button>
   )
 }
 
-function SwatchRow({
+function SwatchSection({
   title,
   options,
   current,
@@ -189,16 +301,14 @@ function SwatchRow({
 }) {
   return (
     <div>
-      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">{title}</p>
+      <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">{title}</p>
       <div className="flex flex-wrap gap-1.5">
         {options.map((option) => (
           <button
             key={option.value}
             onClick={() => onPick(option.value)}
             className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
-              current === option.value
-                ? 'bg-brand-600 text-white'
-                : 'bg-canvas-soft text-muted hover:text-ink-text'
+              current === option.value ? 'bg-brand-600 text-white' : 'bg-canvas-soft text-muted hover:text-ink-text'
             }`}
           >
             {option.label}

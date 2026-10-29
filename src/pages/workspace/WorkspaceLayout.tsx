@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate, useParams, useOutletContext } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate, useParams, useOutletContext, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Box,
@@ -12,10 +12,12 @@ import {
   SlidersHorizontal,
   Sparkles,
 } from 'lucide-react'
-import type { ElementType, FinishOption, Project, Room, RoomCategory, Units, Vec2 } from '@/types'
+import type { ElementType, FinishOption, Project, Room, Units, Vec2 } from '@/types'
 import { useProjects } from '@/hooks/useProjects'
 import { uid } from '@/lib/id'
-import { ROOM_FURNITURE, ROOM_OPTIONS } from '@/data/catalog'
+import { ROOM_FURNITURE } from '@/data/catalog'
+import type { PendingPlacement, ToolVariant } from '@/data/toolLibrary'
+import { variantFromAsset, ASSET_LOOKUP } from '@/data/toolLibrary'
 import { Logo } from '@/components/layout/Logo'
 import { Button } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/FormControls'
@@ -37,11 +39,23 @@ export type ToolId =
   | 'finish'
   | 'measure'
 
+export interface Ornament extends Vec2 {
+  kind?: string
+}
+
+export interface EditorState {
+  rooms: Room[]
+  placed: Record<string, string[]>
+  ornaments: Ornament[]
+}
+
 export interface WorkspaceContext {
   project: Project
-  /** Project clone with preview overrides (roof / finishes) applied. */
+  /** Live clone: edited rooms + preview roof/finishes — what the 3D shows. */
   previewProject: Project
   rooms: Room[]
+  placed: Record<string, string[]>
+  ornaments: Ornament[]
   units: Units
   setUnits: (units: Units) => void
   selectedRoomId: string | null
@@ -49,29 +63,33 @@ export interface WorkspaceContext {
   selectedRoom: Room | null
   resizeRoom: (id: string, width: number, length: number) => void
   renameRoom: (id: string, name: string) => void
-  placed: Record<string, string[]>
   toggleFurniture: (roomId: string, item: string) => void
   assistantOpen: boolean
   setAssistantOpen: (open: boolean) => void
   propsOpen: boolean
   setPropsOpen: (open: boolean) => void
-  canvasView: '2D' | '3D'
-  setCanvasView: (view: '2D' | '3D') => void
   save: () => void
   saved: boolean
   showProperties: boolean
-  /* Editing tools */
+  /* Tools */
   tool: ToolId
   setTool: (tool: ToolId) => void
-  pendingRoom: RoomCategory | null
-  setPendingRoom: (category: RoomCategory | null) => void
-  pendingInterior: string | null
-  setPendingInterior: (item: string | null) => void
-  ornaments: Vec2[]
-  addRoomAt: (point: Vec2, category: RoomCategory) => void
-  addOpening: (roomId: string, type: ElementType) => void
+  pending: PendingPlacement | null
+  setPending: (pending: PendingPlacement | null) => void
+  addRoomAt: (point: Vec2, variant: ToolVariant) => void
+  addOpening: (roomId: string, type: ElementType, label?: string) => void
   placeInterior: (roomId: string, item: string) => void
-  addTreeAt: (point: Vec2) => void
+  addTreeAt: (point: Vec2, kind?: string) => void
+  /* Editing with history */
+  beginEdit: () => void
+  liveEdit: (fn: (state: EditorState) => EditorState) => void
+  endEdit: () => void
+  commit: (fn: (state: EditorState) => EditorState) => void
+  undo: () => void
+  redo: () => void
+  canUndo: boolean
+  canRedo: boolean
+  /* Preview overrides */
   previewRoof: string
   setPreviewRoof: (roof: string) => void
   previewExt: FinishOption
@@ -91,43 +109,141 @@ const VIEW_TABS = [
   { key: 'assets', to: 'assets', label: 'Assets', icon: Boxes },
 ] as const
 
+const EMPTY_EDITOR: EditorState = { rooms: [], placed: {}, ornaments: [] }
+
 export function WorkspaceLayout() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const { projects, loading, updateProject } = useProjects()
   const project = projects.find((p) => p.id === id)
 
-  const [rooms, setRooms] = useState<Room[]>([])
+  const [editor, setEditor] = useState<EditorState>(EMPTY_EDITOR)
   const [units, setUnits] = useState<Units>('ft')
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
-  const [placed, setPlaced] = useState<Record<string, string[]>>({})
-  const [ornaments, setOrnaments] = useState<Vec2[]>([])
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [propsOpen, setPropsOpen] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [canvasView, setCanvasView] = useState<'2D' | '3D'>('2D')
   const [propsCollapsed, setPropsCollapsed] = useState(false)
   const [tool, setTool] = useState<ToolId>('select')
-  const [pendingRoom, setPendingRoom] = useState<RoomCategory | null>(null)
-  const [pendingInterior, setPendingInterior] = useState<string | null>(null)
+  const [pending, setPending] = useState<PendingPlacement | null>(null)
   const [previewRoof, setPreviewRoof] = useState('flat')
   const [previewExt, setPreviewExt] = useState<FinishOption>('render')
   const [previewInt, setPreviewInt] = useState<FinishOption>('wood')
 
+  /* ---- undo / redo history ---- */
+  const past = useRef<EditorState[]>([])
+  const future = useRef<EditorState[]>([])
+  const editSnapshot = useRef<EditorState | null>(null)
+  const [historyTick, setHistoryTick] = useState(0)
+  const bumpHistory = () => setHistoryTick((t) => t + 1)
+
+  const commit = useCallback((fn: (state: EditorState) => EditorState) => {
+    setEditor((prev) => {
+      past.current.push(prev)
+      future.current = []
+      return fn(prev)
+    })
+    bumpHistory()
+  }, [])
+
+  const beginEdit = useCallback(() => {
+    editSnapshot.current = null
+    setEditor((prev) => {
+      editSnapshot.current = prev
+      return prev
+    })
+  }, [])
+
+  const liveEdit = useCallback((fn: (state: EditorState) => EditorState) => {
+    setEditor(fn)
+  }, [])
+
+  const endEdit = useCallback(() => {
+    if (editSnapshot.current) {
+      past.current.push(editSnapshot.current)
+      future.current = []
+      editSnapshot.current = null
+      bumpHistory()
+    }
+  }, [])
+
+  const undo = useCallback(() => {
+    const prev = past.current.pop()
+    if (!prev) return
+    setEditor((current) => {
+      future.current.push(current)
+      return prev
+    })
+    bumpHistory()
+  }, [])
+
+  const redo = useCallback(() => {
+    const next = future.current.pop()
+    if (!next) return
+    setEditor((current) => {
+      past.current.push(current)
+      return next
+    })
+    bumpHistory()
+  }, [])
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)
+      ) {
+        return
+      }
+      if (!(event.ctrlKey || event.metaKey)) return
+      const key = event.key.toLowerCase()
+      if (key === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) redo()
+        else undo()
+      } else if (key === 'y') {
+        event.preventDefault()
+        redo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undo, redo])
+
+  /* ---- load project into editor ---- */
   useEffect(() => {
     if (!project) return
-    setRooms(structuredClone(project.floors.find((f) => f.level === 1)?.rooms ?? []))
+    setEditor({
+      rooms: structuredClone(project.floors.find((f) => f.level === 1)?.rooms ?? []),
+      placed: {},
+      ornaments: [],
+    })
     setUnits(project.plot.units)
     setSelectedRoomId(null)
-    setOrnaments([])
     setPreviewRoof(project.roof)
     setPreviewExt(project.preferences.exteriorFinish)
     setPreviewInt(project.preferences.interiorFinish)
     setTool('select')
+    setPending(null)
+    past.current = []
+    future.current = []
+    bumpHistory()
+
+    /* Deep link: ?add=<assetId> arms a placement from the Assets library. */
+    const addId = searchParams.get('add')
+    if (addId) {
+      const asset = ASSET_LOOKUP[addId]
+      const placement = asset ? variantFromAsset(asset) : null
+      if (placement) {
+        setPending(placement)
+        setTool(placement.tool)
+      }
+    }
   }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Selecting a room on a phone opens the properties drawer so the edit is visible. */
   const selectRoom = useCallback((roomId: string | null) => {
     setSelectedRoomId(roomId)
     if (roomId && window.matchMedia('(max-width: 1023px)').matches) {
@@ -135,94 +251,139 @@ export function WorkspaceLayout() {
     }
   }, [])
 
-  const resizeRoom = useCallback((roomId: string, width: number, length: number) => {
-    setRooms((prev) =>
-      prev.map((room) =>
-        room.id === roomId
-          ? { ...room, width, length, rect: { ...room.rect, w: width, h: length } }
-          : room,
-      ),
-    )
-  }, [])
-
-  const renameRoom = useCallback((roomId: string, name: string) => {
-    setRooms((prev) => prev.map((room) => (room.id === roomId ? { ...room, name } : room)))
-  }, [])
-
-  const toggleFurniture = useCallback((roomId: string, item: string) => {
-    setPlaced((prev) => {
-      const current = prev[roomId] ?? []
-      return {
-        ...prev,
-        [roomId]: current.includes(item) ? current.filter((i) => i !== item) : [...current, item],
-      }
-    })
-  }, [])
-
+  /* ---- mutators ---- */
   const addRoomAt = useCallback(
-    (point: Vec2, category: RoomCategory) => {
-      const size = 10
-      const plotW = project?.plot.width ?? 50
-      const plotL = project?.plot.length ?? 50
-      const x = Math.max(0, Math.min(plotW - size, point.x - size / 2))
-      const y = Math.max(0, Math.min(plotL - size, point.y - size / 2))
-      const label = ROOM_OPTIONS.find((r) => r.value === category)?.label ?? 'Room'
-      setRooms((prev) => [
-        ...prev,
-        {
-          id: uid('room'),
-          name: label,
-          category,
-          width: size,
-          length: size,
-          units: project?.plot.units ?? 'ft',
-          rect: { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, w: size, h: size },
-          level: 1,
-          furniture: ROOM_FURNITURE[category] ?? [],
-          elements: [
-            { id: uid('el'), type: 'door', label: 'Door' },
-            { id: uid('el'), type: 'window', label: 'Window' },
+    (point: Vec2, variant: ToolVariant) => {
+      commit((state) => {
+        const w = variant.w ?? 10
+        const h = variant.h ?? 10
+        const plotW = project?.plot.width ?? 50
+        const plotL = project?.plot.length ?? 50
+        const x = Math.max(0, Math.min(plotW - w, point.x - w / 2))
+        const y = Math.max(0, Math.min(plotL - h, point.y - h / 2))
+        const category = variant.id.startsWith('rm_')
+          ? (variant.id.replace('rm_', '') as Room['category'])
+          : 'other'
+        return {
+          ...state,
+          rooms: [
+            ...state.rooms,
+            {
+              id: uid('room'),
+              name: variant.name,
+              category: normaliseCategory(category),
+              width: w,
+              length: h,
+              units: project?.plot.units ?? 'ft',
+              rect: { x: round1(x), y: round1(y), w, h },
+              level: 1,
+              furniture: ROOM_FURNITURE[normaliseCategory(category)] ?? [],
+              elements: [
+                { id: uid('el'), type: 'door', label: 'Door' },
+                { id: uid('el'), type: 'window', label: 'Window' },
+              ],
+            },
           ],
-        },
-      ])
+        }
+      })
     },
-    [project],
+    [commit, project],
   )
 
-  const addOpening = useCallback((roomId: string, type: ElementType) => {
-    setRooms((prev) =>
-      prev.map((room) =>
-        room.id === roomId
-          ? { ...room, elements: [...room.elements, { id: uid('el'), type, label: type === 'door' ? 'Door' : 'Window' }] }
-          : room,
-      ),
-    )
-  }, [])
+  const addOpening = useCallback(
+    (roomId: string, type: ElementType, label?: string) => {
+      commit((state) => ({
+        ...state,
+        rooms: state.rooms.map((room) =>
+          room.id === roomId
+            ? {
+                ...room,
+                elements: [
+                  ...room.elements,
+                  { id: uid('el'), type, label: label ?? (type === 'door' ? 'Door' : 'Window') },
+                ],
+              }
+            : room,
+        ),
+      }))
+    },
+    [commit],
+  )
 
-  const placeInterior = useCallback((roomId: string, item: string) => {
-    setPlaced((prev) => {
-      const current = prev[roomId] ?? []
-      return current.includes(item) ? prev : { ...prev, [roomId]: [...current, item] }
-    })
-  }, [])
+  const placeInterior = useCallback(
+    (roomId: string, item: string) => {
+      commit((state) => {
+        const current = state.placed[roomId] ?? []
+        if (current.includes(item)) return state
+        return { ...state, placed: { ...state.placed, [roomId]: [...current, item] } }
+      })
+    },
+    [commit],
+  )
 
-  const addTreeAt = useCallback((point: Vec2) => {
-    setOrnaments((prev) => [...prev, { x: Math.round(point.x * 10) / 10, y: Math.round(point.y * 10) / 10 }])
-  }, [])
+  const addTreeAt = useCallback(
+    (point: Vec2, kind?: string) => {
+      commit((state) => ({
+        ...state,
+        ornaments: [...state.ornaments, { x: round1(point.x), y: round1(point.y), kind }],
+      }))
+    },
+    [commit],
+  )
+
+  const resizeRoom = useCallback(
+    (roomId: string, width: number, length: number) => {
+      commit((state) => ({
+        ...state,
+        rooms: state.rooms.map((room) =>
+          room.id === roomId
+            ? { ...room, width, length, rect: { ...room.rect, w: width, h: length } }
+            : room,
+        ),
+      }))
+    },
+    [commit],
+  )
+
+  const renameRoom = useCallback(
+    (roomId: string, name: string) => {
+      commit((state) => ({
+        ...state,
+        rooms: state.rooms.map((room) => (room.id === roomId ? { ...room, name } : room)),
+      }))
+    },
+    [commit],
+  )
+
+  const toggleFurniture = useCallback(
+    (roomId: string, item: string) => {
+      commit((state) => {
+        const current = state.placed[roomId] ?? []
+        return {
+          ...state,
+          placed: {
+            ...state.placed,
+            [roomId]: current.includes(item) ? current.filter((i) => i !== item) : [...current, item],
+          },
+        }
+      })
+    },
+    [commit],
+  )
 
   const save = useCallback(() => {
     if (!project) return
     const floors = project.floors.map((floor) =>
-      floor.level === 1 ? { ...floor, rooms } : floor,
+      floor.level === 1 ? { ...floor, rooms: editor.rooms } : floor,
     )
     void updateProject(project.id, { floors })
     setSaved(true)
     window.setTimeout(() => setSaved(false), 1800)
-  }, [project, rooms, updateProject])
+  }, [project, editor.rooms, updateProject])
 
   const selectedRoom = useMemo(
-    () => rooms.find((room) => room.id === selectedRoomId) ?? null,
-    [rooms, selectedRoomId],
+    () => editor.rooms.find((room) => room.id === selectedRoomId) ?? null,
+    [editor.rooms, selectedRoomId],
   )
 
   const previewProject = useMemo<Project | null>(
@@ -231,10 +392,17 @@ export function WorkspaceLayout() {
         ? {
             ...project,
             roof: previewRoof,
-            preferences: { ...project.preferences, exteriorFinish: previewExt, interiorFinish: previewInt },
+            floors: project.floors.map((floor) =>
+              floor.level === 1 ? { ...floor, rooms: editor.rooms } : floor,
+            ),
+            preferences: {
+              ...project.preferences,
+              exteriorFinish: previewExt,
+              interiorFinish: previewInt,
+            },
           }
         : null,
-    [project, previewRoof, previewExt, previewInt],
+    [project, previewRoof, previewExt, previewInt, editor.rooms],
   )
 
   if (loading) {
@@ -249,7 +417,6 @@ export function WorkspaceLayout() {
     return <NotFoundPage />
   }
 
-  /** Current workspace segment: '' | '3d' | 'drawings' | 'assets' */
   const segment = location.pathname
     .slice(`/workspace/${id}`.length)
     .replace(/^\/+/, '')
@@ -258,15 +425,12 @@ export function WorkspaceLayout() {
   const isActiveTab = (key: (typeof VIEW_TABS)[number]['key']) =>
     key === 'floor' ? segment === '' || segment === 'floor-plan' : segment === key
 
-  const handleViewChange = (next: '2D' | '3D') => {
-    setCanvasView(next)
-    if (segment !== '') navigate('')
-  }
-
   const context: WorkspaceContext = {
     project,
     previewProject,
-    rooms,
+    rooms: editor.rooms,
+    placed: editor.placed,
+    ornaments: editor.ornaments,
     units,
     setUnits,
     selectedRoomId,
@@ -274,28 +438,30 @@ export function WorkspaceLayout() {
     selectedRoom,
     resizeRoom,
     renameRoom,
-    placed,
     toggleFurniture,
     assistantOpen,
     setAssistantOpen,
     propsOpen,
     setPropsOpen,
-    canvasView,
-    setCanvasView,
     save,
     saved,
     showProperties,
     tool,
     setTool,
-    pendingRoom,
-    setPendingRoom,
-    pendingInterior,
-    setPendingInterior,
-    ornaments,
+    pending,
+    setPending,
     addRoomAt,
     addOpening,
     placeInterior,
     addTreeAt,
+    beginEdit,
+    liveEdit,
+    endEdit,
+    commit,
+    undo,
+    redo,
+    canUndo: past.current.length > 0,
+    canRedo: future.current.length > 0,
     previewRoof,
     setPreviewRoof,
     previewExt,
@@ -303,10 +469,10 @@ export function WorkspaceLayout() {
     previewInt,
     setPreviewInt,
   }
+  void historyTick
 
   return (
     <div className="flex h-dvh flex-col bg-canvas">
-      {/* Top toolbar */}
       <header className="z-30 flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface px-3 sm:px-4">
         <button
           onClick={() => navigate('/')}
@@ -326,7 +492,6 @@ export function WorkspaceLayout() {
           </span>
         </div>
 
-        {/* View tabs — like document/view tabs in an editor */}
         <nav className="hidden items-center gap-1 rounded-lg bg-canvas-soft p-1 md:flex">
           {VIEW_TABS.map((tab) => (
             <NavLink
@@ -349,8 +514,8 @@ export function WorkspaceLayout() {
               { value: '2D', label: '2D' },
               { value: '3D', label: '3D' },
             ]}
-            value={segment === '3d' ? '3D' : canvasView}
-            onChange={handleViewChange}
+            value={segment === '3d' ? '3D' : '2D'}
+            onChange={(next) => navigate(next === '3D' ? '3d' : '')}
           />
         </div>
 
@@ -376,7 +541,6 @@ export function WorkspaceLayout() {
         ) : null}
       </header>
 
-      {/* Mobile view tabs */}
       <div className="flex gap-1 overflow-x-auto border-b border-line bg-surface px-2 py-1.5 scroll-thin md:hidden">
         {VIEW_TABS.map((tab) => (
           <NavLink
@@ -420,7 +584,7 @@ export function WorkspaceLayout() {
                 units={units}
                 onRename={renameRoom}
                 onResize={resizeRoom}
-                placed={placed}
+                placed={editor.placed}
                 onToggleFurniture={toggleFurniture}
                 onCollapse={() => setPropsCollapsed(true)}
               />
@@ -436,7 +600,6 @@ export function WorkspaceLayout() {
         />
       </div>
 
-      {/* Mobile properties drawer */}
       {propsOpen && showProperties ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-ink-950/50 animate-fade-in" onClick={() => setPropsOpen(false)} />
@@ -449,7 +612,7 @@ export function WorkspaceLayout() {
                 onClose={() => setPropsOpen(false)}
                 onRename={renameRoom}
                 onResize={resizeRoom}
-                placed={placed}
+                placed={editor.placed}
                 onToggleFurniture={toggleFurniture}
               />
             </div>
@@ -458,4 +621,27 @@ export function WorkspaceLayout() {
       ) : null}
     </div>
   )
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10
+}
+
+function normaliseCategory(value: string): Room['category'] {
+  const known = [
+    'bedroom', 'bathroom', 'kitchen', 'living', 'dining', 'study', 'garage', 'storage',
+    'porch', 'balcony', 'laundry', 'garden', 'pool', 'circulation',
+  ]
+  const mapped: Record<string, string> = {
+    master: 'bedroom',
+    bed: 'bedroom',
+    kids: 'bedroom',
+    guest: 'bedroom',
+    family: 'living',
+    pantry: 'storage',
+    ensuite: 'bathroom',
+  }
+  if (known.includes(value)) return value as Room['category']
+  if (mapped[value]) return mapped[value] as Room['category']
+  return 'other'
 }

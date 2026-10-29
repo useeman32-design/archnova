@@ -7,23 +7,37 @@ import { Spinner } from '@/components/ui/Feedback'
  * Interactive massing preview surface.
  *
  * The React Three Fiber scene lives in `./MassingCanvas` and is loaded lazily
- * so the three.js bundle only downloads when a 3D surface mounts. This
- * component is the seam: when `@/services/threeModelService` gains a real
- * implementation, replace the lazy scene with a GLTF viewer and keep the
- * props, badge and error boundary as they are.
+ * so the three.js bundle only downloads when a 3D surface mounts. Props mirror
+ * the editor contract: selection, move/scale transforms and site ornaments
+ * flow straight through, keeping 2D and 3D in sync.
  */
 
 const MassingCanvas = lazy(() => import('./MassingCanvas'))
 
-interface MassingProps {
+export interface MassingProps {
   project: Project
   mode?: 'exterior' | 'interior'
   className?: string
+  selectedId?: string | null
+  onSelectRoom?: (id: string | null) => void
+  transformMode?: 'translate' | 'scale'
+  onMoveLive?: (id: string, x: number, y: number) => void
+  onResizeLive?: (id: string, w: number, h: number) => void
+  onEditBegin?: () => void
+  onEditEnd?: () => void
+  ornaments?: { x: number; y: number; kind?: string }[]
+  placed?: Record<string, string[]>
 }
 
-export function MassingViewer({ project, mode = 'exterior', className = '' }: MassingProps) {
+export function MassingViewer({ project, mode = 'exterior', className = '', ...rest }: MassingProps) {
   const [resetKey, setResetKey] = useState(0)
-  const label = mode === 'interior' ? 'Interior massing preview' : 'Interactive massing preview'
+  const label = mode === 'interior' ? 'Interior preview' : 'Interactive massing preview'
+  const hint =
+    mode === 'interior'
+      ? 'drag to look around'
+      : rest.onSelectRoom
+        ? 'click a volume to select · drag to orbit · use Move/Scale to edit'
+        : 'drag to orbit, scroll to zoom'
 
   return (
     <div className={`relative overflow-hidden bg-[#e8edf2] ${className}`}>
@@ -34,10 +48,10 @@ export function MassingViewer({ project, mode = 'exterior', className = '' }: Ma
           </div>
         }
       >
-        <MassingCanvas key={`${mode}-${resetKey}`} project={project} mode={mode} />
+        <MassingCanvas key={`${mode}-${resetKey}`} project={project} mode={mode} {...rest} />
       </Suspense>
       <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-ink-950/70 px-2.5 py-1 text-[10.5px] font-medium text-white/90 backdrop-blur">
-        {label} · drag to orbit, scroll to zoom
+        {label} · {hint}
       </span>
       <button
         type="button"
@@ -67,7 +81,8 @@ export class ThreeErrorBoundary extends Component<
   }
 }
 
-export function MassingViewerSafe({ project, mode, className }: MassingProps) {
+export function MassingViewerSafe(props: MassingProps) {
+  const { project, className } = props
   return (
     <ThreeErrorBoundary
       fallback={
@@ -82,7 +97,7 @@ export function MassingViewerSafe({ project, mode, className }: MassingProps) {
         />
       }
     >
-      <MassingViewer project={project} mode={mode} className={className} />
+      <MassingViewer {...props} />
     </ThreeErrorBoundary>
   )
 }

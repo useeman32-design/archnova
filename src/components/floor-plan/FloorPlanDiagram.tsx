@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useLayoutEffect, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import type { Room, RoomCategory, Units, Vec2 } from '@/types'
 import { formatArea } from '@/lib/format'
 
@@ -49,7 +49,15 @@ export interface FloorPlanDiagramProps {
   /** Receives background clicks in plan units (used by placement tools). */
   onCanvasClick?: (point: Vec2) => void
   /** Site ornaments (trees) rendered as planting glyphs. */
-  trees?: Vec2[]
+  trees?: (Vec2 & { kind?: string })[]
+  /* Direct manipulation (select tool) */
+  dragEnabled?: boolean
+  onEditBegin?: () => void
+  onEditEnd?: () => void
+  onDragLive?: (id: string, x: number, y: number) => void
+  onResizeLive?: (id: string, w: number, h: number) => void
+  /** Exposes a client-pixels → plan-units converter (for drag & drop). */
+  registerClientToPlan?: (fn: ((clientX: number, clientY: number) => Vec2 | null) | null) => void
 }
 
 export function FloorPlanDiagram({
@@ -66,6 +74,12 @@ export function FloorPlanDiagram({
   measure = false,
   onCanvasClick,
   trees = [],
+  dragEnabled = false,
+  onEditBegin,
+  onEditEnd,
+  onDragLive,
+  onResizeLive,
+  registerClientToPlan,
 }: FloorPlanDiagramProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [scale, setScale] = useState<number | null>(null)
@@ -119,6 +133,71 @@ export function FloorPlanDiagram({
     if (!ctm) return null
     const pt = new DOMPoint(event.clientX, event.clientY).matrixTransform(ctm.inverse())
     return { x: pt.x, y: pt.y }
+  }
+
+  const clientToPlan = (clientX: number, clientY: number): Vec2 | null => {
+    const svg = svgRef.current
+    if (!svg) return null
+    const ctm = svg.getScreenCTM()
+    if (!ctm) return null
+    const pt = new DOMPoint(clientX, clientY).matrixTransform(ctm.inverse())
+    return { x: pt.x, y: pt.y }
+  }
+
+  useEffect(() => {
+    if (!registerClientToPlan) return
+    registerClientToPlan(clientToPlan)
+    return () => registerClientToPlan(null)
+  }, [registerClientToPlan, scale]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ---- direct manipulation (move / resize) ---- */
+  const drag = useRef<{
+    mode: 'move' | 'resize'
+    id: string
+    startX: number
+    startY: number
+    orig: { x: number; y: number; w: number; h: number }
+  } | null>(null)
+
+  const startDrag = (
+    event: ReactPointerEvent<SVGGElement>,
+    room: Room,
+    mode: 'move' | 'resize',
+  ) => {
+    if (!dragEnabled) return
+    event.stopPropagation()
+    drag.current = {
+      mode,
+      id: room.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      orig: { x: room.rect.x, y: room.rect.y, w: room.rect.w, h: room.rect.h },
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    onEditBegin?.()
+  }
+
+  const moveDrag = (event: ReactPointerEvent<SVGGElement>) => {
+    const state = drag.current
+    if (!state) return
+    const dx = (event.clientX - state.startX) / s
+    const dy = (event.clientY - state.startY) / s
+    if (state.mode === 'move') {
+      onDragLive?.(state.id, round1(state.orig.x + dx), round1(state.orig.y + dy))
+    } else {
+      onResizeLive?.(
+        state.id,
+        Math.max(4, round1(state.orig.w + dx)),
+        Math.max(4, round1(state.orig.h + dy)),
+      )
+    }
+  }
+
+  const endDrag = (event: ReactPointerEvent<SVGGElement>) => {
+    if (!drag.current) return
+    drag.current = null
+    event.currentTarget.releasePointerCapture(event.pointerId)
+    onEditEnd?.()
   }
 
   const handleBackgroundClick = (event: ReactMouseEvent<SVGSVGElement>) => {
@@ -202,6 +281,7 @@ export function FloorPlanDiagram({
           <g
             key={room.id}
             className={onSelectRoom && !measure ? 'room-hit cursor-pointer' : undefined}
+            style={dragEnabled ? { cursor: 'move' } : undefined}
             onClick={
               onSelectRoom && !measure
                 ? (event) => {
@@ -210,6 +290,10 @@ export function FloorPlanDiagram({
                   }
                 : undefined
             }
+            onPointerDown={dragEnabled ? (event) => startDrag(event, room, 'move') : undefined}
+            onPointerMove={dragEnabled ? moveDrag : undefined}
+            onPointerUp={dragEnabled ? endDrag : undefined}
+            onPointerCancel={dragEnabled ? endDrag : undefined}
             role={onSelectRoom && !measure ? 'button' : undefined}
             aria-label={onSelectRoom ? `Select ${room.name}` : undefined}
           >
@@ -263,6 +347,23 @@ export function FloorPlanDiagram({
             {rw >= 70 && rh >= 48 ? <RoomFurniture room={room} u={u} color={palette.text} /> : null}
             {rw >= 60 && rh >= 40 ? (
               <RoomOpenings room={room} u={u} stroke={palette.stroke} />
+            ) : null}
+            {isSelected && dragEnabled ? (
+              <circle
+                cx={room.rect.x + room.rect.w}
+                cy={room.rect.y + room.rect.h}
+                r={u(5)}
+                fill="#1a56f5"
+                stroke="#ffffff"
+                strokeWidth={u(1.5)}
+                style={{ cursor: 'nwse-resize' }}
+                onPointerDown={(event) => startDrag(event, room, 'resize')}
+                onPointerMove={moveDrag}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+              >
+                <title>Drag to resize</title>
+              </circle>
             ) : null}
           </g>
         )
@@ -398,6 +499,10 @@ function DimensionLine({
 
 function fmt(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10
 }
 
 function pickScaleBar(s: number, units: Units): { units: number } | null {

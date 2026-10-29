@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Compass, Crosshair, Frame, Info, Tag } from 'lucide-react'
-import type { Room } from '@/types'
+import type { Room, Vec2 } from '@/types'
 import { useWorkspace } from '@/pages/workspace/WorkspaceLayout'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
 import { PlanCanvas, ZoomControls, useZoom } from '@/components/floor-plan/PlanCanvas'
 import { SegmentedControl } from '@/components/ui/FormControls'
-import { ROOM_OPTIONS } from '@/data/catalog'
+import type { PendingPlacement } from '@/data/toolLibrary'
 
 function IconToggle({
   active,
@@ -37,19 +37,14 @@ function IconToggle({
 }
 
 const TOOL_HINTS: Record<string, string> = {
-  select: 'Select a room to edit it in Properties. Detail levels adapt to zoom, like a CAD viewport.',
+  select: 'Select tool: click a room to edit, drag it to move, pull the blue handle to resize. Ctrl+Z undo · Ctrl+Shift+Z redo.',
   pan: 'Pan: drag the canvas to move around.',
-  room: 'Add room: click anywhere on the plan to place the room.',
-  door: 'Door tool: click a room to add a door opening.',
-  window: 'Window tool: click a room to add a window.',
-  interior: 'Interior tool: click a room to place the selected item.',
-  trees: 'Trees: click the plan to plant.',
   measure: 'Measure: click two points to read a distance · click again to start over.',
 }
 
 /**
- * The 2D design canvas: grid, zoom, measure, placement tools, level-of-detail
- * toggles and room selection. Embedded as the "2D" tab of the workspace canvas.
+ * The 2D design canvas (Floor Plan view): grid, zoom, measure, library
+ * placement (click or drag & drop), direct move/resize and selection.
  */
 export function PlanEditor() {
   const ctx = useWorkspace()
@@ -59,45 +54,64 @@ export function PlanEditor() {
   const [showDimensions, setShowDimensions] = useState(true)
   const [showAreas, setShowAreas] = useState(true)
   const [showCompass, setShowCompass] = useState(true)
+  const clientToPlan = useRef<((x: number, y: number) => Vec2 | null) | null>(null)
 
   const measure = ctx.tool === 'measure'
 
+  const roomAt = (point: Vec2): Room | null =>
+    [...rooms]
+      .reverse()
+      .find(
+        (room) =>
+          point.x >= room.rect.x &&
+          point.x <= room.rect.x + room.rect.w &&
+          point.y >= room.rect.y &&
+          point.y <= room.rect.y + room.rect.h,
+      ) ?? null
+
+  const applyPlacement = (placement: PendingPlacement, point: Vec2) => {
+    const { tool, variant } = placement
+    if (tool === 'room') {
+      ctx.addRoomAt(point, variant)
+      return
+    }
+    if (tool === 'trees') {
+      ctx.addTreeAt(point, variant.kind)
+      return
+    }
+    const room = roomAt(point)
+    if (!room) return
+    if (tool === 'door') ctx.addOpening(room.id, 'door', variant.label)
+    if (tool === 'window') ctx.addOpening(room.id, 'window', variant.label)
+    if (tool === 'interior' && variant.item) ctx.placeInterior(room.id, variant.item)
+  }
+
   const handleRoomClick = (room: Room) => {
-    switch (ctx.tool) {
-      case 'door':
-        ctx.addOpening(room.id, 'door')
-        return
-      case 'window':
-        ctx.addOpening(room.id, 'window')
-        return
-      case 'interior':
-        if (ctx.pendingInterior) {
-          ctx.placeInterior(room.id, ctx.pendingInterior)
-          return
-        }
-        break
-      default:
-        break
+    if (ctx.pending) {
+      const { tool, variant } = ctx.pending
+      if (tool === 'door') return ctx.addOpening(room.id, 'door', variant.label)
+      if (tool === 'window') return ctx.addOpening(room.id, 'window', variant.label)
+      if (tool === 'interior' && variant.item) return ctx.placeInterior(room.id, variant.item)
     }
     ctx.selectRoom(room.id === selectedRoomId ? null : room.id)
   }
 
-  const handleCanvasClick = (point: { x: number; y: number }) => {
-    if (ctx.tool === 'room' && ctx.pendingRoom) {
-      ctx.addRoomAt(point, ctx.pendingRoom)
-      return
-    }
-    if (ctx.tool === 'trees') {
-      ctx.addTreeAt(point)
-    }
+  const handleCanvasClick = (point: Vec2) => {
+    if (ctx.pending) applyPlacement(ctx.pending, point)
   }
 
-  const pendingLabel =
-    ctx.tool === 'room' && ctx.pendingRoom
-      ? ROOM_OPTIONS.find((r) => r.value === ctx.pendingRoom)?.label
-      : ctx.tool === 'interior'
-        ? ctx.pendingInterior
-        : null
+  const handleDrop = (event: React.DragEvent) => {
+    const raw = event.dataTransfer.getData('application/x-archnova')
+    if (!raw) return
+    event.preventDefault()
+    const point = clientToPlan.current?.(event.clientX, event.clientY)
+    if (!point) return
+    try {
+      applyPlacement(JSON.parse(raw) as PendingPlacement, point)
+    } catch {
+      /* ignore malformed payloads */
+    }
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -126,38 +140,69 @@ export function PlanEditor() {
         </div>
       </div>
 
-      <PlanCanvas zoom={zoom} pan={ctx.tool === 'pan'} className="min-h-0 flex-1">
-        <FloorPlanDiagram
-          rooms={rooms}
-          units={units}
-          showLabels={showLabels}
-          showDimensions={showDimensions}
-          showAreas={showAreas}
-          showCompass={showCompass}
-          showBoundary
-          measure={measure}
-          trees={ctx.ornaments}
-          onCanvasClick={handleCanvasClick}
-          selectedId={selectedRoomId}
-          onSelectRoom={handleRoomClick}
-          className="min-h-0 min-w-0 drop-shadow-sm"
-        />
-      </PlanCanvas>
+      <div
+        className="min-h-0 flex-1"
+        onDragOver={(event) => {
+          if (event.dataTransfer.types.includes('application/x-archnova')) {
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'copy'
+          }
+        }}
+        onDrop={handleDrop}
+      >
+        <PlanCanvas zoom={zoom} pan={ctx.tool === 'pan'} className="h-full">
+          <FloorPlanDiagram
+            rooms={rooms}
+            units={units}
+            showLabels={showLabels}
+            showDimensions={showDimensions}
+            showAreas={showAreas}
+            showCompass={showCompass}
+            showBoundary
+            measure={measure}
+            trees={ctx.ornaments}
+            onCanvasClick={handleCanvasClick}
+            selectedId={selectedRoomId}
+            onSelectRoom={handleRoomClick}
+            dragEnabled={ctx.tool === 'select'}
+            onEditBegin={ctx.beginEdit}
+            onEditEnd={ctx.endEdit}
+            onDragLive={(id, x, y) =>
+              ctx.liveEdit((state) => ({
+                ...state,
+                rooms: state.rooms.map((room) =>
+                  room.id === id ? { ...room, rect: { ...room.rect, x, y } } : room,
+                ),
+              }))
+            }
+            onResizeLive={(id, w, h) =>
+              ctx.liveEdit((state) => ({
+                ...state,
+                rooms: state.rooms.map((room) =>
+                  room.id === id
+                    ? { ...room, width: w, length: h, rect: { ...room.rect, w, h } }
+                    : room,
+                ),
+              }))
+            }
+            registerClientToPlan={(fn) => {
+              clientToPlan.current = fn
+            }}
+            className="min-h-0 min-w-0 drop-shadow-sm"
+          />
+        </PlanCanvas>
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-surface px-3 py-2">
         <p className="text-[11.5px] text-muted">
-          {pendingLabel ? (
+          {ctx.pending ? (
             <span className="font-medium text-brand-700">
-              Placing: {pendingLabel} — click the plan{ctx.tool === 'interior' ? ' on a room' : ''} to
-              add it.{' '}
-              <button
-                className="underline underline-offset-2"
-                onClick={() => {
-                  ctx.setPendingRoom(null)
-                  ctx.setPendingInterior(null)
-                  ctx.setTool('select')
-                }}
-              >
+              Placing: {ctx.pending.variant.name} — click the plan
+              {ctx.pending.tool === 'door' || ctx.pending.tool === 'window' || ctx.pending.tool === 'interior'
+                ? ' on a room'
+                : ''}
+              , or drag a library tile.{' '}
+              <button className="underline underline-offset-2" onClick={() => ctx.setPending(null)}>
                 Cancel
               </button>
             </span>

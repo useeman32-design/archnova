@@ -30,9 +30,11 @@ import {
   UtensilsCrossed,
   type LucideIcon,
 } from 'lucide-react'
-import { ASSETS, ASSET_CATEGORIES, type AssetCategory } from '@/data/assets'
+import { ASSETS, ASSET_CATEGORIES, type AssetCategory, type AssetItem } from '@/data/assets'
+import { variantFromAsset } from '@/data/toolLibrary'
 import { Badge } from '@/components/ui/Badge'
 import { EmptyState } from '@/components/ui/Feedback'
+import { Plus } from 'lucide-react'
 
 const ICONS: Record<string, LucideIcon> = {
   Frame,
@@ -79,7 +81,7 @@ function AssetTile({ icon, swatch }: { icon: string; swatch?: string }) {
   )
 }
 
-export function AssetsView() {
+export function AssetsView({ onAdd }: { onAdd?: (asset: AssetItem) => void }) {
   const [category, setCategory] = useState<AssetCategory | 'all'>('all')
   const [query, setQuery] = useState('')
 
@@ -137,21 +139,34 @@ export function AssetsView() {
         />
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {filtered.map((asset) => (
-            <article
-              key={asset.id}
-              className="group overflow-hidden rounded-xl border border-line bg-surface p-2.5 shadow-sm transition-shadow hover:shadow-md"
-            >
-              <AssetTile icon={asset.icon} swatch={asset.swatch} />
-              <div className="mt-2.5 flex items-start justify-between gap-2 px-0.5">
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-medium text-ink-text">{asset.name}</p>
-                  <p className="truncate text-[11px] text-faint">{asset.tags.join(' · ')}</p>
+          {filtered.map((asset) => {
+            const placeable = Boolean(variantFromAsset(asset))
+            return (
+              <article
+                key={asset.id}
+                className="group overflow-hidden rounded-xl border border-line bg-surface p-2.5 shadow-sm transition-shadow hover:shadow-md"
+              >
+                <AssetTile icon={asset.icon} swatch={asset.swatch} />
+                <div className="mt-2.5 flex items-start justify-between gap-2 px-0.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium text-ink-text">{asset.name}</p>
+                    <p className="truncate text-[11px] text-faint">{asset.tags.join(' · ')}</p>
+                  </div>
+                  {onAdd && placeable ? (
+                    <button
+                      onClick={() => onAdd(asset)}
+                      title="Add to project"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm shadow-brand-600/25 hover:bg-brand-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <Badge tone="neutral">{placeable ? 'Preview' : 'Later'}</Badge>
+                  )}
                 </div>
-                <Badge tone="neutral">Preview</Badge>
-              </div>
-            </article>
-          ))}
+              </article>
+            )
+          })}
         </div>
       )}
 
