@@ -17,6 +17,12 @@ const WALL: Record<FinishOption, string> = {
   stone: '#c9cdd3',
   wood: '#d8b58c',
   glass: '#dfe9f5',
+  tile: '#e3e0d8',
+  marble: '#e9e5df',
+  concrete: '#b9bbbd',
+  carpet: '#98949a',
+  terrazzo: '#d6d0c6',
+  metal: '#aab4bc',
 }
 
 /**

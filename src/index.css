@@ -65,6 +65,29 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+@page {
+  size: landscape;
+  margin: 10mm;
+}
+
+@media print {
+  html, body, #root { width: 100%; height: 100%; background: #fff !important; }
+  body * { visibility: hidden !important; }
+  .print-plan-svg, .print-plan-svg * { visibility: visible !important; }
+  .print-plan-svg {
+    position: fixed !important;
+    inset: 0 !important;
+    display: block !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    background: #fff !important;
+    filter: none !important;
+    overflow: visible !important;
+  }
+}
+
 * {
   border-color: var(--color-line);
 }

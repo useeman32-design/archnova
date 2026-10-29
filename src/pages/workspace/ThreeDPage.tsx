@@ -17,6 +17,24 @@ const FINISH_ICONS: Record<FinishOption, React.ReactNode> = {
   stone: <Mountain className="h-4 w-4" />,
   wood: <Plane className="h-4 w-4" />,
   glass: <Square className="h-4 w-4" />,
+  tile: <Square className="h-4 w-4" />,
+  marble: <Mountain className="h-4 w-4" />,
+  concrete: <Layers className="h-4 w-4" />,
+  carpet: <Sofa className="h-4 w-4" />,
+  terrazzo: <Box className="h-4 w-4" />,
+  metal: <Square className="h-4 w-4" />,
+}
+
+function materialSwatch(value: FinishOption): string {
+  const patterns: Record<FinishOption, string> = {
+    render: 'linear-gradient(135deg,#eeeae3,#d6d1c8)', paint: 'linear-gradient(135deg,#fafafa,#dfe8f0)',
+    brick: 'repeating-linear-gradient(0deg,#b97861 0 7px,#eee3d8 8px 9px)', stone: 'repeating-linear-gradient(45deg,#c8c1b2 0 12px,#aaa394 13px,#d7d1c6 15px)',
+    wood: 'repeating-linear-gradient(0deg,#c9a97f 0 7px,#8b6747 8px,#d8bc98 9px)', glass: 'linear-gradient(135deg,#d9f0fb 0 40%,#8eb5ca 42%,#e9f8ff 50%,#bfdbe8 62%)',
+    tile: 'repeating-linear-gradient(0deg,#e8e4db 0 14px,#89929b 15px,#e8e4db 16px)', marble: 'linear-gradient(135deg,#eee9df,#c2c4c2 42%,#f7f4ed 60%,#d6d1c7)',
+    concrete: 'repeating-linear-gradient(45deg,#c4c5c2 0 3px,#b5b7b6 4px,#c7c8c6 6px)', carpet: 'repeating-linear-gradient(90deg,#8a8790 0 2px,#a09da5 3px,#89868e 4px)',
+    terrazzo: 'radial-gradient(#6d8794 1px,transparent 2px),radial-gradient(#b87861 1px,transparent 2px),#d6d2c9', metal: 'repeating-linear-gradient(90deg,#87929a 0 5px,#c0c8ce 6px,#87929a 8px)',
+  }
+  return patterns[value]
 }
 
 const CATEGORIES = [
@@ -103,6 +121,15 @@ export function ThreeDPage() {
           onEditEnd={ctx.endEdit}
           ornaments={ctx.ornaments}
           placed={ctx.placed}
+          selectedItemId={mode === 'interior' ? ctx.selectedItemId : null}
+          onSelectItem={ctx.selectItem}
+          selectedSiteId={ctx.selectedSiteId}
+          onSelectSite={ctx.selectSite}
+          onUpdateSiteLive={(id, x, y, scale) => ctx.liveEdit((state) => ({ ...state, ornaments: state.ornaments.map((site) => site.id === id ? { ...site, x, y, scale } : site) }))}
+          onUpdatePlacedItem={(roomId, itemId, patch) => ctx.liveEdit((state) => {
+            const items = (state.placed[roomId] ?? []).map((item) => item.id === itemId ? { ...item, ...patch } : item)
+            return { ...state, placed: { ...state.placed, [roomId]: items }, rooms: state.rooms.map((room) => room.id === roomId ? { ...room, items } : room) }
+          })}
           pendingItem={mode === 'interior' && ctx.pending?.tool === 'interior' ? ctx.pending.variant.item ?? null : null}
           onPlaceInterior={(item) => {
             const target = ctx.selectedRoom ?? ctx.rooms[0]
@@ -209,6 +236,7 @@ export function ThreeDPage() {
                 </button>
               ))}
             </div>
+            <label className="mt-2 flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[11px] font-medium text-muted">Roof color<input type="color" value={ctx.previewRoofColor} onChange={(event) => ctx.setPreviewRoofColor(event.target.value)} className="h-7 w-10 cursor-pointer rounded border-0 bg-transparent p-0" /></label>
           </div>
 
           <div>
@@ -224,11 +252,12 @@ export function ThreeDPage() {
                       : 'border-line text-muted hover:bg-canvas-soft'
                   }`}
                 >
-                  {FINISH_ICONS[option.value]}
-                  {option.label}
+                  <span className="h-8 w-full rounded-md border border-black/10" style={{ background: materialSwatch(option.value) }} />
+                  <span className="flex items-center gap-1">{FINISH_ICONS[option.value]}{option.label}</span>
                 </button>
               ))}
             </div>
+            <label className="mt-2 flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[11px] font-medium text-muted">Wall color<input type="color" value={ctx.previewExtColor} onChange={(event) => ctx.setPreviewExtColor(event.target.value)} className="h-7 w-10 cursor-pointer rounded border-0 bg-transparent p-0" /></label>
           </div>
 
           <div>
@@ -244,8 +273,8 @@ export function ThreeDPage() {
                       : 'border-line text-muted hover:bg-canvas-soft'
                   }`}
                 >
-                  {FINISH_ICONS[option.value]}
-                  {option.label}
+                  <span className="h-8 w-full rounded-md border border-black/10" style={{ background: materialSwatch(option.value) }} />
+                  <span className="flex items-center gap-1">{FINISH_ICONS[option.value]}{option.label}</span>
                 </button>
               ))}
             </div>

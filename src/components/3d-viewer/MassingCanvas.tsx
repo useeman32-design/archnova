@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, type ThreeEvent } from '@react-three/fiber'
 import { OrbitControls, TransformControls, Edges } from '@react-three/drei'
-import { BackSide, CanvasTexture, RepeatWrapping, SRGBColorSpace, type Mesh, type Object3D } from 'three'
-import type { FinishOption, Project, Room } from '@/types'
+import { CanvasTexture, RepeatWrapping, SRGBColorSpace, Shape, type Mesh, type Object3D } from 'three'
+import type { ArchitecturalWall, FinishOption, PlacedItem, Project, Room, WallOpening } from '@/types'
+import { getFloorArchitecturalModel, wallLength, wallSolidSections, type WallThicknessSettings } from '@/lib/architecturalModel'
+import { canonicalFurnitureKey, getFurnitureDimensions } from '@/lib/furniture'
 
 /**
  * React Three Fiber scene for the massing preview.
@@ -24,6 +26,12 @@ export const WALL_COLORS: Record<FinishOption, string> = {
   stone: '#c8c1b2',
   wood: '#a9805a',
   glass: '#bcd6e2',
+  tile: '#dad8d0',
+  marble: '#e5e1d8',
+  concrete: '#aeb1b3',
+  carpet: '#8a8790',
+  terrazzo: '#d4d0c7',
+  metal: '#87929a',
 }
 
 export const FLOOR_COLORS: Record<FinishOption, string> = {
@@ -33,6 +41,12 @@ export const FLOOR_COLORS: Record<FinishOption, string> = {
   stone: '#cfc8b8',
   wood: '#c9a97f',
   glass: '#d7e2e8',
+  tile: '#ddd9cf',
+  marble: '#e9e4da',
+  concrete: '#bebfbd',
+  carpet: '#85818b',
+  terrazzo: '#d7d2c8',
+  metal: '#b6bdc3',
 }
 
 const FLAT_CATEGORIES = new Set(['garden', 'pool', 'circulation'])
@@ -47,8 +61,14 @@ export interface MassingCanvasProps {
   onResizeLive?: (id: string, w: number, h: number) => void
   onEditBegin?: () => void
   onEditEnd?: () => void
-  ornaments?: { x: number; y: number; kind?: string }[]
-  placed?: Record<string, string[]>
+  ornaments?: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string }[]
+  placed?: Record<string, PlacedItem[]>
+  selectedItemId?: string | null
+  onSelectItem?: (id: string | null) => void
+  onUpdatePlacedItem?: (roomId: string, itemId: string, patch: Partial<PlacedItem>) => void
+  selectedSiteId?: string | null
+  onSelectSite?: (id: string | null) => void
+  onUpdateSiteLive?: (id: string, x: number, y: number, scale: number) => void
   pendingItem?: string | null
   onPlaceInterior?: (item: string) => void
 }
@@ -56,7 +76,11 @@ export interface MassingCanvasProps {
 export default function MassingCanvas(props: MassingCanvasProps) {
   const orbitRef = useRef<any>(null)
   const meshRefs = useRef(new Map<string, Mesh>())
+  const itemRefs = useRef(new Map<string, Object3D>())
+  const siteRefs = useRef(new Map<string, Object3D>())
+  const [selectedSiteObj, setSelectedSiteObj] = useState<Object3D | null>(null)
   const [selectedObj, setSelectedObj] = useState<Object3D | null>(null)
+  const [selectedItemObj, setSelectedItemObj] = useState<Object3D | null>(null)
   const baseSize = useRef<{ w: number; h: number } | null>(null)
   const { project, mode, selectedId, onSelectRoom, transformMode = 'translate' } = props
 
@@ -66,6 +90,34 @@ export default function MassingCanvas(props: MassingCanvasProps) {
 
   const rooms = project.floors.flatMap((floor) => floor.rooms)
   const selectedRoom = rooms.find((r) => r.id === selectedId) ?? null
+
+  useEffect(() => {
+    setSelectedItemObj(props.selectedItemId ? (itemRefs.current.get(props.selectedItemId) ?? null) : null)
+  }, [props.selectedItemId, props.placed])
+
+  useEffect(() => {
+    setSelectedSiteObj(props.selectedSiteId ? (siteRefs.current.get(props.selectedSiteId) ?? null) : null)
+  }, [props.selectedSiteId, props.ornaments])
+
+  const handleSiteTransform = () => {
+    const obj = selectedSiteObj
+    if (!obj || !props.selectedSiteId) return
+    props.onUpdateSiteLive?.(
+      props.selectedSiteId,
+      obj.position.x / S + project.plot.width / 2,
+      obj.position.z / S + project.plot.length / 2,
+      Math.max(0.35, Math.min(4, obj.scale.x)),
+    )
+  }
+
+  const handleFurnitureTransform = () => {
+    const obj = selectedItemObj
+    if (!obj || !selectedRoom || !props.selectedItemId) return
+    props.onUpdatePlacedItem?.(selectedRoom.id, props.selectedItemId, {
+      x: Math.max(-0.45, Math.min(0.45, obj.position.x / Math.max(selectedRoom.width * S, 0.1))),
+      z: Math.max(-0.45, Math.min(0.45, obj.position.z / Math.max(selectedRoom.length * S, 0.1))),
+    })
+  }
 
   const handleTransform = () => {
     const obj = selectedObj
@@ -93,14 +145,21 @@ export default function MassingCanvas(props: MassingCanvasProps) {
           ? { position: [0, 0.5, 0.01], fov: 70 }
           : { position: [5.4, 4.2, 6.4], fov: 42 }
       }
-      onPointerMissed={() => onSelectRoom?.(null)}
+      onPointerMissed={() => { onSelectRoom?.(null); props.onSelectSite?.(null); props.onSelectItem?.(null) }}
     >
       {mode === 'interior' ? (
         <InteriorScene
           rooms={rooms}
           selected={selectedRoom}
           floorFinish={project.preferences.interiorFinish}
+          wallThicknesses={{
+            exterior: project.preferences.exteriorWallThickness ?? (project.plot.units === 'ft' ? 0.75 : 0.23),
+            interior: project.preferences.interiorWallThickness ?? (project.plot.units === 'ft' ? 0.375 : 0.12),
+          }}
           placed={props.placed ?? {}}
+          itemRefs={itemRefs}
+          selectedItemId={props.selectedItemId ?? null}
+          onSelectItem={props.onSelectItem}
           pendingItem={props.pendingItem ?? null}
           onPlaceInterior={props.onPlaceInterior}
         />
@@ -110,6 +169,9 @@ export default function MassingCanvas(props: MassingCanvasProps) {
           selectedId={selectedId ?? null}
           onSelectRoom={onSelectRoom}
           meshRefs={meshRefs}
+          siteRefs={siteRefs}
+          selectedSiteId={props.selectedSiteId ?? null}
+          onSelectSite={props.onSelectSite}
           ornaments={props.ornaments ?? []}
         />
       )}
@@ -136,6 +198,36 @@ export default function MassingCanvas(props: MassingCanvasProps) {
         />
       ) : null}
 
+      {mode === 'exterior' && selectedSiteObj && props.selectedSiteId ? (
+        <TransformControls
+          object={selectedSiteObj}
+          mode={transformMode}
+          showY={false}
+          size={0.65}
+          onMouseDown={() => { if (orbitRef.current) orbitRef.current.enabled = false; props.onEditBegin?.() }}
+          onMouseUp={() => { if (orbitRef.current) orbitRef.current.enabled = true; props.onEditEnd?.() }}
+          onObjectChange={handleSiteTransform}
+        />
+      ) : null}
+
+      {mode === 'interior' && selectedItemObj && selectedRoom ? (
+        <TransformControls
+          object={selectedItemObj}
+          mode="translate"
+          showY={false}
+          size={0.55}
+          onMouseDown={() => {
+            if (orbitRef.current) orbitRef.current.enabled = false
+            props.onEditBegin?.()
+          }}
+          onMouseUp={() => {
+            if (orbitRef.current) orbitRef.current.enabled = true
+            props.onEditEnd?.()
+          }}
+          onObjectChange={handleFurnitureTransform}
+        />
+      ) : null}
+
       <OrbitControls
         ref={orbitRef}
         enableDamping
@@ -156,16 +248,27 @@ function ExteriorScene({
   selectedId,
   onSelectRoom,
   meshRefs,
+  siteRefs,
+  selectedSiteId,
+  onSelectSite,
   ornaments,
 }: {
   project: Project
   selectedId: string | null
   onSelectRoom?: (id: string | null) => void
   meshRefs: React.MutableRefObject<Map<string, Mesh>>
-  ornaments: { x: number; y: number; kind?: string }[]
+  siteRefs: React.MutableRefObject<Map<string, Object3D>>
+  selectedSiteId: string | null
+  onSelectSite?: (id: string | null) => void
+  ornaments: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string }[]
 }) {
   const { width: plotW, length: plotL } = project.plot
-  const wallColor = WALL_COLORS[project.preferences.exteriorFinish] ?? WALL_COLORS.render
+  const wallThicknesses = {
+    exterior: project.preferences.exteriorWallThickness ?? (project.plot.units === 'ft' ? 0.75 : 0.23),
+    interior: project.preferences.interiorWallThickness ?? (project.plot.units === 'ft' ? 0.375 : 0.12),
+  }
+  const wallTexture = useMemo(() => makeFloorTexture(project.preferences.exteriorFinish, plotW * S, plotL * S), [project.preferences.exteriorFinish, plotW, plotL])
+  useEffect(() => () => wallTexture.dispose(), [wallTexture])
   const topLevel = Math.max(...project.floors.map((f) => f.level), 1)
   const buildingRooms = project.floors.flatMap((floor) => floor.rooms.filter((room) => !FLAT_CATEGORIES.has(room.category)))
   const buildingBounds = buildingRooms.length ? {
@@ -195,72 +298,63 @@ function ExteriorScene({
       {project.floors.flatMap((floor) =>
         floor.rooms.map((room) => {
           const flat = FLAT_CATEGORIES.has(room.category)
-          const h = flat ? 0.05 : WALL_H
           const [wx, wz] = toWorld(room.rect.x + room.rect.w / 2, room.rect.y + room.rect.h / 2)
-          const y = (floor.level - 1) * (WALL_H + SLAB) + h / 2
+          const floorY = (floor.level - 1) * (WALL_H + SLAB) + 0.012
           const isSelected = room.id === selectedId
-          const color = flat
-            ? room.category === 'pool'
-              ? '#7fc4e8'
-              : room.category === 'garden'
-                ? '#a9cf94'
-                : '#d8d5cd'
-            : wallColor
+          const floorShape = makeRoomShape(room, S)
+          const floorColor = room.finishColor ?? (room.category === 'pool' ? '#7fc4e8' : room.category === 'garden' ? '#a9cf94' : '#d8d5cd')
           return (
             <mesh
-              key={room.id}
+              key={`room-floor-${room.id}`}
               ref={(mesh) => {
                 if (mesh) meshRefs.current.set(room.id, mesh)
                 else meshRefs.current.delete(room.id)
               }}
-              position={[wx, y, wz]}
-              castShadow={!flat}
+              position={[wx, floorY, wz]}
+              rotation={[-Math.PI / 2, 0, 0]}
               receiveShadow
-              onClick={
-                onSelectRoom
-                  ? (event: ThreeEvent<MouseEvent>) => {
-                      event.stopPropagation()
-                      onSelectRoom(room.id === selectedId ? null : room.id)
-                    }
-                  : undefined
-              }
+              onClick={onSelectRoom ? (event: ThreeEvent<MouseEvent>) => {
+                event.stopPropagation()
+                onSelectRoom(room.id === selectedId ? null : room.id)
+              } : undefined}
             >
-              <boxGeometry args={[room.rect.w * S, h, room.rect.h * S]} />
-              <meshStandardMaterial
-                color={color}
-                roughness={0.85}
-                emissive={isSelected ? '#1a56f5' : '#000000'}
-                emissiveIntensity={isSelected ? 0.28 : 0}
-              />
+              <shapeGeometry args={[floorShape]} />
+              <meshStandardMaterial color={floorColor} roughness={flat ? 0.92 : 0.78} />
               {isSelected ? <Edges color="#1a56f5" /> : null}
-              {!flat ? room.elements.filter((element) => element.type === 'door').map((element, index, all) => {
-                const width = Math.min(room.rect.w * S * 0.82, (element.width ?? 3) * S)
-                const height = Math.min(WALL_H * 0.92, (element.height ?? 7) * S)
-                const offsetX = -room.rect.w * S / 2 + room.rect.w * S * ((index + 1) / (all.length + 1))
-                return <group key={element.id} position={[offsetX, -h / 2 + height / 2, room.rect.h * S / 2 + 0.012]}>
-                  <mesh><boxGeometry args={[width + 0.045, height + 0.035, 0.025]} /><meshStandardMaterial color="#44372c" roughness={0.78} /></mesh>
-                  <mesh position={[0, 0, 0.016]}><boxGeometry args={[Math.max(0.12, width - 0.035), Math.max(0.2, height - 0.035), 0.012]} /><meshStandardMaterial color="#9a7654" roughness={0.62} /></mesh>
-                </group>
-              }) : null}
-              {!flat ? room.elements.filter((element) => element.type === 'window').map((element, index, all) => {
-                const width = Math.min(room.rect.w * S * 0.7, (element.width ?? 4) * S)
-                const height = Math.min(WALL_H * 0.62, (element.height ?? 4) * S)
-                const offsetX = -room.rect.w * S / 2 + room.rect.w * S * ((index + 1) / (all.length + 1))
-                const sill = WALL_H * 0.18
-                return <group key={element.id} position={[offsetX, sill + height / 2, room.rect.h * S / 2 + 0.014]}>
-                  <mesh><boxGeometry args={[width + 0.045, height + 0.045, 0.026]} /><meshStandardMaterial color="#f3f0e8" roughness={0.55} /></mesh>
-                  <mesh position={[0, 0, 0.016]}><boxGeometry args={[width, height, 0.012]} /><meshStandardMaterial color="#a8d2e7" emissive="#8dc7e5" emissiveIntensity={0.18} metalness={0.1} roughness={0.23} /></mesh>
-                  <mesh position={[0, 0, 0.024]}><boxGeometry args={[0.018, height, 0.008]} /><meshStandardMaterial color="#e8edf0" /></mesh>
-                </group>
-              }) : null}
             </mesh>
           )
         }),
       )}
 
-      {ornaments.map((tree, index) => {
+      {project.floors.flatMap((floor) => {
+        const model = getFloorArchitecturalModel(floor.rooms, floor.walls, floor.openings, wallThicknesses)
+        return model.walls.map((wall) => (
+          <ExteriorWall
+            key={wall.id}
+            wall={wall}
+            openings={model.openings.filter((opening) => opening.wallId === wall.id)}
+            plotWidth={plotW}
+            plotLength={plotL}
+            wallTexture={wallTexture}
+            wallColor={project.preferences.exteriorColor ?? '#ffffff'}
+            exteriorFinish={project.preferences.exteriorFinish}
+          />
+        ))
+      })}
+
+      {ornaments.map((tree) => {
         const [tx, tz] = toWorld(tree.x, tree.y)
-        return <Tree key={`t${index}`} position={[tx, 0, tz]} kind={tree.kind} />
+        return <group
+          key={tree.id}
+          ref={(obj) => { if (obj) siteRefs.current.set(tree.id, obj); else siteRefs.current.delete(tree.id) }}
+          position={[tx, 0, tz]}
+          rotation={[0, tree.rotation, 0]}
+          scale={tree.scale}
+          onClick={(event) => { event.stopPropagation(); onSelectSite?.(tree.id) }}
+        >
+          {tree.id === selectedSiteId ? <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}><ringGeometry args={[0.31, 0.36, 28]} /><meshBasicMaterial color="#1a56f5" /></mesh> : null}
+          <Tree position={[0, 0, 0]} kind={tree.kind} color={tree.color} />
+        </group>
       })}
 
       {buildingBounds ? (
@@ -270,6 +364,7 @@ function ExteriorScene({
             y={topLevel * (WALL_H + SLAB)}
             width={(buildingBounds.maxX - buildingBounds.minX) * S * 1.06}
             length={(buildingBounds.maxY - buildingBounds.minY) * S * 1.06}
+            color={project.preferences.roofColor}
           />
         </group>
       ) : null}
@@ -277,11 +372,155 @@ function ExteriorScene({
   )
 }
 
-function Tree({ position, kind = 'palm' }: { position: [number, number, number]; kind?: string }) {
+function ExteriorWall({
+  wall,
+  openings,
+  plotWidth,
+  plotLength,
+  wallTexture,
+  wallColor,
+  exteriorFinish,
+}: {
+  wall: ArchitecturalWall
+  openings: WallOpening[]
+  plotWidth: number
+  plotLength: number
+  wallTexture: CanvasTexture
+  wallColor: string
+  exteriorFinish: FinishOption
+}) {
+  const length = wallLength(wall)
+  if (length <= 0) return null
+  const scale = S
+  const startX = (wall.start.x - plotWidth / 2) * scale
+  const startZ = (wall.start.y - plotLength / 2) * scale
+  const endX = (wall.end.x - plotWidth / 2) * scale
+  const endZ = (wall.end.y - plotLength / 2) * scale
+  const midX = (startX + endX) / 2
+  const midZ = (startZ + endZ) / 2
+  const angle = -Math.atan2(endZ - startZ, endX - startX)
+  const baseY = (wall.level - 1) * (WALL_H + SLAB)
+  const height = Math.min(WALL_H, wall.height * scale)
+  const thickness = wall.thickness * scale
+  const validOpenings = openings
+.filter((opening) => opening.offset >= 0 && opening.width > 0 && opening.offset + opening.width <= length && opening.sillHeight >= 0 && opening.sillHeight + opening.height <= height / scale)
+    .sort((a, b) => a.offset - b.offset)
+  const material = wall.kind === 'exterior'
+    ? <meshStandardMaterial map={wallTexture} color={wallColor} roughness={exteriorFinish === 'metal' ? 0.32 : exteriorFinish === 'glass' ? 0.18 : 0.82} metalness={exteriorFinish === 'metal' ? 0.48 : 0} />
+    : <meshStandardMaterial color="#e4e0d6" roughness={0.86} />
+  const sections = wallSolidSections({ ...wall, height: height / scale }, validOpenings)
+
+  return (
+    <group position={[midX, baseY, midZ]} rotation={[0, angle, 0]}>
+      {sections.map((part, index) => (
+        <mesh key={`wall-${wall.id}-${index}`} position={[(part.offsetStart + part.offsetEnd) * scale / 2 - length * scale / 2, (part.elevationStart + part.elevationEnd) * scale / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[(part.offsetEnd - part.offsetStart) * scale, (part.elevationEnd - part.elevationStart) * scale, thickness]} />
+          {material}
+        </mesh>
+      ))}
+      {validOpenings.map((opening) => (
+        <OpeningFixture key={opening.id} opening={opening} wallThickness={thickness} wallLength={length} />
+      ))}
+    </group>
+  )
+}
+
+function InteriorArchitecturalWall({ wall, openings, room, color }: { wall: ArchitecturalWall; openings: WallOpening[]; room: Room; color: string }) {
+  const length = wallLength(wall)
+  if (length <= 0) return null
+  const cx = room.rect.x + room.rect.w / 2
+  const cy = room.rect.y + room.rect.h / 2
+  const ax = (wall.start.x - cx) * S
+  const az = (wall.start.y - cy) * S
+  const bx = (wall.end.x - cx) * S
+  const bz = (wall.end.y - cy) * S
+  const midX = (ax + bx) / 2
+  const midZ = (az + bz) / 2
+  const angle = -Math.atan2(bz - az, bx - ax)
+  const height = Math.min(WALL_H, wall.height * S)
+  const thickness = Math.max(0.035, wall.thickness * S)
+  const validOpenings = openings.filter((opening) => opening.offset >= 0 && opening.width > 0 && opening.offset + opening.width <= length && opening.sillHeight >= 0 && opening.sillHeight + opening.height <= height / S).sort((a, b) => a.offset - b.offset)
+  const sections = wallSolidSections({ ...wall, height: height / S }, validOpenings)
+  return (
+    <group position={[midX, 0, midZ]} rotation={[0, angle, 0]}>
+      {sections.map((part, index) => (
+        <mesh key={index} position={[(part.offsetStart + part.offsetEnd) * S / 2 - length * S / 2, (part.elevationStart + part.elevationEnd) * S / 2, 0]} receiveShadow>
+          <boxGeometry args={[(part.offsetEnd - part.offsetStart) * S, (part.elevationEnd - part.elevationStart) * S, thickness]} />
+          <meshStandardMaterial color={color} roughness={0.86} />
+        </mesh>
+      ))}
+      {validOpenings.map((opening) => <OpeningFixture key={opening.id} opening={opening} wallThickness={thickness} wallLength={length} />)}
+    </group>
+  )
+}
+
+function OpeningFixture({ opening, wallThickness, wallLength }: { opening: WallOpening; wallThickness: number; wallLength: number }) {
+  const scale = S
+  const width = opening.width * scale
+  const height = opening.height * scale
+  const sill = opening.type === 'door' ? 0 : opening.sillHeight * scale
+  if (opening.type === 'door') {
+    const split = opening.style === 'double-hinged' || opening.style === 'sliding' || opening.style === 'folding'
+    const leafWidth = split ? width / 2 : width
+    const leaves = split ? [-1, 1] : [0]
+    return (
+      <group position={[(opening.offset + opening.width / 2 - wallLength / 2) * scale, height / 2, 0]}>
+        {leaves.map((side) => (
+          <group key={side} position={[split ? side * width / 4 : 0, 0, opening.style === 'sliding' ? side * wallThickness * 0.2 : 0]}>
+            <mesh castShadow>
+              <boxGeometry args={[leafWidth - (split ? 0.012 : 0), height, Math.max(0.025, wallThickness * 0.55)]} />
+              <meshStandardMaterial color={opening.color ?? '#8a6a48'} roughness={0.62} />
+            </mesh>
+            {split ? <mesh position={[side * leafWidth * 0.38, 0, wallThickness * 0.3]}><sphereGeometry args={[0.012, 8, 6]} /><meshStandardMaterial color="#d4b46c" metalness={0.65} roughness={0.28} /></mesh> : null}
+          </group>
+        ))}
+      </group>
+    )
+  }
+
+  const glass = <meshStandardMaterial color={opening.color ?? '#9fd4ee'} transparent opacity={0.76} metalness={0.12} roughness={0.18} />
+  const frame = <meshStandardMaterial color="#f5f4ee" />
+  if (opening.style === 'bay') {
+    const panelWidth = width * 0.38
+    return (
+      <group position={[(opening.offset + opening.width / 2 - wallLength / 2) * scale, sill + height / 2, 0]}>
+        <mesh><boxGeometry args={[panelWidth, height, wallThickness * 0.35]} />{glass}</mesh>
+        <mesh position={[-width * 0.32, 0, -wallThickness * 0.25]} rotation={[0, -0.45, 0]}><boxGeometry args={[panelWidth, height, wallThickness * 0.3]} />{glass}</mesh>
+        <mesh position={[width * 0.32, 0, -wallThickness * 0.25]} rotation={[0, 0.45, 0]}><boxGeometry args={[panelWidth, height, wallThickness * 0.3]} />{glass}</mesh>
+        {[-width * 0.18, width * 0.18].map((x) => <mesh key={x} position={[x, 0, wallThickness * 0.3]}><boxGeometry args={[0.018, height, 0.012]} />{frame}</mesh>)}
+      </group>
+    )
+  }
+  return (
+    <group position={[(opening.offset + opening.width / 2 - wallLength / 2) * scale, sill + height / 2, 0]}>
+      <mesh><boxGeometry args={[width, height, Math.max(0.025, wallThickness * 0.45)]} />{glass}</mesh>
+      <mesh position={[0, height / 2, wallThickness * 0.32]}><boxGeometry args={[width, 0.018, 0.012]} />{frame}</mesh>
+      <mesh position={[0, -height / 2, wallThickness * 0.32]}><boxGeometry args={[width, 0.018, 0.012]} />{frame}</mesh>
+      {opening.style === 'casement' || opening.style === 'sliding' ? <mesh position={[0, 0, wallThickness * 0.32]}><boxGeometry args={[0.018, height, 0.012]} />{frame}</mesh> : null}
+    </group>
+  )
+}
+
+function makeRoomShape(room: Room, scale: number): Shape {
+  const outline = room.outline && room.outline.length >= 3
+    ? room.outline
+    : [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }]
+  const points = outline.map((point) => ({
+    x: (point.x - 0.5) * room.rect.w * scale,
+    y: (0.5 - point.y) * room.rect.h * scale,
+  }))
+  const shape = new Shape()
+  shape.moveTo(points[0].x, points[0].y)
+  for (const point of points.slice(1)) shape.lineTo(point.x, point.y)
+  shape.closePath()
+  return shape
+}
+
+function Tree({ position, kind = 'palm', color = '#4f8a3f' }: { position: [number, number, number]; kind?: string; color?: string }) {
   if (kind === 'car') {
     return (
       <group position={position}>
-        <mesh position={[0, 0.16, 0]} castShadow><boxGeometry args={[0.52, 0.18, 0.28]} /><meshStandardMaterial color="#53677e" metalness={0.18} roughness={0.45} /></mesh>
+        <mesh position={[0, 0.16, 0]} castShadow><boxGeometry args={[0.52, 0.18, 0.28]} /><meshStandardMaterial color={color} metalness={0.18} roughness={0.45} /></mesh>
         <mesh position={[0, 0.27, -0.01]} castShadow><boxGeometry args={[0.28, 0.16, 0.24]} /><meshStandardMaterial color="#8eb4c8" roughness={0.25} /></mesh>
         {[-1, 1].flatMap((x) => [-1, 1].map((z) => <mesh key={`${x}-${z}`} position={[x * 0.17, 0.07, z * 0.12]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.055, 0.055, 0.035, 12]} /><meshStandardMaterial color="#20252b" /></mesh>))}
       </group>
@@ -290,7 +529,7 @@ function Tree({ position, kind = 'palm' }: { position: [number, number, number];
   if (kind === 'person') {
     return (
       <group position={position}>
-        <mesh position={[0, 0.24, 0]} castShadow><capsuleGeometry args={[0.055, 0.25, 4, 8]} /><meshStandardMaterial color="#455f87" /></mesh>
+        <mesh position={[0, 0.24, 0]} castShadow><capsuleGeometry args={[0.055, 0.25, 4, 8]} /><meshStandardMaterial color={color} /></mesh>
         <mesh position={[0, 0.45, 0]} castShadow><sphereGeometry args={[0.075, 12, 10]} /><meshStandardMaterial color="#c9926d" /></mesh>
       </group>
     )
@@ -306,12 +545,12 @@ function Tree({ position, kind = 'palm' }: { position: [number, number, number];
       {kind === 'conifer' ? (
         <mesh position={[0, trunkH + 0.28, 0]} castShadow>
           <coneGeometry args={[0.26, 0.62, 8]} />
-          <meshStandardMaterial color="#3f6d3a" roughness={0.85} />
+          <meshStandardMaterial color={color} roughness={0.85} />
         </mesh>
       ) : kind === 'shrub' || kind === 'flower' ? (
         <mesh position={[0, trunkH + 0.08, 0]} castShadow>
           <sphereGeometry args={[0.14, 12, 10]} />
-          <meshStandardMaterial color={kind === 'flower' ? '#c96f8e' : '#5d8a43'} roughness={0.9} />
+          <meshStandardMaterial color={color} roughness={0.9} />
         </mesh>
       ) : kind === 'hedge' ? (
         <mesh position={[0, trunkH + 0.06, 0]} castShadow>
@@ -328,9 +567,8 @@ function Tree({ position, kind = 'palm' }: { position: [number, number, number];
   )
 }
 
-function Roof({ form, y, width, length }: { form: string; y: number; width: number; length: number }) {
+function Roof({ form, y, width, length, color = '#33415c' }: { form: string; y: number; width: number; length: number; color?: string }) {
   const rise = Math.min(width, length) * 0.32
-  const color = '#33415c'
 
   if (form === 'pitched-gable') {
     const slope = Math.atan2(rise, length / 2)
@@ -386,14 +624,22 @@ function InteriorScene({
   rooms,
   selected,
   floorFinish,
+  wallThicknesses,
   placed,
+  itemRefs,
+  selectedItemId,
+  onSelectItem,
   pendingItem,
   onPlaceInterior,
 }: {
   rooms: Room[]
   selected: Room | null
   floorFinish: FinishOption
-  placed: Record<string, string[]>
+  wallThicknesses: WallThicknessSettings
+  placed: Record<string, PlacedItem[]>
+  itemRefs: React.MutableRefObject<Map<string, Object3D>>
+  selectedItemId: string | null
+  onSelectItem?: (id: string | null) => void
   pendingItem: string | null
   onPlaceInterior?: (item: string) => void
 }) {
@@ -409,12 +655,14 @@ function InteriorScene({
   const finish = room?.finish ?? floorFinish
   const w = (room?.width ?? 0) * S
   const l = (room?.length ?? 0) * S
+  const roomModel = useMemo(() => getFloorArchitecturalModel(rooms, undefined, undefined, wallThicknesses), [rooms, wallThicknesses])
+  const roomWalls = room ? roomModel.walls.filter((wall) => wall.roomIds.includes(room.id)) : []
+  const roomFloorShape = useMemo(() => room ? makeRoomShape(room, S) : null, [room?.id, room?.rect.w, room?.rect.h, room?.outline])
   const floorTexture = useMemo(() => room ? makeFloorTexture(finish, w, l) : null, [room?.id, finish, w, l])
   useEffect(() => () => floorTexture?.dispose(), [floorTexture])
 
-  if (!room) return null
-  const items = placed[room.id] ?? []
-  const effective = items.length > 0 ? items : defaultItemsFor(room.category)
+  if (!room || !roomFloorShape) return null
+  const items = placed[room.id] ?? room.items ?? []
 
   return (
     <>
@@ -423,9 +671,10 @@ function InteriorScene({
       <pointLight position={[0, WALL_H * 0.82, 0]} intensity={1.5} distance={7} color="#fff4e0" />
       <directionalLight position={[2, 3, 2]} intensity={0.5} />
 
-      {/* floor + ceiling */}
+      {/* Floor is lifted a hair above the datum; walls are separate meshes, so no coplanar shell can flicker through it. */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.004, 0]}
         receiveShadow
         onClick={(event) => {
           if (!pendingItem) return
@@ -433,42 +682,47 @@ function InteriorScene({
           onPlaceInterior?.(pendingItem)
         }}
       >
-        <planeGeometry args={[w, l]} />
-        <meshStandardMaterial map={floorTexture ?? undefined} color={floorTexture ? '#ffffff' : (FLOOR_COLORS[finish] ?? FLOOR_COLORS.wood)} roughness={finish === 'wood' ? 0.62 : 0.78} />
+        <shapeGeometry args={[roomFloorShape]} />
+        <meshStandardMaterial map={floorTexture ?? undefined} color={room.finishColor ?? '#ffffff'} roughness={finish === 'marble' || finish === 'glass' ? 0.18 : finish === 'tile' ? 0.28 : finish === 'carpet' ? 0.96 : 0.72} metalness={finish === 'metal' ? 0.45 : 0} />
       </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, WALL_H, 0]}>
-        <planeGeometry args={[w, l]} />
-        <meshStandardMaterial color="#f4f1ea" roughness={0.9} />
-      </mesh>
-
-      {/* shell */}
-      <mesh position={[0, WALL_H / 2, 0]}>
-        <boxGeometry args={[w, WALL_H, l]} />
-        <meshStandardMaterial color="#efece4" side={BackSide} roughness={0.9} />
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, WALL_H + 0.006, 0]}>
+        <shapeGeometry args={[roomFloorShape]} />
+        <meshStandardMaterial color="#f4f1ea" roughness={0.9} side={2} />
       </mesh>
 
-      {/* windows on the far wall */}
-      {[-w * 0.22, w * 0.22].map((x, i) => (
-        <mesh key={i} position={[x, WALL_H * 0.55, -l / 2 + 0.012]}>
-          <planeGeometry args={[w * 0.26, WALL_H * 0.5]} />
-          <meshStandardMaterial color="#cfe8f7" emissive="#bfe0f5" emissiveIntensity={0.55} />
-        </mesh>
+      {/* The room cutaway uses the same wall/opening graph as the 2D plan and exterior model. */}
+      {roomWalls.map((wall) => (
+        <InteriorArchitecturalWall
+          key={wall.id}
+          wall={wall}
+          openings={roomModel.openings.filter((opening) => opening.wallId === wall.id)}
+          room={room}
+          color={room.finishColor ?? '#efece4'}
+        />
       ))}
-      {/* door on the side wall */}
-      <mesh position={[-w / 2 + 0.012, WALL_H * 0.35, l * 0.25]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[w * 0.18, WALL_H * 0.7]} />
-        <meshStandardMaterial color="#8a6a48" roughness={0.7} />
-      </mesh>
 
-      {/* skirting */}
-      <mesh position={[0, 0.02, -l / 2 + 0.02]}>
-        <boxGeometry args={[w, 0.04, 0.02]} />
-        <meshStandardMaterial color="#ffffff" />
-      </mesh>
+      {/* Skirting remains clear of the floor face. */}
+      <mesh position={[0, 0.035, -l / 2 + 0.053]}><boxGeometry args={[w - 0.1, 0.045, 0.025]} /><meshStandardMaterial color="#ffffff" /></mesh>
 
-      {effective.map((item, index) => (
-        <FurniturePiece key={`${item}-${index}`} item={item} w={w} l={l} slot={index} />
-      ))}
+      {items.map((placedItem) => {
+        const defaults = getFurnitureDimensions(placedItem.item, room.units)
+        return (
+          <group
+            key={placedItem.id}
+            ref={(obj) => {
+              if (obj) itemRefs.current.set(placedItem.id, obj)
+              else itemRefs.current.delete(placedItem.id)
+            }}
+            position={[placedItem.x * w, 0, placedItem.z * l]}
+            rotation={[0, placedItem.rotation, 0]}
+            scale={placedItem.scale}
+            onClick={(event) => { event.stopPropagation(); onSelectItem?.(placedItem.id) }}
+          >
+            <FurniturePiece item={placedItem.item} width={placedItem.width ?? defaults.width} depth={placedItem.depth ?? defaults.depth} height={placedItem.height ?? defaults.height} color={placedItem.color} />
+            {selectedItemId === placedItem.id ? <Edges color="#1a56f5" /> : null}
+          </group>
+        )
+      })}
     </>
   )
 }
@@ -499,7 +753,7 @@ function makeFloorTexture(finish: FinishOption, width: number, length: number): 
         ctx.beginPath(); ctx.moveTo(8, y + 5 + grain * 8); ctx.lineTo(245, y + 5 + grain * 8); ctx.stroke()
       }
     }
-  } else if (finish === 'stone' || finish === 'glass') {
+  } else if (finish === 'stone' || finish === 'glass' || finish === 'tile' || finish === 'metal') {
     ctx.strokeStyle = finish === 'glass' ? 'rgba(81,126,151,.28)' : 'rgba(92,99,105,.24)'
     ctx.lineWidth = 2
     for (let y = 0; y <= 256; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(256, y); ctx.stroke() }
@@ -507,6 +761,23 @@ function makeFloorTexture(finish: FinishOption, width: number, length: number): 
     if (finish === 'glass') {
       ctx.fillStyle = 'rgba(255,255,255,.18)'
       ctx.fillRect(8, 8, 42, 42)
+    }
+  } else if (finish === 'marble') {
+    ctx.strokeStyle = 'rgba(104,117,128,.25)'
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.moveTo(10, 38); ctx.bezierCurveTo(70, 72, 110, 15, 246, 65); ctx.stroke()
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 4
+    ctx.beginPath(); ctx.moveTo(8, 190); ctx.bezierCurveTo(90, 130, 150, 230, 250, 175); ctx.stroke()
+  } else if (finish === 'terrazzo') {
+    for (let i = 0; i < 90; i++) {
+      const x = (i * 73) % 256, y = (i * 127) % 256
+      ctx.fillStyle = ['#aeb3b1', '#c98f73', '#697985', '#e6c796'][i % 4]
+      ctx.fillRect(x, y, 3 + (i % 4), 2 + (i % 3))
+    }
+  } else if (finish === 'carpet') {
+    for (let i = 0; i < 256; i += 3) {
+      ctx.strokeStyle = `rgba(255,255,255,${(i % 7) / 70})`
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke()
     }
   } else if (finish === 'brick') {
     ctx.strokeStyle = 'rgba(87,55,43,.3)'
@@ -536,174 +807,106 @@ function makeFloorTexture(finish: FinishOption, width: number, length: number): 
   return texture
 }
 
-function defaultItemsFor(category: string): string[] {
-  switch (category) {
-    case 'bedroom':
-      return ['bed', 'wardrobe']
-    case 'living':
-      return ['sofa', 'tv', 'lamp']
-    case 'dining':
-      return ['dining']
-    case 'kitchen':
-      return ['kitchen', 'fridge']
-    case 'bathroom':
-      return ['bath']
-    case 'study':
-      return ['desk']
-    default:
-      return []
-  }
-}
+function FurniturePiece({ item, width, depth, height, color = '#a9805a' }: { item: string; width: number; depth: number; height: number; color?: string }) {
+  const key = canonicalFurnitureKey(item)
+  const w = Math.max(0.08, width * S)
+  const d = Math.max(0.08, depth * S)
+  const h = Math.max(0.08, height * S)
+  const leg = Math.max(0.025, Math.min(w, d) * 0.08)
+  const topThickness = Math.max(0.035, h * 0.08)
+  const wood = color
+  const fabric = color
 
-const SLOTS: [number, number][] = [
-  [0, -0.38],
-  [-0.38, 0],
-  [0.38, 0],
-  [0, 0.3],
-  [-0.3, 0.32],
-  [0.3, 0.32],
-]
-
-function FurniturePiece({ item, w, l, slot }: { item: string; w: number; l: number; slot: number }) {
-  const [sx, sz] = SLOTS[slot % SLOTS.length]
-  const x = sx * w
-  const z = sz * l
-  const wood = '#a9805a'
-  const fabric = '#7d8ba1'
-
-  if (item === 'bed') {
-    return (
-      <group position={[x, 0, z]}>
-        <mesh position={[0, 0.14, 0]} castShadow>
-          <boxGeometry args={[Math.min(w * 0.42, 0.85), 0.28, Math.min(l * 0.55, 1.1)]} />
-          <meshStandardMaterial color="#e8e2d6" roughness={0.8} />
-        </mesh>
-        <mesh position={[0, 0.32, -Math.min(l * 0.55, 1.1) / 2 + 0.06]} castShadow>
-          <boxGeometry args={[Math.min(w * 0.42, 0.85), 0.5, 0.08]} />
-          <meshStandardMaterial color={wood} roughness={0.6} />
-        </mesh>
-      </group>
-    )
-  }
-  if (item === 'sofa' || item === 'armchair') {
-    const sw = item === 'sofa' ? Math.min(w * 0.5, 1.1) : 0.5
-    return (
-      <group position={[x, 0, z]}>
-        <mesh position={[0, 0.16, 0]} castShadow>
-          <boxGeometry args={[sw, 0.32, 0.42]} />
-          <meshStandardMaterial color={fabric} roughness={0.9} />
-        </mesh>
-        <mesh position={[0, 0.36, -0.17]} castShadow>
-          <boxGeometry args={[sw, 0.4, 0.1]} />
-          <meshStandardMaterial color={fabric} roughness={0.9} />
-        </mesh>
-      </group>
-    )
-  }
-  if (item === 'dining') {
-    return (
-      <group position={[x, 0, z]}>
-        <mesh position={[0, 0.36, 0]} castShadow>
-          <cylinderGeometry args={[0.42, 0.42, 0.05, 20]} />
-          <meshStandardMaterial color={wood} roughness={0.5} />
-        </mesh>
-        <mesh position={[0, 0.18, 0]}>
-          <cylinderGeometry args={[0.05, 0.08, 0.36, 10]} />
-          <meshStandardMaterial color={wood} />
-        </mesh>
-      </group>
-    )
-  }
-  if (item === 'tv') {
-    return (
-      <group position={[x, 0, z]}>
-        <mesh position={[0, 0.2, 0]} castShadow>
-          <boxGeometry args={[0.9, 0.4, 0.22]} />
-          <meshStandardMaterial color={wood} roughness={0.6} />
-        </mesh>
-        <mesh position={[0, 0.62, 0]}>
-          <boxGeometry args={[0.8, 0.45, 0.04]} />
-          <meshStandardMaterial color="#101418" roughness={0.3} />
-        </mesh>
-      </group>
-    )
-  }
-  if (item === 'wardrobe' || item === 'kitchen' || item === 'fridge') {
-    const tall = item === 'fridge' ? 0.95 : 0.8
-    const bw = item === 'kitchen' ? Math.min(w * 0.7, 1.4) : 0.7
-    return (
-      <mesh position={[x, tall / 2, z]} castShadow>
-        <boxGeometry args={[bw, tall, 0.32]} />
-        <meshStandardMaterial color={item === 'fridge' ? '#c9ced4' : wood} roughness={0.55} />
-      </mesh>
-    )
-  }
-  if (item === 'bath') {
-    return (
-      <mesh position={[x, 0.26, z]} castShadow>
-        <boxGeometry args={[0.8, 0.52, 0.45]} />
-        <meshStandardMaterial color="#ffffff" roughness={0.25} />
-      </mesh>
-    )
-  }
-  if (item === 'desk') {
-    return (
-      <group position={[x, 0, z]}>
-        <mesh position={[0, 0.36, 0]} castShadow>
-          <boxGeometry args={[0.8, 0.05, 0.4]} />
-          <meshStandardMaterial color={wood} roughness={0.5} />
-        </mesh>
-        <mesh position={[0, 0.18, 0]}>
-          <boxGeometry args={[0.7, 0.36, 0.3]} />
-          <meshStandardMaterial color="#8f96a3" />
-        </mesh>
-      </group>
-    )
-  }
-  if (item === 'chair') {
-    return (
-      <group position={[x, 0, z]}>
-        <mesh position={[0, 0.22, 0]} castShadow><boxGeometry args={[0.34, 0.08, 0.34]} /><meshStandardMaterial color={wood} /></mesh>
-        <mesh position={[0, 0.43, -0.14]} castShadow><boxGeometry args={[0.34, 0.42, 0.07]} /><meshStandardMaterial color={wood} /></mesh>
-        {[[-0.13, -0.13], [0.13, -0.13], [-0.13, 0.13], [0.13, 0.13]].map(([lx, lz], i) => <mesh key={i} position={[lx, 0.1, lz]}><boxGeometry args={[0.035, 0.2, 0.035]} /><meshStandardMaterial color={wood} /></mesh>)}
-      </group>
-    )
-  }
-  if (item === 'table') {
-    return (
-      <group position={[x, 0, z]}>
-        <mesh position={[0, 0.36, 0]} castShadow><boxGeometry args={[0.72, 0.07, 0.48]} /><meshStandardMaterial color={wood} roughness={0.5} /></mesh>
-        {[[-0.3, -0.18], [0.3, -0.18], [-0.3, 0.18], [0.3, 0.18]].map(([lx, lz], i) => <mesh key={i} position={[lx, 0.18, lz]}><boxGeometry args={[0.045, 0.36, 0.045]} /><meshStandardMaterial color={wood} /></mesh>)}
-      </group>
-    )
-  }
-  if (item === 'ac') {
-    return <mesh position={[x, WALL_H * 0.74, z - l * 0.44]} castShadow><boxGeometry args={[0.55, 0.16, 0.18]} /><meshStandardMaterial color="#f6f7f8" roughness={0.4} /></mesh>
-  }
-  if (item === 'fan') {
-    return (
-      <group position={[x, WALL_H * 0.88, z]}>
-        <mesh><cylinderGeometry args={[0.06, 0.06, 0.12, 12]} /><meshStandardMaterial color="#87919b" metalness={0.3} /></mesh>
-        {[0, 1, 2, 3].map((i) => <mesh key={i} rotation={[0, i * Math.PI / 2, 0]} position={[0.28, 0, 0]}><boxGeometry args={[0.5, 0.025, 0.09]} /><meshStandardMaterial color="#d2d6da" /></mesh>)}
-      </group>
-    )
-  }
-  if (item === 'bulb') {
-    return <mesh position={[x, WALL_H * 0.82, z]}><sphereGeometry args={[0.075, 14, 10]} /><meshStandardMaterial color="#fff0bd" emissive="#ffe092" emissiveIntensity={1.2} /></mesh>
-  }
-  if (item === 'lamp') {
-    return (
-      <group position={[x, 0, z]}>
-        <mesh position={[0, 0.5, 0]}>
-          <cylinderGeometry args={[0.02, 0.02, 1, 8]} />
-          <meshStandardMaterial color="#3a3f46" />
-        </mesh>
-        <mesh position={[0, 1.02, 0]}>
-          <coneGeometry args={[0.14, 0.2, 12, 1, true]} />
-          <meshStandardMaterial color="#f4e3c2" emissive="#f4e3c2" emissiveIntensity={0.5} side={2} />
-        </mesh>
-      </group>
-    )
-  }
-  return null
+  if (key === 'bed' || key === 'king-bed') return (
+    <group>
+      <mesh position={[0, h * 0.23, 0]} castShadow><boxGeometry args={[w, h * 0.28, d]} /><meshStandardMaterial color="#e8e2d6" roughness={0.82} /></mesh>
+      <mesh position={[0, h * 0.48, -d * 0.47]} castShadow><boxGeometry args={[w, h * 0.78, h * 0.08]} /><meshStandardMaterial color={wood} roughness={0.65} /></mesh>
+      {[-0.24, 0.24].map((x) => <mesh key={x} position={[w * x, h * 0.42, -d * 0.29]}><boxGeometry args={[w * 0.38, h * 0.16, d * 0.22]} /><meshStandardMaterial color="#fff" roughness={0.95} /></mesh>)}
+    </group>
+  )
+  if (key === 'sofa' || key === 'armchair') return (
+    <group>
+      <mesh position={[0, h * 0.28, d * 0.05]} castShadow><boxGeometry args={[w, h * 0.48, d * 0.68]} /><meshStandardMaterial color={fabric} roughness={0.9} /></mesh>
+      <mesh position={[0, h * 0.62, -d * 0.28]} castShadow><boxGeometry args={[w * 0.92, h * 0.55, d * 0.18]} /><meshStandardMaterial color={fabric} roughness={0.92} /></mesh>
+      {[-1, 1].map((side) => <mesh key={side} position={[side * w * 0.45, h * 0.38, d * 0.02]} castShadow><boxGeometry args={[w * 0.1, h * 0.42, d * 0.72]} /><meshStandardMaterial color={fabric} roughness={0.9} /></mesh>)}
+    </group>
+  )
+  if (key === 'dining' || key === 'table' || key === 'coffee-table' || key === 'desk' || key === 'sideboard') return (
+    <group>
+      <mesh position={[0, h * 0.72, 0]} castShadow><boxGeometry args={[w, topThickness, d]} /><meshStandardMaterial color={wood} roughness={0.55} /></mesh>
+      {[-1, 1].flatMap((x) => [-1, 1].map((z) => <mesh key={`${x}:${z}`} position={[x * (w / 2 - leg), h * 0.36, z * (d / 2 - leg)]} castShadow><boxGeometry args={[leg, h * 0.72, leg]} /><meshStandardMaterial color={wood} /></mesh>))}
+    </group>
+  )
+  if (key === 'chair') return (
+    <group>
+      <mesh position={[0, h * 0.42, 0]} castShadow><boxGeometry args={[w, h * 0.1, d]} /><meshStandardMaterial color={wood} /></mesh>
+      <mesh position={[0, h * 0.72, -d * 0.43]} castShadow><boxGeometry args={[w, h * 0.55, leg * 1.4]} /><meshStandardMaterial color={wood} /></mesh>
+      {[-1, 1].flatMap((x) => [-1, 1].map((z) => <mesh key={`${x}:${z}`} position={[x * w * 0.4, h * 0.2, z * d * 0.4]}><boxGeometry args={[leg, h * 0.4, leg]} /><meshStandardMaterial color={wood} /></mesh>))}
+    </group>
+  )
+  if (key === 'fridge') return (
+    <group>
+      <mesh position={[0, h / 2, 0]} castShadow><boxGeometry args={[w, h, d]} /><meshStandardMaterial color={color === '#a9805a' ? '#c9ced4' : color} metalness={0.18} roughness={0.36} /></mesh>
+      <mesh position={[w * 0.33, h * 0.55, d / 2 + 0.006]}><boxGeometry args={[leg * 0.35, h * 0.45, 0.012]} /><meshStandardMaterial color="#67717b" metalness={0.5} /></mesh>
+      <mesh position={[0, h * 0.38, d / 2 + 0.008]}><boxGeometry args={[w * 0.98, 0.018, 0.012]} /><meshStandardMaterial color="#87919a" /></mesh>
+    </group>
+  )
+  if (key === 'wardrobe' || key === 'kitchen' || key === 'cabinets' || key === 'bookshelf' || key === 'storage-rack') return (
+    <group>
+      <mesh position={[0, h / 2, 0]} castShadow><boxGeometry args={[w, h, d]} /><meshStandardMaterial color={wood} roughness={0.65} /></mesh>
+      {[0.25, 0.5, 0.75].map((fraction) => <mesh key={fraction} position={[0, h * fraction, 0]}><boxGeometry args={[w * 0.94, 0.025, d * 0.96]} /><meshStandardMaterial color="#d7c8b5" /></mesh>)}
+      <mesh position={[0, h / 2, d / 2 + 0.006]}><boxGeometry args={[0.018, h * 0.9, 0.012]} /><meshStandardMaterial color="#6f5a43" /></mesh>
+    </group>
+  )
+  if (key === 'sink' || key === 'washbasin') return (
+    <group>
+      <mesh position={[0, h * 0.32, 0]} castShadow><boxGeometry args={[w, h * 0.12, d]} /><meshStandardMaterial color="#f8f8f4" roughness={0.28} /></mesh>
+      <mesh position={[0, h * 0.44, 0]}><boxGeometry args={[w * 0.72, h * 0.08, d * 0.66]} /><meshStandardMaterial color="#fff" roughness={0.25} /></mesh>
+      <mesh position={[0, h * 0.48, 0]}><cylinderGeometry args={[Math.min(w, d) * 0.05, Math.min(w, d) * 0.05, h * 0.12, 10]} /><meshStandardMaterial color="#8798a3" metalness={0.55} roughness={0.25} /></mesh>
+    </group>
+  )
+  if (key === 'cooker') return (
+    <group>
+      <mesh position={[0, h * 0.45, 0]} castShadow><boxGeometry args={[w, h * 0.9, d]} /><meshStandardMaterial color="#c9ced4" metalness={0.2} roughness={0.34} /></mesh>
+      {[[-0.23, -0.22], [0.23, -0.22], [-0.23, 0.22], [0.23, 0.22]].map(([x, z], index) => <mesh key={index} position={[w * x, h * 0.91, d * z]}><cylinderGeometry args={[Math.min(w, d) * 0.13, Math.min(w, d) * 0.13, 0.018, 16]} /><meshStandardMaterial color="#33383e" /></mesh>)}
+    </group>
+  )
+  if (key === 'toilet') return (
+    <group>
+      <mesh position={[0, h * 0.28, d * 0.08]} castShadow scale={[1, 0.75, 1]}><sphereGeometry args={[1, 20, 14]} /><meshStandardMaterial color="#fafaf6" roughness={0.25} /></mesh>
+      <mesh position={[0, h * 0.67, -d * 0.32]} castShadow><boxGeometry args={[w * 0.76, h * 0.48, d * 0.32]} /><meshStandardMaterial color="#fff" roughness={0.25} /></mesh>
+      <mesh position={[0, h * 0.51, d * 0.08]}><torusGeometry args={[Math.min(w, d) * 0.29, Math.min(w, d) * 0.035, 8, 20]} /><meshStandardMaterial color="#dfe3e5" /></mesh>
+    </group>
+  )
+  if (key === 'shower') return (
+    <group>
+      <mesh position={[0, h * 0.04, 0]}><boxGeometry args={[w, h * 0.08, d]} /><meshStandardMaterial color="#e8edf0" /></mesh>
+      <mesh position={[-w * 0.45, h * 0.5, 0]}><boxGeometry args={[0.018, h, d]} /><meshStandardMaterial color="#c4dbe6" transparent opacity={0.38} /></mesh>
+      <mesh position={[0, h * 0.92, -d * 0.35]}><cylinderGeometry args={[0.025, 0.025, d * 0.25, 8]} /><meshStandardMaterial color="#8997a1" metalness={0.55} /></mesh>
+    </group>
+  )
+  if (key === 'bath') return (
+    <group>
+      <mesh position={[0, h * 0.28, 0]} castShadow><boxGeometry args={[w, h * 0.52, d]} /><meshStandardMaterial color="#f8f8f4" roughness={0.25} /></mesh>
+      <mesh position={[0, h * 0.55, 0]}><boxGeometry args={[w * 0.78, h * 0.04, d * 0.72]} /><meshStandardMaterial color="#dceef4" /></mesh>
+    </group>
+  )
+  if (key === 'tv-unit' || key === 'tv') return (
+    <group>
+      <mesh position={[0, h * 0.18, 0]} castShadow><boxGeometry args={[w, h * 0.36, d]} /><meshStandardMaterial color={wood} roughness={0.64} /></mesh>
+      <mesh position={[0, h * 0.76, 0]}><boxGeometry args={[w * 0.9, h * 0.48, Math.max(0.025, d * 0.06)]} /><meshStandardMaterial color="#151a21" roughness={0.3} /></mesh>
+    </group>
+  )
+  if (key === 'washer' || key === 'dryer') return (
+    <group>
+      <mesh position={[0, h / 2, 0]} castShadow><boxGeometry args={[w, h, d]} /><meshStandardMaterial color="#d9dfe3" metalness={0.12} roughness={0.35} /></mesh>
+      <mesh position={[0, h * 0.44, d / 2 + 0.006]}><cylinderGeometry args={[Math.min(w, d) * 0.27, Math.min(w, d) * 0.27, 0.015, 24]} /><meshStandardMaterial color="#53616d" metalness={0.18} roughness={0.25} /></mesh>
+    </group>
+  )
+  return (
+    <mesh position={[0, h / 2, 0]} castShadow>
+      <boxGeometry args={[w, h, d]} />
+      <meshStandardMaterial color={wood} roughness={0.7} />
+    </mesh>
+  )
 }

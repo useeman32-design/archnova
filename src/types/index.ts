@@ -38,6 +38,39 @@ export type RoomCategory =
   | 'other'
 
 export type ElementType = 'wall' | 'door' | 'window'
+export type WallKind = 'exterior' | 'interior'
+export type DoorStyle = 'single-hinged' | 'double-hinged' | 'sliding' | 'pocket' | 'folding'
+export type WindowStyle = 'casement' | 'sliding' | 'bay' | 'fixed'
+export type OpeningDirection = 'inward' | 'outward'
+export type HingeSide = 'left' | 'right'
+
+/** One shared, dimensioned wall segment in floor-plan coordinates. */
+export interface ArchitecturalWall {
+  id: string
+  start: Vec2
+  end: Vec2
+  thickness: number
+  height: number
+  kind: WallKind
+  level: number
+  roomIds: string[]
+}
+
+/** Door or window hosted along a wall; offset is measured from wall.start. */
+export interface WallOpening {
+  id: string
+  wallId: string
+  roomId?: string
+  type: 'door' | 'window'
+  style: DoorStyle | WindowStyle
+  offset: number
+  width: number
+  height: number
+  sillHeight: number
+  direction?: OpeningDirection
+  hingeSide?: HingeSide
+  color?: string
+}
 
 export type OutdoorFeature =
   | 'parking'
@@ -49,7 +82,22 @@ export type OutdoorFeature =
   | 'barbecue'
   | 'shed'
 
-export type FinishOption = 'render' | 'paint' | 'brick' | 'stone' | 'wood' | 'glass'
+export type FinishOption = 'render' | 'paint' | 'brick' | 'stone' | 'wood' | 'glass' | 'tile' | 'marble' | 'concrete' | 'carpet' | 'terrazzo' | 'metal'
+
+export interface PlacedItem {
+  id: string
+  item: string
+  /** Room-relative normalized floor position; center is 0, 0. */
+  x: number
+  z: number
+  rotation: number
+  scale: number
+  /** Real-world footprint/height in project units; omitted on legacy items. */
+  width?: number
+  depth?: number
+  height?: number
+  color: string
+}
 
 export interface Vec2 {
   x: number
@@ -75,6 +123,8 @@ export interface Budget {
   currency: string
 }
 
+export type RoomShape = 'rectangle' | 'L' | 'T' | 'U' | 'custom'
+
 export interface Room {
   id: string
   name: string
@@ -84,11 +134,17 @@ export interface Room {
   length: number
   units: Units
   rect: RoomRect
+  shape?: RoomShape
+  /** Normalized outline coordinates (0–1) relative to the room bounds. */
+  outline?: Vec2[]
   level: number
   /** Optional furniture swatches for the properties panel. */
   furniture: string[]
   /** Optional per-room interior finish override. */
   finish?: FinishOption
+  finishColor?: string
+  /** Individually editable placed furniture/appliances. */
+  items?: PlacedItem[]
   elements: Element[]
 }
 
@@ -99,6 +155,17 @@ export interface Element {
   /** Nominal opening size in the project plot units. */
   width?: number
   height?: number
+  /** Legacy normalized room anchor; retained for older saved projects. */
+  position?: Vec2
+  /** Optional wall-hosted metadata used by the shared architectural model. */
+  wallId?: string
+  offset?: number
+  sillHeight?: number
+  doorStyle?: DoorStyle
+  windowStyle?: WindowStyle
+  openingDirection?: OpeningDirection
+  hingeSide?: HingeSide
+  color?: string
 }
 
 export interface Floor {
@@ -106,6 +173,9 @@ export interface Floor {
   name: string
   level: number
   rooms: Room[]
+  /** Shared wall/opening model; absent on older saved projects, which are derived from rooms. */
+  walls?: ArchitecturalWall[]
+  openings?: WallOpening[]
 }
 
 export interface Plot {
@@ -122,6 +192,10 @@ export interface DesignPreferences {
   roof: string
   exteriorFinish: FinishOption
   interiorFinish: FinishOption
+  exteriorColor?: string
+  roofColor?: string
+  exteriorWallThickness?: number
+  interiorWallThickness?: number
   outdoor: OutdoorFeature[]
   notes: string
 }
@@ -144,6 +218,8 @@ export interface Project {
   createdAt: string
   updatedAt: string
   floors: Floor[]
+  /** User-placed landscaping, vehicles and site entourage. */
+  landscape?: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string }[]
   preferences: DesignPreferences
 }
 

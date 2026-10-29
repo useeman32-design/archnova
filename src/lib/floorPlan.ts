@@ -285,5 +285,13 @@ function relocateBedrooms(rooms: Room[], bands: BandLayout, form: NewProjectForm
 }
 
 export function roomArea(room: Room): number {
-  return Math.round(room.width * room.length)
+  const outline = room.outline
+  if (!outline || outline.length < 3) return Math.round(room.width * room.length)
+  let twiceArea = 0
+  for (let i = 0; i < outline.length; i += 1) {
+    const current = outline[i]
+    const next = outline[(i + 1) % outline.length]
+    twiceArea += current.x * next.y - next.x * current.y
+  }
+  return Math.round(Math.abs(twiceArea) * 0.5 * room.width * room.length)
 }

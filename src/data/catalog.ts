@@ -67,6 +67,8 @@ export const EXTERIOR_FINISHES: Option<FinishOption>[] = [
   { value: 'stone', label: 'Stone', description: 'Natural stone cladding' },
   { value: 'wood', label: 'Timber', description: 'Warm timber cladding' },
   { value: 'glass', label: 'Glass / curtain wall', description: 'Full-height glazing' },
+  { value: 'concrete', label: 'Fair-face concrete', description: 'Architectural exposed concrete' },
+  { value: 'metal', label: 'Metal cladding', description: 'Standing seam / sheet cladding' },
 ]
 
 export const INTERIOR_FINISHES: Option<FinishOption>[] = [
@@ -76,6 +78,11 @@ export const INTERIOR_FINISHES: Option<FinishOption>[] = [
   { value: 'paint', label: 'Minimal white', description: 'Bright, neutral palette' },
   { value: 'glass', label: 'Glass partitions', description: 'Open, glazed interiors' },
   { value: 'brick', label: 'Exposed brick', description: 'Brick & raw texture' },
+  { value: 'tile', label: 'Porcelain tile', description: 'Durable patterned tile' },
+  { value: 'marble', label: 'Polished marble', description: 'Glossy natural stone' },
+  { value: 'terrazzo', label: 'Terrazzo', description: 'Composite stone with aggregate' },
+  { value: 'concrete', label: 'Concrete', description: 'Polished or honed concrete' },
+  { value: 'carpet', label: 'Carpet', description: 'Soft textile finish' },
 ]
 
 export const ROOM_OPTIONS: { value: RoomCategory; label: string }[] = [

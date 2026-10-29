@@ -1,6 +1,9 @@
-import { useLayoutEffect, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useLayoutEffect, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import type { Room, RoomCategory, Units, Vec2 } from '@/types'
 import { formatArea } from '@/lib/format'
+import { roomArea } from '@/lib/floorPlan'
+import { canonicalFurnitureKey, getFurnitureDimensions } from '@/lib/furniture'
+import { getFloorArchitecturalModel, pointAlongWall, wallLength, type WallThicknessSettings } from '@/lib/architecturalModel'
 
 /**
  * CAD-style 2D plan renderer.
@@ -36,13 +39,14 @@ const SMALL_PX = 10
 export interface FloorPlanDiagramProps {
   rooms: Room[]
   units: Units
+  wallThicknesses?: WallThicknessSettings
   /** Plot extents keep an empty, start-from-scratch project drawable. */
   plot?: { width: number; length: number }
   className?: string
   showLabels?: boolean
   showDimensions?: boolean
   selectedId?: string | null
-  onSelectRoom?: (room: Room) => void
+  onSelectRoom?: (room: Room, point?: Vec2) => void
   showBoundary?: boolean
   showCompass?: boolean
   showAreas?: boolean
@@ -50,8 +54,12 @@ export interface FloorPlanDiagramProps {
   measure?: boolean
   /** Receives background clicks in plan units (used by placement tools). */
   onCanvasClick?: (point: Vec2) => void
-  /** Site ornaments (trees) rendered as planting glyphs. */
-  trees?: (Vec2 & { kind?: string })[]
+  /** Individually selectable, moveable and scalable landscape/site objects. */
+  trees?: (Vec2 & { id: string; kind?: string; scale: number; rotation: number; color: string })[]
+  selectedTreeId?: string | null
+  onSelectTree?: (id: string | null) => void
+  onMoveTree?: (id: string, x: number, y: number) => void
+  onResizeTree?: (id: string, scale: number) => void
   /* Direct manipulation (select tool) */
   dragEnabled?: boolean
   onEditBegin?: () => void
@@ -65,6 +73,7 @@ export interface FloorPlanDiagramProps {
 export function FloorPlanDiagram({
   rooms,
   units,
+  wallThicknesses,
   plot,
   className = '',
   showLabels = true,
@@ -77,6 +86,10 @@ export function FloorPlanDiagram({
   measure = false,
   onCanvasClick,
   trees = [],
+  selectedTreeId = null,
+  onSelectTree,
+  onMoveTree,
+  onResizeTree,
   dragEnabled = false,
   onEditBegin,
   onEditEnd,
@@ -94,9 +107,13 @@ export function FloorPlanDiagram({
   const minY = plot ? 0 : hasRooms ? Math.min(...rooms.map((r) => r.rect.y)) : 0
   const maxX = plot ? plot.width : hasRooms ? Math.max(...rooms.map((r) => r.rect.x + r.rect.w)) : 1
   const maxY = plot ? plot.length : hasRooms ? Math.max(...rooms.map((r) => r.rect.y + r.rect.h)) : 1
+  const buildingMinX = hasRooms ? Math.min(...rooms.map((room) => room.rect.x)) : 0
+  const buildingMinY = hasRooms ? Math.min(...rooms.map((room) => room.rect.y)) : 0
+  const buildingMaxX = hasRooms ? Math.max(...rooms.map((room) => room.rect.x + room.rect.w)) : 0
+  const buildingMaxY = hasRooms ? Math.max(...rooms.map((room) => room.rect.y + room.rect.h)) : 0
 
-  const padX = 8
-  const padY = 13
+  const padX = 12
+  const padY = 20
   const vbX = minX - padX
   const vbY = minY - padY
   const vbW = maxX - minX + padX * 2
@@ -154,6 +171,7 @@ export function FloorPlanDiagram({
     startY: number
     orig: { x: number; y: number; w: number; h: number }
   } | null>(null)
+  const treeDrag = useRef<{ mode: 'move' | 'resize'; id: string; startX: number; startY: number; x: number; y: number; scale: number } | null>(null)
 
   /* Early return AFTER every hook — changing hook order between renders
      crashes React ("Rendered more hooks than during the previous render"). */
@@ -206,6 +224,30 @@ export function FloorPlanDiagram({
     onEditEnd?.()
   }
 
+  const startTreeDrag = (event: ReactPointerEvent<SVGGElement>, tree: (Vec2 & { id: string; scale: number; rotation: number; color: string; kind?: string }), mode: 'move' | 'resize') => {
+    event.stopPropagation()
+    treeDrag.current = { mode, id: tree.id, startX: event.clientX, startY: event.clientY, x: tree.x, y: tree.y, scale: tree.scale }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    onSelectTree?.(tree.id)
+    onEditBegin?.()
+  }
+
+  const moveTreeDrag = (event: ReactPointerEvent<SVGGElement>) => {
+    const state = treeDrag.current
+    if (!state) return
+    const dx = (event.clientX - state.startX) / s
+    const dy = (event.clientY - state.startY) / s
+    if (state.mode === 'move') onMoveTree?.(state.id, round1(state.x + dx), round1(state.y + dy))
+    else onResizeTree?.(state.id, Math.max(0.35, Math.min(4, state.scale + dx / 10)))
+  }
+
+  const endTreeDrag = (event: ReactPointerEvent<SVGGElement>) => {
+    if (!treeDrag.current) return
+    treeDrag.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    onEditEnd?.()
+  }
+
   const handleBackgroundClick = (event: ReactMouseEvent<SVGSVGElement>) => {
     const point = toPlanPoint(event)
     if (!point) return
@@ -222,6 +264,7 @@ export function FloorPlanDiagram({
       : null
 
   const scaleBar = pickScaleBar(s, units)
+  const architecturalModel = useMemo(() => getFloorArchitecturalModel(rooms, undefined, undefined, wallThicknesses), [rooms, wallThicknesses])
 
   return (
     <svg
@@ -267,7 +310,7 @@ export function FloorPlanDiagram({
             y1={minY - 5}
             x2={maxX}
             y2={minY - 5}
-            label={`${fmt(maxX - minX)}'`}
+            label={`${plot ? 'Plot ' : 'Overall '}${fmt(maxX - minX)} ${units}`}
             u={u}
             vertical={false}
           />
@@ -276,7 +319,29 @@ export function FloorPlanDiagram({
             y1={minY}
             x2={minX - 5}
             y2={maxY}
-            label={`${fmt(maxY - minY)}'`}
+            label={`${plot ? 'Plot ' : 'Overall '}${fmt(maxY - minY)} ${units}`}
+            u={u}
+            vertical
+          />
+        </g>
+      ) : null}
+      {showDimensions && plot && hasRooms ? (
+        <g stroke="#64748b" strokeWidth={u(0.8)} fill="#475569" strokeDasharray={`${u(2)} ${u(2)}`}>
+          <DimensionLine
+            x1={buildingMinX}
+            y1={buildingMaxY + u(16)}
+            x2={buildingMaxX}
+            y2={buildingMaxY + u(16)}
+            label={`Building ${fmt(buildingMaxX - buildingMinX)} ${units}`}
+            u={u}
+            vertical={false}
+          />
+          <DimensionLine
+            x1={buildingMaxX + u(16)}
+            y1={buildingMinY}
+            x2={buildingMaxX + u(16)}
+            y2={buildingMaxY}
+            label={`Building ${fmt(buildingMaxY - buildingMinY)} ${units}`}
             u={u}
             vertical
           />
@@ -292,7 +357,7 @@ export function FloorPlanDiagram({
         const showArea = showAreas && rw >= 88 && rh >= 34
         const showRoomDim = showDimensions && rw >= 120 && rh >= 52
         const maxChars = Math.max(4, Math.floor(rw / (LABEL_PX * 0.62)))
-        const name = room.name.length > maxChars ? `${room.name.slice(0, maxChars - 1)}…` : room.name
+        const nameLines = wrapLabel(room.name, maxChars, Math.max(1, Math.min(3, Math.floor(rh / (LABEL_PX * 1.5)))))
 
         return (
           <g
@@ -303,7 +368,7 @@ export function FloorPlanDiagram({
               onSelectRoom && !measure
                 ? (event) => {
                     event.stopPropagation()
-                    onSelectRoom(room)
+                    onSelectRoom(room, clientToPlan(event.clientX, event.clientY) ?? undefined)
                   }
                 : undefined
             }
@@ -314,28 +379,39 @@ export function FloorPlanDiagram({
             role={onSelectRoom && !measure ? 'button' : undefined}
             aria-label={onSelectRoom ? `Select ${room.name}` : undefined}
           >
-            <title>{`${room.name} — ${formatArea(room.rect.w, room.rect.h, units)}`}</title>
-            <rect
-              x={room.rect.x}
-              y={room.rect.y}
-              width={room.rect.w}
-              height={room.rect.h}
-              rx={u(2)}
-              fill={palette.fill}
-              stroke={isSelected ? '#1a56f5' : palette.stroke}
-              strokeWidth={isSelected ? u(2.2) : u(1.25)}
-              opacity={selectedId && !isSelected ? 0.6 : 1}
-            />
+            <title>{`${room.name} — ${formatArea(roomArea(room), 1, units)}`}</title>
+            {room.outline && room.shape !== 'rectangle' ? (
+              <polygon
+                points={room.outline.map((point) => `${room.rect.x + point.x * room.rect.w},${room.rect.y + point.y * room.rect.h}`).join(' ')}
+                fill={palette.fill}
+                stroke={isSelected ? '#1a56f5' : palette.stroke}
+                strokeWidth={isSelected ? u(2.2) : u(1.25)}
+                strokeLinejoin="round"
+                opacity={selectedId && !isSelected ? 0.6 : 1}
+              />
+            ) : (
+              <rect
+                x={room.rect.x}
+                y={room.rect.y}
+                width={room.rect.w}
+                height={room.rect.h}
+                rx={u(2)}
+                fill={palette.fill}
+                stroke={isSelected ? '#1a56f5' : palette.stroke}
+                strokeWidth={isSelected ? u(2.2) : u(1.25)}
+                opacity={selectedId && !isSelected ? 0.6 : 1}
+              />
+            )}
             {showLabel ? (
               <text
                 x={room.rect.x + room.rect.w / 2}
-                y={room.rect.y + room.rect.h / 2 - (showArea ? u(3) : -u(4))}
+                y={room.rect.y + room.rect.h / 2 - (nameLines.length - 1) * u(LABEL_PX * 0.55) - (showArea ? u(3) : -u(4))}
                 textAnchor="middle"
                 fontSize={u(LABEL_PX)}
                 fontWeight={600}
                 fill={isSelected ? '#1a56f5' : palette.text}
               >
-                {name}
+                {nameLines.map((line, index) => <tspan key={`${room.id}-line-${index}`} x={room.rect.x + room.rect.w / 2} dy={index === 0 ? 0 : u(LABEL_PX * 1.1)}>{line}</tspan>)}
               </text>
             ) : null}
             {showArea ? (
@@ -347,7 +423,7 @@ export function FloorPlanDiagram({
                 fill={isSelected ? '#1a56f5' : palette.text}
                 opacity="0.8"
               >
-                {formatArea(room.rect.w, room.rect.h, units)}
+                {formatArea(roomArea(room), 1, units)}
               </text>
             ) : null}
             {showRoomDim ? (
@@ -358,13 +434,10 @@ export function FloorPlanDiagram({
                 fontSize={u(SMALL_PX - 1)}
                 fill="#7c8794"
               >
-                {fmt(room.rect.w)} × {fmt(room.rect.h)}
+                {fmt(room.rect.w)} × {fmt(room.rect.h)} {units}
               </text>
             ) : null}
             {rw >= 70 && rh >= 48 ? <RoomFurniture room={room} u={u} color={palette.text} /> : null}
-            {rw >= 60 && rh >= 40 ? (
-              <RoomOpenings room={room} u={u} stroke={palette.stroke} />
-            ) : null}
             {isSelected && dragEnabled ? (
               <circle
                 cx={room.rect.x + room.rect.w}
@@ -386,13 +459,117 @@ export function FloorPlanDiagram({
         )
       })}
 
-      {/* Site ornaments (trees) */}
-      {trees.map((point, index) => (
-        <g key={`tree-${index}`} pointerEvents="none" opacity={0.8}>
-          <circle cx={point.x} cy={point.y} r={1.8} fill="#dbeccd" stroke="#7fa668" strokeWidth={u(1)} />
-          <circle cx={point.x} cy={point.y} r={u(1.6)} fill="#5d8a43" stroke="none" />
-        </g>
-      ))}
+      {/* Walls and openings are drawn from the shared floor geometry, not baked into room fills. */}
+      <g pointerEvents="none">
+        {architecturalModel.walls.map((wall) => {
+          const dx = wall.end.x - wall.start.x
+          const dy = wall.end.y - wall.start.y
+          const length = wallLength(wall) || 1
+          const ux = dx / length
+          const uy = dy / length
+          const nx = -uy
+          const ny = ux
+          const wallOpenings = architecturalModel.openings.filter((opening) => opening.wallId === wall.id)
+          return (
+            <g key={wall.id}>
+              <line x1={wall.start.x} y1={wall.start.y} x2={wall.end.x} y2={wall.end.y}
+                stroke={wall.kind === 'exterior' ? '#344253' : '#657286'}
+                strokeWidth={wall.thickness} strokeLinecap="square" />
+              {wallOpenings.map((opening) => {
+                const from = pointAlongWall(wall, opening.offset)
+                const to = pointAlongWall(wall, opening.offset + opening.width)
+                const mx = (from.x + to.x) / 2
+                const my = (from.y + to.y) / 2
+                const gap = opening.type === 'door' ? '#f7f9fc' : '#ffffff'
+                const hingeDirection = opening.direction === 'outward' ? -1 : 1
+                const room = rooms.find((candidate) => candidate.id === opening.roomId)
+                let inwardSign = hingeDirection
+                if (room && opening.direction !== 'outward') {
+                  const roomCenter = { x: room.rect.x + room.rect.w / 2, y: room.rect.y + room.rect.h / 2 }
+                  inwardSign = ((roomCenter.x - mx) * nx + (roomCenter.y - my) * ny) >= 0 ? 1 : -1
+                }
+                const singleHinge = opening.style === 'single-hinged' && opening.hingeSide === 'right' ? to : from
+                const singleArcEnd = opening.style === 'single-hinged' && opening.hingeSide === 'right' ? from : to
+                const leafEnd = { x: singleHinge.x + nx * opening.width * inwardSign, y: singleHinge.y + ny * opening.width * inwardSign }
+                const sweep = (ux * (ny * inwardSign) - uy * (nx * inwardSign)) >= 0 ? 1 : 0
+                return (
+                  <g key={opening.id}>
+                    <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke={gap} strokeWidth={wall.thickness + 0.3} strokeLinecap="square" />
+                    {opening.type === 'door' ? (
+                      opening.style === 'single-hinged' || opening.style === 'double-hinged' ? (
+                        <g fill="none" stroke={opening.color ?? '#795b3e'} strokeWidth={u(0.9)}>
+                          {opening.style === 'single-hinged' ? <>
+                            <line x1={singleHinge.x} y1={singleHinge.y} x2={leafEnd.x} y2={leafEnd.y} />
+                            <path d={`M ${leafEnd.x} ${leafEnd.y} A ${opening.width} ${opening.width} 0 0 ${sweep} ${singleArcEnd.x} ${singleArcEnd.y}`} />
+                          </> : <>
+                            <line x1={from.x} y1={from.y} x2={from.x + nx * opening.width * inwardSign / 2} y2={from.y + ny * opening.width * inwardSign / 2} />
+                            <line x1={to.x} y1={to.y} x2={to.x + nx * opening.width * inwardSign / 2} y2={to.y + ny * opening.width * inwardSign / 2} />
+                            <path d={`M ${from.x + nx * opening.width * inwardSign / 2} ${from.y + ny * opening.width * inwardSign / 2} A ${opening.width / 2} ${opening.width / 2} 0 0 ${sweep} ${mx} ${my}`} />
+                            <path d={`M ${to.x + nx * opening.width * inwardSign / 2} ${to.y + ny * opening.width * inwardSign / 2} A ${opening.width / 2} ${opening.width / 2} 0 0 ${sweep ? 0 : 1} ${mx} ${my}`} />
+                          </>}
+                        </g>
+                      ) : (
+                        <g stroke={opening.color ?? '#795b3e'} strokeWidth={u(0.8)} fill="none">
+                          {opening.style === 'folding' ? (
+                            <path d={`M ${from.x} ${from.y} L ${mx - ux * opening.width * 0.18 + nx * opening.width * 0.1} ${my - uy * opening.width * 0.18 + ny * opening.width * 0.1} L ${mx + ux * opening.width * 0.18 - nx * opening.width * 0.1} ${my + uy * opening.width * 0.18 - ny * opening.width * 0.1} L ${to.x} ${to.y}`} />
+                          ) : (
+                            <>
+                              <line x1={from.x + nx * u(1.1)} y1={from.y + ny * u(1.1)} x2={to.x + nx * u(1.1)} y2={to.y + ny * u(1.1)} strokeDasharray={opening.style === 'pocket' ? `${u(1.3)} ${u(0.8)}` : undefined} />
+                              <path d={`M ${mx - ux * u(1.4)} ${my - uy * u(1.4)} l ${ux * u(2.8)} ${uy * u(2.8)}`} />
+                            </>
+                          )}
+                        </g>
+                      )
+                    ) : (
+                      <g stroke={opening.color ?? '#36718f'} strokeWidth={u(0.75)} fill="none">
+                        <line x1={from.x + nx * wall.thickness * 0.18} y1={from.y + ny * wall.thickness * 0.18} x2={to.x + nx * wall.thickness * 0.18} y2={to.y + ny * wall.thickness * 0.18} />
+                        <line x1={from.x - nx * wall.thickness * 0.18} y1={from.y - ny * wall.thickness * 0.18} x2={to.x - nx * wall.thickness * 0.18} y2={to.y - ny * wall.thickness * 0.18} />
+                        {opening.style === 'casement' ? <path d={`M ${from.x} ${from.y} L ${mx + nx * opening.width * 0.18} ${my + ny * opening.width * 0.18} M ${to.x} ${to.y} L ${mx + nx * opening.width * 0.18} ${my + ny * opening.width * 0.18}`} /> : null}
+                        {opening.style === 'sliding' ? <line x1={mx} y1={my} x2={mx + nx * wall.thickness * 0.22} y2={my + ny * wall.thickness * 0.22} /> : null}
+                        {opening.style === 'bay' ? <path d={`M ${from.x - nx * wall.thickness} ${from.y - ny * wall.thickness} L ${mx - nx * wall.thickness * 1.4} ${my - ny * wall.thickness * 1.4} L ${to.x - nx * wall.thickness} ${to.y - ny * wall.thickness}`} /> : null}
+                      </g>
+                    )}
+                  </g>
+                )
+              })}
+            </g>
+          )
+        })}
+      </g>
+
+      {/* Site objects have independent selection, movement and resize handles. */}
+      {trees.map((tree) => {
+        const selected = tree.id === selectedTreeId
+        const radius = 1.7 * tree.scale
+        return (
+          <g
+            key={tree.id}
+            opacity={0.95}
+            style={{ cursor: selected ? 'move' : 'pointer' }}
+            onClick={(event) => { event.stopPropagation(); onSelectTree?.(tree.id) }}
+            onPointerDown={(event) => startTreeDrag(event, tree, 'move')}
+            onPointerMove={moveTreeDrag}
+            onPointerUp={endTreeDrag}
+            onPointerCancel={endTreeDrag}
+            aria-label={`Select ${tree.kind ?? 'landscape object'}`}
+          >
+            {tree.kind === 'car' ? (
+              <g transform={`translate(${tree.x} ${tree.y}) rotate(${tree.rotation * 180 / Math.PI})`}>
+                <rect x={-radius * 1.7} y={-radius} width={radius * 3.4} height={radius * 2} rx={u(1.4)} fill={tree.color} fillOpacity=".75" stroke="#536273" strokeWidth={u(0.8)} />
+                <rect x={-radius * 0.8} y={-radius * 0.7} width={radius * 1.6} height={radius * 1.4} rx={u(0.6)} fill="#d9edf6" stroke="#627786" strokeWidth={u(0.5)} />
+              </g>
+            ) : (
+              <>
+                <circle cx={tree.x} cy={tree.y} r={radius + 0.35} fill={selected ? '#dbeafe' : '#dbeccd'} stroke={selected ? '#1a56f5' : '#7fa668'} strokeWidth={selected ? u(1.4) : u(0.8)} />
+                <circle cx={tree.x} cy={tree.y} r={radius} fill={tree.color} stroke="#47643c" strokeWidth={u(0.5)} />
+              </>
+            )}
+            {selected ? (
+              <circle cx={tree.x + radius} cy={tree.y + radius} r={u(3.2)} fill="#1a56f5" stroke="white" strokeWidth={u(1)} style={{ cursor: 'nwse-resize' }} onPointerDown={(event) => startTreeDrag(event, tree, 'resize')} onPointerMove={moveTreeDrag} onPointerUp={endTreeDrag} onPointerCancel={endTreeDrag} />
+            ) : null}
+          </g>
+        )
+      })}
 
       {/* Measure overlay */}
       {measure && measurePts.length > 0 ? (
@@ -518,6 +695,28 @@ function fmt(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
+function wrapLabel(value: string, maxChars: number, maxLines: number): string[] {
+  const words = value.trim().split(/\s+/).filter(Boolean)
+  if (!words.length) return ['']
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (candidate.length <= maxChars) {
+      current = candidate
+      continue
+    }
+    if (current) lines.push(current)
+    current = word.length > maxChars ? `${word.slice(0, Math.max(1, maxChars - 1))}…` : word
+    if (lines.length === maxLines - 1) break
+  }
+  if (current && lines.length < maxLines) lines.push(current)
+  if (lines.length === maxLines && words.join(' ').length > lines.join(' ').replace(/…$/, '').length && !lines[lines.length - 1]?.endsWith('…')) {
+    lines[lines.length - 1] = `${lines[lines.length - 1].slice(0, Math.max(1, maxChars - 1))}…`
+  }
+  return lines
+}
+
 function round1(value: number): number {
   return Math.round(value * 10) / 10
 }
@@ -534,156 +733,65 @@ function pickScaleBar(s: number, units: Units): { units: number } | null {
  */
 function RoomFurniture({ room, u, color }: { room: Room; u: (px: number) => number; color: string }) {
   const { x, y, w, h } = room.rect
-  const common = {
-    fill: 'none',
-    stroke: color,
-    strokeWidth: u(1),
-    opacity: 0.5,
-    strokeLinecap: 'round' as const,
-  }
-  const min = Math.min
-
-  switch (room.category) {
-    case 'bedroom': {
-      const bw = min(6, w - 2)
-      const bh = min(7.5, h - 2)
-      return (
-        <g {...common}>
-          <rect x={x + 1.5} y={y + 1.5} width={bw} height={bh} rx={u(2)} />
-          <line x1={x + 1.5} y1={y + 3} x2={x + 1.5 + bw} y2={y + 3} />
-        </g>
-      )
-    }
-    case 'living': {
-      const sw = min(7, w - 3)
-      const sx = x + (w - sw) / 2
-      const sy = y + h - 3.4
-      return (
-        <g {...common}>
-          <rect x={sx} y={sy} width={sw} height={2.4} rx={u(2)} />
-          <line x1={sx} y1={sy + 0.7} x2={sx + sw} y2={sy + 0.7} />
-          <rect x={x + w / 2 - 1.4} y={sy - 2.6} width={2.8} height={1.5} rx={u(2)} />
-        </g>
-      )
-    }
-    case 'dining': {
-      const r = min(w, h) * 0.2
-      const cx = x + w / 2
-      const cy = y + h / 2
-      return (
-        <g {...common}>
-          <circle cx={cx} cy={cy} r={r} />
-          <rect x={cx - 0.7} y={cy - r - 1.7} width={1.4} height={1.2} />
-          <rect x={cx - 0.7} y={cy + r + 0.5} width={1.4} height={1.2} />
-          <rect x={cx - r - 1.7} y={cy - 0.7} width={1.2} height={1.4} />
-          <rect x={cx + r + 0.5} y={cy - 0.7} width={1.2} height={1.4} />
-        </g>
-      )
-    }
-    case 'kitchen':
-      return (
-        <g {...common}>
-          <rect x={x + 1} y={y + 1} width={w - 2} height={2} />
-          <rect x={x + 1} y={y + 1} width={2} height={min(h - 2, 6)} />
-          <circle cx={x + w / 2} cy={y + 2} r={0.7} />
-        </g>
-      )
-    case 'bathroom':
-    case 'laundry':
-      return (
-        <g {...common}>
-          <rect x={x + 1.2} y={y + 1.2} width={1.7} height={1.3} />
-          <circle cx={x + 2.05} cy={y + 3.4} r={0.85} />
-          <rect x={x + w - 3.2} y={y + 1.2} width={2} height={1.6} />
-        </g>
-      )
-    case 'garage': {
-      const cw = min(6.5, w - 3)
-      const ch = min(12, h - 3)
-      const cx = x + (w - cw) / 2
-      const cy = y + (h - ch) / 2
-      return (
-        <g {...common}>
-          <rect x={cx} y={cy} width={cw} height={ch} rx={u(6)} />
-          <line x1={cx} y1={cy + ch * 0.28} x2={cx + cw} y2={cy + ch * 0.28} />
-          <line x1={cx} y1={cy + ch * 0.72} x2={cx + cw} y2={cy + ch * 0.72} />
-        </g>
-      )
-    }
-    case 'study':
-      return (
-        <g {...common}>
-          <rect x={x + (w - min(6, w - 3)) / 2} y={y + 1.5} width={min(6, w - 3)} height={2.5} />
-          <circle cx={x + w / 2} cy={y + 5.4} r={0.9} />
-        </g>
-      )
-    case 'storage':
-      return (
-        <g {...common}>
-          <line x1={x + 1} y1={y + 2} x2={x + w - 1} y2={y + 2} />
-          <line x1={x + 1} y1={y + 3.4} x2={x + w - 1} y2={y + 3.4} />
-        </g>
-      )
-    case 'pool':
-      return (
-        <g {...common}>
-          {[0.3, 0.5, 0.7].map((t) => (
-            <path
-              key={t}
-              d={`M ${x + 1.5} ${y + h * t} q ${(w - 3) / 4} -1 ${(w - 3) / 2} 0 q ${(w - 3) / 4} 1 ${(w - 3) / 2} 0`}
-            />
-          ))}
-        </g>
-      )
-    case 'garden':
-      return (
-        <g {...common}>
-          <circle cx={x + w * 0.25} cy={y + h * 0.5} r={1.7} />
-          <circle cx={x + w * 0.6} cy={y + h * 0.35} r={1.4} />
-          <circle cx={x + w * 0.78} cy={y + h * 0.65} r={1.6} />
-        </g>
-      )
-    case 'porch':
-    case 'balcony':
-      return (
-        <g {...common}>
-          <line x1={x + 0.6} y1={y + h - 0.6} x2={x + w - 0.6} y2={y + h - 0.6} strokeDasharray={`${u(4)} ${u(3)}`} />
-        </g>
-      )
-    default:
-      return null
-  }
-}
-
-/** Door swings + window bands on the room envelope (drafting convention).
- *  Counts follow the room's element list, so the Door/Window tools give
- *  immediate visual feedback. */
-function RoomOpenings({ room, u, stroke }: { room: Room; u: (px: number) => number; stroke: string }) {
-  if (['circulation', 'garden', 'pool', 'balcony'].includes(room.category)) return null
-  const { x, y, w, h } = room.rect
-  const doors = Math.max(1, room.elements.filter((e) => e.type === 'door').length)
-  const windows = Math.max(1, room.elements.filter((e) => e.type === 'window').length)
-  const doorGap = Math.min(6, (w - 2) / doors)
-  const leaf = Math.min(3, h * 0.5)
-  const wl = Math.min(3.4, (w - 2) / windows - 1)
-
+  if (!room.items?.length) return null
   return (
-    <g fill="none" strokeWidth={u(1)} opacity={0.75}>
-      {Array.from({ length: doors }).map((_, i) => {
-        const hinge = x + 1.2 + i * doorGap
+    <g pointerEvents="none" strokeWidth={u(0.85)}>
+      {room.items.map((item) => {
+        const key = canonicalFurnitureKey(item.item)
+        const defaults = getFurnitureDimensions(item.item, room.units)
+        const iw = item.width ?? defaults.width
+        const ih = item.depth ?? defaults.depth
+        const cx = x + w * (0.5 + item.x)
+        const cy = y + h * (0.5 + item.z)
+        const stroke = item.color || color
+        const base = <rect x={-iw / 2} y={-ih / 2} width={iw} height={ih} rx={u(0.3)} fill={stroke} fillOpacity={0.13} stroke={stroke} />
         return (
-          <g key={`d${i}`} stroke={stroke}>
-            <line x1={hinge} y1={y + h} x2={hinge} y2={y + h - leaf} />
-            <path d={`M ${hinge} ${y + h - leaf} A ${leaf} ${leaf} 0 0 1 ${hinge + leaf} ${y + h}`} />
-          </g>
-        )
-      })}
-      {Array.from({ length: windows }).map((_, i) => {
-        const wx = x + ((w * (i + 1)) / (windows + 1)) - wl / 2
-        return (
-          <g key={`w${i}`} stroke={stroke}>
-            <rect x={wx} y={y - 0.35} width={wl} height={0.7} fill="#ffffff" />
-            <line x1={wx} y1={y} x2={wx + wl} y2={y} />
+          <g key={item.id} transform={`translate(${cx} ${cy}) rotate(${item.rotation * 180 / Math.PI})`} stroke={stroke} fill="none">
+            {base}
+            {key === 'bed' || key === 'king-bed' ? <>
+              <path d={`M ${-iw * 0.42} ${-ih * 0.18} h ${iw * 0.84} v ${ih * 0.58} h ${-iw * 0.84} Z`} fill="#fff" fillOpacity=".7" />
+              <line x1={-iw / 2} y1={-ih * 0.28} x2={iw / 2} y2={-ih * 0.28} />
+              <rect x={-iw * 0.36} y={-ih * 0.42} width={iw * 0.3} height={ih * 0.16} rx={u(0.15)} fill="#fff" />
+              <rect x={iw * 0.06} y={-ih * 0.42} width={iw * 0.3} height={ih * 0.16} rx={u(0.15)} fill="#fff" />
+            </> : null}
+            {key === 'sofa' || key === 'armchair' ? <>
+              <line x1={-iw * 0.38} y1={-ih * 0.26} x2={iw * 0.38} y2={-ih * 0.26} />
+              <line x1={-iw * 0.38} y1={-ih * 0.26} x2={-iw * 0.38} y2={ih * 0.4} />
+              <line x1={iw * 0.38} y1={-ih * 0.26} x2={iw * 0.38} y2={ih * 0.4} />
+              <line x1={-iw * 0.5} y1={ih * 0.38} x2={iw * 0.5} y2={ih * 0.38} />
+            </> : null}
+            {key === 'dining' || key === 'table' || key === 'coffee-table' || key === 'sideboard' || key === 'desk' ? <>
+              <line x1={-iw * 0.35} y1={-ih * 0.35} x2={-iw * 0.35} y2={ih * 0.35} />
+              <line x1={iw * 0.35} y1={-ih * 0.35} x2={iw * 0.35} y2={ih * 0.35} />
+            </> : null}
+            {key === 'chair' ? <path d={`M ${-iw * 0.42} ${-ih * 0.45} h ${iw * 0.84} v ${ih * 0.35} h ${-iw * 0.84} Z M ${-iw * 0.42} ${-ih * 0.1} v ${ih * 0.5} M ${iw * 0.42} ${-ih * 0.1} v ${ih * 0.5}`} /> : null}
+            {key === 'toilet' ? <>
+              <ellipse cx="0" cy={ih * 0.1} rx={iw * 0.38} ry={ih * 0.32} fill="#fff" />
+              <rect x={-iw * 0.34} y={-ih * 0.43} width={iw * 0.68} height={ih * 0.22} rx={u(0.1)} />
+            </> : null}
+            {key === 'sink' || key === 'washbasin' ? <>
+              <ellipse cx="0" cy="0" rx={iw * 0.34} ry={ih * 0.3} fill="#fff" />
+              <circle cx="0" cy="0" r={u(0.12)} />
+            </> : null}
+            {key === 'shower' ? <>
+              <line x1={-iw / 2} y1={-ih / 2} x2={iw / 2} y2={ih / 2} />
+              <circle cx={iw * 0.3} cy={-ih * 0.3} r={u(0.2)} />
+            </> : null}
+            {key === 'bath' ? <>
+              <rect x={-iw * 0.4} y={-ih * 0.36} width={iw * 0.8} height={ih * 0.72} rx={u(0.55)} fill="#fff" />
+              <ellipse cx="0" cy="0" rx={iw * 0.25} ry={ih * 0.18} />
+            </> : null}
+            {key === 'fridge' || key === 'kitchen' || key === 'cabinets' || key === 'wardrobe' || key === 'bookshelf' || key === 'storage-rack' ? <>
+              <line x1={0} y1={-ih / 2} x2={0} y2={ih / 2} />
+              <line x1={iw * 0.35} y1={-ih * 0.2} x2={iw * 0.35} y2={ih * 0.2} />
+            </> : null}
+            {key === 'cooker' ? <>
+              {[[-0.22, -0.2], [0.22, -0.2], [-0.22, 0.2], [0.22, 0.2]].map(([px, py], index) => <circle key={index} cx={px * iw} cy={py * ih} r={Math.min(iw, ih) * 0.12} />)}
+            </> : null}
+            {key === 'tv-unit' || key === 'tv' ? <>
+              <line x1={-iw * 0.35} y1={-ih * 0.25} x2={iw * 0.35} y2={-ih * 0.25} />
+              <line x1={-iw * 0.35} y1={ih * 0.25} x2={iw * 0.35} y2={ih * 0.25} />
+            </> : null}
           </g>
         )
       })}

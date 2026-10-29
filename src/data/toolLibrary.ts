@@ -145,7 +145,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
           { id: 'in_tv', name: 'TV Stand', icon: 'Monitor', item: 'tv' },
           { id: 'in_lamp', name: 'Floor Lamp', icon: 'Lamp', item: 'lamp' },
           { id: 'in_chair', name: 'Dining Chair', icon: 'Armchair', item: 'chair' },
-          { id: 'in_table', name: 'Coffee Table', icon: 'Box', item: 'table' },
+          { id: 'in_table', name: 'Coffee Table', icon: 'Box', item: 'coffee-table' },
           { id: 'in_ac', name: 'Wall AC Unit', icon: 'Box', item: 'ac' },
           { id: 'in_fan', name: 'Ceiling Fan', icon: 'Lamp', item: 'fan' },
           { id: 'in_bulb', name: 'Ceiling Light', icon: 'Lamp', item: 'bulb' },
@@ -157,6 +157,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
         variants: [
           { id: 'in_bed', name: 'Double Bed', icon: 'BedDouble', item: 'bed' },
           { id: 'in_wardrobe', name: 'Wardrobe', icon: 'Box', item: 'wardrobe' },
+          { id: 'in_bedside', name: 'Bedside Table', icon: 'Table', item: 'bedside-table' },
         ],
       },
       {
@@ -164,8 +165,12 @@ export const TOOL_GROUPS: ToolGroup[] = [
         label: 'Kitchen & dining',
         variants: [
           { id: 'in_cabinet', name: 'Cabinet Run', icon: 'UtensilsCrossed', item: 'kitchen' },
+          { id: 'in_island', name: 'Kitchen Island', icon: 'PanelTop', item: 'island' },
+          { id: 'in_sink', name: 'Kitchen Sink', icon: 'Waves', item: 'sink' },
+          { id: 'in_cooker', name: 'Cooker / Hob', icon: 'CookingPot', item: 'cooker' },
           { id: 'in_fridge', name: 'Refrigerator', icon: 'Refrigerator', item: 'fridge' },
           { id: 'in_dining', name: 'Dining Table', icon: 'Utensils', item: 'dining' },
+          { id: 'in_chairs', name: 'Dining Chair', icon: 'Armchair', item: 'chair' },
         ],
       },
       {
@@ -173,7 +178,20 @@ export const TOOL_GROUPS: ToolGroup[] = [
         label: 'Bath & office',
         variants: [
           { id: 'in_bath', name: 'Bathtub', icon: 'Bath', item: 'bath' },
+          { id: 'in_shower', name: 'Shower', icon: 'Waves', item: 'shower' },
+          { id: 'in_washbasin', name: 'Washbasin', icon: 'Waves', item: 'washbasin' },
+          { id: 'in_toilet', name: 'Toilet', icon: 'Box', item: 'toilet' },
           { id: 'in_desk', name: 'Study Desk', icon: 'Laptop', item: 'desk' },
+        ],
+      },
+      {
+        id: 'int_utility',
+        label: 'Laundry & garage',
+        variants: [
+          { id: 'in_washer', name: 'Washer', icon: 'Box', item: 'washer' },
+          { id: 'in_dryer', name: 'Dryer', icon: 'Box', item: 'dryer' },
+          { id: 'in_car', name: 'Vehicle footprint', icon: 'Car', item: 'vehicle-footprint' },
+          { id: 'in_shelf', name: 'Storage rack', icon: 'Box', item: 'storage-rack' },
         ],
       },
     ],

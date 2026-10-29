@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Compass, Crosshair, Frame, Info, Tag } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, Compass, Crosshair, Frame, Info, Printer, Tag } from 'lucide-react'
 import type { Room, Vec2 } from '@/types'
 import { useWorkspace } from '@/pages/workspace/WorkspaceLayout'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
@@ -7,6 +7,7 @@ import { PlanCanvas, ZoomControls, useZoom } from '@/components/floor-plan/PlanC
 import { SegmentedControl } from '@/components/ui/FormControls'
 import { NumberField } from '@/components/ui/Field'
 import type { PendingPlacement } from '@/data/toolLibrary'
+import { validatePlan } from '@/lib/planValidation'
 
 function IconToggle({
   active,
@@ -49,12 +50,21 @@ const TOOL_HINTS: Record<string, string> = {
  */
 export function PlanEditor() {
   const ctx = useWorkspace()
-  const { project, rooms, units, setUnits, selectedRoomId, selectedRoom } = ctx
+  const { project, rooms, units, setUnits, wallThicknesses, selectedRoomId, selectedRoom } = ctx
   const [zoom, setZoom] = useZoom()
   const [showLabels, setShowLabels] = useState(true)
   const [showDimensions, setShowDimensions] = useState(true)
   const [showAreas, setShowAreas] = useState(true)
   const [showCompass, setShowCompass] = useState(true)
+  const [showPlanCheck, setShowPlanCheck] = useState(false)
+  const planIssues = useMemo(() => validatePlan(
+    rooms,
+    { width: project.plot.width, length: project.plot.length, units },
+    ctx.walls,
+    ctx.openings,
+    ctx.placed,
+  ), [rooms, project.plot.width, project.plot.length, units, ctx.walls, ctx.openings, ctx.placed])
+  const planErrorCount = planIssues.filter((issue) => issue.severity === 'error').length
   const [plotWidth, setPlotWidth] = useState(String(project.plot.width))
   const [plotLength, setPlotLength] = useState(String(project.plot.length))
   useEffect(() => {
@@ -97,17 +107,17 @@ export function PlanEditor() {
     }
     const room = roomAt(point)
     if (!room) return
-    if (tool === 'door') ctx.addOpening(room.id, 'door', variant.label, { width: variant.w, height: variant.h })
-    if (tool === 'window') ctx.addOpening(room.id, 'window', variant.label, { width: variant.w, height: variant.h })
-    if (tool === 'interior' && variant.item) ctx.placeInterior(room.id, variant.item)
+    if (tool === 'door') ctx.addOpening(room.id, 'door', variant.label, { width: variant.w, height: variant.h }, point)
+    if (tool === 'window') ctx.addOpening(room.id, 'window', variant.label, { width: variant.w, height: variant.h }, point)
+    if (tool === 'interior' && variant.item) ctx.placeInterior(room.id, variant.item, point)
   }
 
-  const handleRoomClick = (room: Room) => {
+  const handleRoomClick = (room: Room, point?: Vec2) => {
     if (ctx.pending) {
       const { tool, variant } = ctx.pending
-      if (tool === 'door') return ctx.addOpening(room.id, 'door', variant.label, { width: variant.w, height: variant.h })
-      if (tool === 'window') return ctx.addOpening(room.id, 'window', variant.label, { width: variant.w, height: variant.h })
-      if (tool === 'interior' && variant.item) return ctx.placeInterior(room.id, variant.item)
+      if (tool === 'door') return ctx.addOpening(room.id, 'door', variant.label, { width: variant.w, height: variant.h }, point)
+      if (tool === 'window') return ctx.addOpening(room.id, 'window', variant.label, { width: variant.w, height: variant.h }, point)
+      if (tool === 'interior' && variant.item) return ctx.placeInterior(room.id, variant.item, point)
     }
     ctx.selectRoom(room.id === selectedRoomId ? null : room.id)
   }
@@ -162,8 +172,28 @@ export function PlanEditor() {
           <IconToggle active={showDimensions} onClick={() => setShowDimensions((v) => !v)} label="Dims" icon={<Frame className="h-3.5 w-3.5" />} />
           <IconToggle active={showAreas} onClick={() => setShowAreas((v) => !v)} label="Areas" icon={<Info className="h-3.5 w-3.5" />} />
           <IconToggle active={showCompass} onClick={() => setShowCompass((v) => !v)} label="North" icon={<Compass className="h-3.5 w-3.5" />} />
+          <button type="button" onClick={() => setShowPlanCheck((value) => !value)} aria-expanded={showPlanCheck} className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium ${planErrorCount ? 'border-red-200 bg-red-50 text-red-700' : 'border-line bg-surface text-muted hover:bg-canvas-soft'}`}>
+            <AlertTriangle className="h-3.5 w-3.5" /> Check plan <span className="rounded-full bg-white/70 px-1.5 text-[10px]">{planIssues.length}</span>
+          </button>
+          <button type="button" onClick={() => window.print()} title="Print this floor plan or save it as PDF" className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-medium text-muted hover:bg-canvas-soft">
+            <Printer className="h-3.5 w-3.5" /> Print / PDF
+          </button>
         </div>
       </div>
+
+      {showPlanCheck ? (
+        <section aria-label="Plan checks" className="max-h-44 shrink-0 overflow-y-auto border-b border-line bg-white px-4 py-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-xs font-semibold text-ink-text">Plan checks</h3>
+            <span className="text-[10px] text-muted">Geometry checks only — not building-code or permit compliance.</span>
+          </div>
+          {planIssues.length ? (
+            <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+              {planIssues.map((issue, index) => <li key={`${issue.code}-${issue.roomId ?? ''}-${index}`} className={`rounded px-2 py-1 text-[11px] ${issue.severity === 'error' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-800'}`}>{issue.severity === 'error' ? 'Error: ' : 'Check: '}{issue.message}</li>)}
+            </ul>
+          ) : <p className="mt-2 text-[11px] font-medium text-emerald-700">No geometry conflicts detected in this plan.</p>}
+        </section>
+      ) : null}
 
       <div
         className="min-h-0 flex-1"
@@ -179,6 +209,7 @@ export function PlanEditor() {
           <FloorPlanDiagram
             rooms={rooms}
             units={units}
+            wallThicknesses={wallThicknesses}
             plot={{ width: project.plot.width, length: project.plot.length }}
             showLabels={showLabels}
             showDimensions={showDimensions}
@@ -187,6 +218,10 @@ export function PlanEditor() {
             showBoundary
             measure={measure}
             trees={ctx.ornaments}
+            selectedTreeId={ctx.selectedSiteId}
+            onSelectTree={ctx.selectSite}
+            onMoveTree={(id, x, y) => ctx.liveEdit((state) => ({ ...state, ornaments: state.ornaments.map((tree) => tree.id === id ? { ...tree, x, y } : tree) }))}
+            onResizeTree={(id, scale) => ctx.liveEdit((state) => ({ ...state, ornaments: state.ornaments.map((tree) => tree.id === id ? { ...tree, scale } : tree) }))}
             onCanvasClick={handleCanvasClick}
             selectedId={selectedRoomId}
             onSelectRoom={handleRoomClick}
@@ -214,14 +249,16 @@ export function PlanEditor() {
             registerClientToPlan={(fn) => {
               clientToPlan.current = fn
             }}
-            className="min-h-0 min-w-0 drop-shadow-sm"
+            className="print-plan-svg min-h-0 min-w-0 drop-shadow-sm"
           />
         </PlanCanvas>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-surface px-3 py-2">
         <p className="text-[11.5px] text-muted">
-          {ctx.pending ? (
+          {ctx.placementWarning ? (
+            <span role="alert" className="font-medium text-red-700">{ctx.placementWarning} <button className="underline underline-offset-2" onClick={ctx.clearPlacementWarning}>Dismiss</button></span>
+          ) : ctx.pending ? (
             <span className="font-medium text-brand-700">
               Placing: {ctx.pending.variant.name} — click the plan
               {ctx.pending.tool === 'door' || ctx.pending.tool === 'window' || ctx.pending.tool === 'interior'

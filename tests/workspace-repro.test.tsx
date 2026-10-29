@@ -12,6 +12,8 @@ import App from '@/App'
 import { ASSETS } from '@/data/assets'
 import { variantFromAsset } from '@/data/toolLibrary'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
+import { roomArea } from '@/lib/floorPlan'
+import type { Room } from '@/types'
 
 const captured: unknown[] = []
 
@@ -85,6 +87,20 @@ function fmt(errs: unknown[]): string {
     .filter((s) => !s.includes('Not implemented: HTMLFormElement'))
     .join('\n=====\n')
 }
+
+describe('custom room outline geometry', () => {
+  const room = {
+    id: 'outline-test', name: 'Test', category: 'other', width: 4, length: 6, units: 'm',
+    rect: { x: 0, y: 0, w: 4, h: 6 }, level: 1, furniture: [], elements: [],
+  } as Room
+
+  it('uses polygon area for a concave custom outline', () => {
+    expect(roomArea({ ...room, shape: 'custom', outline: [
+      { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0.75, y: 1 },
+      { x: 0.75, y: 0.5 }, { x: 0.25, y: 0.5 }, { x: 0.25, y: 1 }, { x: 0, y: 1 },
+    ] })).toBe(18)
+  })
+})
 
 describe('workspace opens', () => {
   it('renders an empty plot boundary for a start-from-scratch plan', () => {
