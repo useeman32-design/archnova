@@ -6,24 +6,61 @@ const STEPS = [0.6, 0.8, 1, 1.25, 1.6, 2]
 /**
  * Scrollable, zoomable canvas surface for the 2D plan.
  * The grid is pure CSS so it scales with the zoom level.
+ * With `pan` enabled, dragging scrolls the canvas like a CAD viewport.
  */
 export function PlanCanvas({
   zoom,
+  pan = false,
   children,
   className = '',
 }: {
   zoom: number
+  pan?: boolean
   children: ReactNode
   className?: string
 }) {
+  const [dragging, setDragging] = useState(false)
+  const last = useState<{ x: number; y: number } | null>(null)
+  const [ref, setRef] = useState<HTMLDivElement | null>(null)
+
   return (
     <div
-      className={`relative overflow-auto scroll-thin bg-canvas-soft/70 ${className}`}
+      ref={setRef}
+      className={`relative overflow-auto scroll-thin bg-canvas-soft/70 ${pan ? (dragging ? 'cursor-grabbing' : 'cursor-grab') : ''} ${className}`}
       style={{
         backgroundImage:
           'linear-gradient(to right, rgba(100,116,139,0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(100,116,139,0.10) 1px, transparent 1px)',
         backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
       }}
+      onPointerDown={
+        pan
+          ? (event) => {
+              last[1]({ x: event.clientX, y: event.clientY })
+              setDragging(true)
+              event.currentTarget.setPointerCapture(event.pointerId)
+            }
+          : undefined
+      }
+      onPointerMove={
+        pan
+          ? (event) => {
+              const prev = last[0]
+              if (!prev || !ref) return
+              ref.scrollLeft -= event.clientX - prev.x
+              ref.scrollTop -= event.clientY - prev.y
+              last[1]({ x: event.clientX, y: event.clientY })
+            }
+          : undefined
+      }
+      onPointerUp={
+        pan
+          ? (event) => {
+              setDragging(false)
+              last[1](null)
+              event.currentTarget.releasePointerCapture(event.pointerId)
+            }
+          : undefined
+      }
     >
       {/* The inner box has an explicit size on BOTH axes so the SVG letterboxes
           into the pane instead of overflowing it; zoom scales both axes. */}

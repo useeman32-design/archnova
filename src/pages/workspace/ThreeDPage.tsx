@@ -26,17 +26,16 @@ const CATEGORIES = [
 
 export function ThreeDPage() {
   const navigate = useNavigate()
-  const { project } = useWorkspace()
+  const {
+    previewProject,
+    previewRoof: roof,
+    setPreviewRoof: setRoof,
+    previewExt: finish,
+    setPreviewExt: setFinish,
+    previewInt: interior,
+    setPreviewInt: setInterior,
+  } = useWorkspace()
   const [mode, setMode] = useState<'exterior' | 'interior'>('exterior')
-  const [roof, setRoof] = useState(project.roof)
-  const [finish, setFinish] = useState<FinishOption>(project.preferences.exteriorFinish)
-  const [interior, setInterior] = useState<FinishOption>(project.preferences.interiorFinish)
-
-  const previewProject = {
-    ...project,
-    roof,
-    preferences: { ...project.preferences, exteriorFinish: finish, interiorFinish: interior },
-  }
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[1fr_auto] lg:grid-cols-[minmax(0,1fr)_300px] lg:grid-rows-1">

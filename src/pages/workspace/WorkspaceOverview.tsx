@@ -12,7 +12,7 @@ import { formatArea } from '@/lib/format'
  * stacks both previews or overflows the viewport.
  */
 export function WorkspaceOverview() {
-  const { project, canvasView, setCanvasView } = useWorkspace()
+  const { previewProject, canvasView, setCanvasView } = useWorkspace()
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -42,15 +42,15 @@ export function WorkspaceOverview() {
         {canvasView === '2D' ? (
           <PlanEditor />
         ) : (
-          <MassingViewerSafe project={project} className="h-full w-full" />
+          <MassingViewerSafe project={previewProject} className="h-full w-full" />
         )}
       </div>
 
       {canvasView === '3D' ? (
         <div className="border-t border-line bg-surface px-3 py-2">
           <p className="text-[11.5px] text-muted">
-            Massing model built from room volumes on the {formatArea(project.plot.width, project.plot.length, project.plot.units)} plot —
-            materials and object libraries arrive with the 3D model service.
+            Massing model built from room volumes on the {formatArea(previewProject.plot.width, previewProject.plot.length, previewProject.plot.units)} plot —
+            roof and finishes follow the Finishes tool; object libraries arrive with the 3D model service.
           </p>
         </div>
       ) : null}

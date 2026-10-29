@@ -46,6 +46,10 @@ export interface FloorPlanDiagramProps {
   showAreas?: boolean
   /** Measure mode: click two points to read a distance; click again to restart. */
   measure?: boolean
+  /** Receives background clicks in plan units (used by placement tools). */
+  onCanvasClick?: (point: Vec2) => void
+  /** Site ornaments (trees) rendered as planting glyphs. */
+  trees?: Vec2[]
 }
 
 export function FloorPlanDiagram({
@@ -60,6 +64,8 @@ export function FloorPlanDiagram({
   showCompass = false,
   showAreas = false,
   measure = false,
+  onCanvasClick,
+  trees = [],
 }: FloorPlanDiagramProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [scale, setScale] = useState<number | null>(null)
@@ -116,10 +122,13 @@ export function FloorPlanDiagram({
   }
 
   const handleBackgroundClick = (event: ReactMouseEvent<SVGSVGElement>) => {
-    if (!measure) return
     const point = toPlanPoint(event)
     if (!point) return
-    setMeasurePts((prev) => (prev.length >= 2 ? [point] : [...prev, point]))
+    if (measure) {
+      setMeasurePts((prev) => (prev.length >= 2 ? [point] : [...prev, point]))
+      return
+    }
+    onCanvasClick?.(point)
   }
 
   const measureDistance =
@@ -252,10 +261,20 @@ export function FloorPlanDiagram({
               </text>
             ) : null}
             {rw >= 70 && rh >= 48 ? <RoomFurniture room={room} u={u} color={palette.text} /> : null}
-            {rw >= 60 && rh >= 40 ? <RoomOpenings room={room} u={u} stroke={palette.stroke} /> : null}
+            {rw >= 60 && rh >= 40 ? (
+              <RoomOpenings room={room} u={u} stroke={palette.stroke} />
+            ) : null}
           </g>
         )
       })}
+
+      {/* Site ornaments (trees) */}
+      {trees.map((point, index) => (
+        <g key={`tree-${index}`} pointerEvents="none" opacity={0.8}>
+          <circle cx={point.x} cy={point.y} r={1.8} fill="#dbeccd" stroke="#7fa668" strokeWidth={u(1)} />
+          <circle cx={point.x} cy={point.y} r={u(1.6)} fill="#5d8a43" stroke="none" />
+        </g>
+      ))}
 
       {/* Measure overlay */}
       {measure && measurePts.length > 0 ? (
@@ -514,26 +533,38 @@ function RoomFurniture({ room, u, color }: { room: Room; u: (px: number) => numb
   }
 }
 
-/** Door swing + window glyph on the room envelope (drafting convention). */
+/** Door swings + window bands on the room envelope (drafting convention).
+ *  Counts follow the room's element list, so the Door/Window tools give
+ *  immediate visual feedback. */
 function RoomOpenings({ room, u, stroke }: { room: Room; u: (px: number) => number; stroke: string }) {
   if (['circulation', 'garden', 'pool', 'balcony'].includes(room.category)) return null
   const { x, y, w, h } = room.rect
-  const hinge = x + Math.min(2.5, w * 0.25)
+  const doors = Math.max(1, room.elements.filter((e) => e.type === 'door').length)
+  const windows = Math.max(1, room.elements.filter((e) => e.type === 'window').length)
+  const doorGap = Math.min(6, (w - 2) / doors)
   const leaf = Math.min(3, h * 0.5)
-  const wl = Math.min(4, w * 0.5)
-  const wx = x + (w - wl) / 2
+  const wl = Math.min(3.4, (w - 2) / windows - 1)
+
   return (
     <g fill="none" strokeWidth={u(1)} opacity={0.75}>
-      {/* door leaf + swing arc on the bottom wall */}
-      <g stroke={stroke}>
-        <line x1={hinge} y1={y + h} x2={hinge} y2={y + h - leaf} />
-        <path d={`M ${hinge} ${y + h - leaf} A ${leaf} ${leaf} 0 0 1 ${hinge + leaf} ${y + h}`} />
-      </g>
-      {/* window band on the top wall */}
-      <g stroke={stroke}>
-        <rect x={wx} y={y - 0.35} width={wl} height={0.7} fill="#ffffff" />
-        <line x1={wx} y1={y} x2={wx + wl} y2={y} />
-      </g>
+      {Array.from({ length: doors }).map((_, i) => {
+        const hinge = x + 1.2 + i * doorGap
+        return (
+          <g key={`d${i}`} stroke={stroke}>
+            <line x1={hinge} y1={y + h} x2={hinge} y2={y + h - leaf} />
+            <path d={`M ${hinge} ${y + h - leaf} A ${leaf} ${leaf} 0 0 1 ${hinge + leaf} ${y + h}`} />
+          </g>
+        )
+      })}
+      {Array.from({ length: windows }).map((_, i) => {
+        const wx = x + ((w * (i + 1)) / (windows + 1)) - wl / 2
+        return (
+          <g key={`w${i}`} stroke={stroke}>
+            <rect x={wx} y={y - 0.35} width={wl} height={0.7} fill="#ffffff" />
+            <line x1={wx} y1={y} x2={wx + wl} y2={y} />
+          </g>
+        )
+      })}
     </g>
   )
 }

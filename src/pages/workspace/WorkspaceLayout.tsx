@@ -1,33 +1,46 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate, useParams, useOutletContext, useSearchParams } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate, useParams, useOutletContext } from 'react-router-dom'
 import {
   ArrowLeft,
   Box,
   Boxes,
   ChevronsLeft,
-  ChevronsRight,
   DraftingCompass,
   FileDown,
-  Home,
   Loader2,
   Save,
-  Settings,
   SlidersHorizontal,
   Sparkles,
 } from 'lucide-react'
-import type { Project, Room, Units } from '@/types'
+import type { ElementType, FinishOption, Project, Room, RoomCategory, Units, Vec2 } from '@/types'
 import { useProjects } from '@/hooks/useProjects'
-import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { uid } from '@/lib/id'
+import { ROOM_FURNITURE, ROOM_OPTIONS } from '@/data/catalog'
 import { Logo } from '@/components/layout/Logo'
 import { Button } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/FormControls'
 import { StatusBadge } from '@/components/ui/Badge'
 import { PropertiesPanel } from '@/components/editor/PropertiesPanel'
+import { ToolPalette } from '@/components/editor/ToolPalette'
 import { AssistantPanel } from '@/components/ai-assistant/AssistantPanel'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
+export type ToolId =
+  | 'select'
+  | 'pan'
+  | 'room'
+  | 'door'
+  | 'window'
+  | 'roof'
+  | 'interior'
+  | 'trees'
+  | 'finish'
+  | 'measure'
+
 export interface WorkspaceContext {
   project: Project
+  /** Project clone with preview overrides (roof / finishes) applied. */
+  previewProject: Project
   rooms: Room[]
   units: Units
   setUnits: (units: Units) => void
@@ -47,28 +60,41 @@ export interface WorkspaceContext {
   save: () => void
   saved: boolean
   showProperties: boolean
+  /* Editing tools */
+  tool: ToolId
+  setTool: (tool: ToolId) => void
+  pendingRoom: RoomCategory | null
+  setPendingRoom: (category: RoomCategory | null) => void
+  pendingInterior: string | null
+  setPendingInterior: (item: string | null) => void
+  ornaments: Vec2[]
+  addRoomAt: (point: Vec2, category: RoomCategory) => void
+  addOpening: (roomId: string, type: ElementType) => void
+  placeInterior: (roomId: string, item: string) => void
+  addTreeAt: (point: Vec2) => void
+  previewRoof: string
+  setPreviewRoof: (roof: string) => void
+  previewExt: FinishOption
+  setPreviewExt: (finish: FinishOption) => void
+  previewInt: FinishOption
+  setPreviewInt: (finish: FinishOption) => void
 }
 
 export function useWorkspace(): WorkspaceContext {
   return useOutletContext<WorkspaceContext>()
 }
 
-/** Mirrors the reference workspace sidebar, plus the Assets library. */
-const RAIL = [
-  { key: 'home', to: '/', label: 'Home', icon: Home },
+const VIEW_TABS = [
   { key: 'floor', to: '', label: 'Floor Plan', icon: DraftingCompass },
   { key: '3d', to: '3d', label: '3D View', icon: Box },
   { key: 'drawings', to: 'drawings', label: 'Drawings', icon: FileDown },
   { key: 'assets', to: 'assets', label: 'Assets', icon: Boxes },
 ] as const
 
-type RailKey = (typeof RAIL)[number]['key']
-
 export function WorkspaceLayout() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const [searchParams] = useSearchParams()
   const { projects, loading, updateProject } = useProjects()
   const project = projects.find((p) => p.id === id)
 
@@ -76,18 +102,29 @@ export function WorkspaceLayout() {
   const [units, setUnits] = useState<Units>('ft')
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [placed, setPlaced] = useState<Record<string, string[]>>({})
-  const [assistantOpen, setAssistantOpen] = useState(searchParams.get('assistant') === '1')
+  const [ornaments, setOrnaments] = useState<Vec2[]>([])
+  const [assistantOpen, setAssistantOpen] = useState(false)
   const [propsOpen, setPropsOpen] = useState(false)
   const [saved, setSaved] = useState(false)
   const [canvasView, setCanvasView] = useState<'2D' | '3D'>('2D')
   const [propsCollapsed, setPropsCollapsed] = useState(false)
-  const [railCollapsed, setRailCollapsed] = useLocalStorage<boolean>('ui.railCollapsed', false)
+  const [tool, setTool] = useState<ToolId>('select')
+  const [pendingRoom, setPendingRoom] = useState<RoomCategory | null>(null)
+  const [pendingInterior, setPendingInterior] = useState<string | null>(null)
+  const [previewRoof, setPreviewRoof] = useState('flat')
+  const [previewExt, setPreviewExt] = useState<FinishOption>('render')
+  const [previewInt, setPreviewInt] = useState<FinishOption>('wood')
 
   useEffect(() => {
     if (!project) return
     setRooms(structuredClone(project.floors.find((f) => f.level === 1)?.rooms ?? []))
     setUnits(project.plot.units)
     setSelectedRoomId(null)
+    setOrnaments([])
+    setPreviewRoof(project.roof)
+    setPreviewExt(project.preferences.exteriorFinish)
+    setPreviewInt(project.preferences.interiorFinish)
+    setTool('select')
   }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Selecting a room on a phone opens the properties drawer so the edit is visible. */
@@ -122,6 +159,57 @@ export function WorkspaceLayout() {
     })
   }, [])
 
+  const addRoomAt = useCallback(
+    (point: Vec2, category: RoomCategory) => {
+      const size = 10
+      const plotW = project?.plot.width ?? 50
+      const plotL = project?.plot.length ?? 50
+      const x = Math.max(0, Math.min(plotW - size, point.x - size / 2))
+      const y = Math.max(0, Math.min(plotL - size, point.y - size / 2))
+      const label = ROOM_OPTIONS.find((r) => r.value === category)?.label ?? 'Room'
+      setRooms((prev) => [
+        ...prev,
+        {
+          id: uid('room'),
+          name: label,
+          category,
+          width: size,
+          length: size,
+          units: project?.plot.units ?? 'ft',
+          rect: { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, w: size, h: size },
+          level: 1,
+          furniture: ROOM_FURNITURE[category] ?? [],
+          elements: [
+            { id: uid('el'), type: 'door', label: 'Door' },
+            { id: uid('el'), type: 'window', label: 'Window' },
+          ],
+        },
+      ])
+    },
+    [project],
+  )
+
+  const addOpening = useCallback((roomId: string, type: ElementType) => {
+    setRooms((prev) =>
+      prev.map((room) =>
+        room.id === roomId
+          ? { ...room, elements: [...room.elements, { id: uid('el'), type, label: type === 'door' ? 'Door' : 'Window' }] }
+          : room,
+      ),
+    )
+  }, [])
+
+  const placeInterior = useCallback((roomId: string, item: string) => {
+    setPlaced((prev) => {
+      const current = prev[roomId] ?? []
+      return current.includes(item) ? prev : { ...prev, [roomId]: [...current, item] }
+    })
+  }, [])
+
+  const addTreeAt = useCallback((point: Vec2) => {
+    setOrnaments((prev) => [...prev, { x: Math.round(point.x * 10) / 10, y: Math.round(point.y * 10) / 10 }])
+  }, [])
+
   const save = useCallback(() => {
     if (!project) return
     const floors = project.floors.map((floor) =>
@@ -137,6 +225,18 @@ export function WorkspaceLayout() {
     [rooms, selectedRoomId],
   )
 
+  const previewProject = useMemo<Project | null>(
+    () =>
+      project
+        ? {
+            ...project,
+            roof: previewRoof,
+            preferences: { ...project.preferences, exteriorFinish: previewExt, interiorFinish: previewInt },
+          }
+        : null,
+    [project, previewRoof, previewExt, previewInt],
+  )
+
   if (loading) {
     return (
       <div className="flex h-dvh items-center justify-center bg-canvas">
@@ -145,7 +245,7 @@ export function WorkspaceLayout() {
     )
   }
 
-  if (!project) {
+  if (!project || !previewProject) {
     return <NotFoundPage />
   }
 
@@ -155,13 +255,8 @@ export function WorkspaceLayout() {
     .replace(/^\/+/, '')
     .split('/')[0]
   const showProperties = segment === '' || segment === 'floor-plan'
-  const isActive = (key: RailKey) => {
-    if (key === 'floor') return segment === '' || segment === 'floor-plan'
-    if (key === '3d') return segment === '3d'
-    if (key === 'drawings') return segment === 'drawings'
-    if (key === 'assets') return segment === 'assets'
-    return false
-  }
+  const isActiveTab = (key: (typeof VIEW_TABS)[number]['key']) =>
+    key === 'floor' ? segment === '' || segment === 'floor-plan' : segment === key
 
   const handleViewChange = (next: '2D' | '3D') => {
     setCanvasView(next)
@@ -170,6 +265,7 @@ export function WorkspaceLayout() {
 
   const context: WorkspaceContext = {
     project,
+    previewProject,
     rooms,
     units,
     setUnits,
@@ -189,16 +285,24 @@ export function WorkspaceLayout() {
     save,
     saved,
     showProperties,
+    tool,
+    setTool,
+    pendingRoom,
+    setPendingRoom,
+    pendingInterior,
+    setPendingInterior,
+    ornaments,
+    addRoomAt,
+    addOpening,
+    placeInterior,
+    addTreeAt,
+    previewRoof,
+    setPreviewRoof,
+    previewExt,
+    setPreviewExt,
+    previewInt,
+    setPreviewInt,
   }
-
-  const railItemClass = (key: RailKey) =>
-    `mx-2 flex items-center gap-3 rounded-lg py-2.5 text-[13.5px] font-medium transition-colors ${
-      railCollapsed ? 'justify-center px-0' : 'px-3'
-    } ${
-      isActive(key)
-        ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/30'
-        : 'text-white/60 hover:bg-ink-800/60 hover:text-white'
-    }`
 
   return (
     <div className="flex h-dvh flex-col bg-canvas">
@@ -216,15 +320,29 @@ export function WorkspaceLayout() {
         </div>
         <div className="mx-1 hidden h-6 w-px bg-line sm:block" />
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="hidden text-[13px] text-muted md:inline">Project</span>
-          <span className="hidden text-muted md:inline">/</span>
           <span className="truncate text-[14px] font-semibold text-ink-text">{project.name}</span>
           <span className="hidden sm:inline">
             <StatusBadge status={project.status} />
           </span>
         </div>
 
-        <div className="hidden md:block">
+        {/* View tabs — like document/view tabs in an editor */}
+        <nav className="hidden items-center gap-1 rounded-lg bg-canvas-soft p-1 md:flex">
+          {VIEW_TABS.map((tab) => (
+            <NavLink
+              key={tab.key}
+              to={tab.to}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+                isActiveTab(tab.key) ? 'bg-surface text-ink-text shadow-sm ring-1 ring-line' : 'text-muted hover:text-ink-text'
+              }`}
+            >
+              <tab.icon className="h-3.5 w-3.5" />
+              {tab.label}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="hidden lg:block">
           <SegmentedControl<'2D' | '3D'>
             size="sm"
             options={[
@@ -238,14 +356,6 @@ export function WorkspaceLayout() {
 
         <Button size="sm" variant="secondary" onClick={save} icon={<Save className="h-3.5 w-3.5" />}>
           <span className="hidden sm:inline">{saved ? 'Saved' : 'Save'}</span>
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => navigate('drawings')}
-          icon={<FileDown className="h-3.5 w-3.5" />}
-        >
-          <span className="hidden sm:inline">Export</span>
         </Button>
         <Button
           size="sm"
@@ -266,85 +376,25 @@ export function WorkspaceLayout() {
         ) : null}
       </header>
 
-      <div className="relative flex min-h-0 flex-1">
-        {/* Workspace rail (collapsible) */}
-        <nav
-          className={`hidden shrink-0 flex-col border-r border-ink-700/40 bg-ink-900 py-3 transition-all lg:flex ${
-            railCollapsed ? 'w-[56px]' : 'w-52'
-          }`}
-        >
-          {RAIL.map((item) => (
-            <NavLink
-              key={item.key}
-              to={item.to}
-              end={item.key === 'home'}
-              title={railCollapsed ? item.label : undefined}
-              className={railItemClass(item.key)}
-            >
-              <item.icon className="h-[18px] w-[18px] shrink-0" />
-              {railCollapsed ? null : item.label}
-            </NavLink>
-          ))}
-          <button
-            onClick={() => setAssistantOpen(true)}
-            title={railCollapsed ? 'AI Assistant' : undefined}
-            className={`mx-2 mt-1 flex items-center gap-3 rounded-lg py-2.5 text-left text-[13.5px] font-medium text-white/60 transition-colors hover:bg-ink-800/60 hover:text-white ${
-              railCollapsed ? 'justify-center px-0' : 'px-3'
-            }`}
-          >
-            <Sparkles className="h-[18px] w-[18px] shrink-0" />
-            {railCollapsed ? null : 'AI Assistant'}
-          </button>
-          <div className={`my-3 border-t border-ink-700/60 ${railCollapsed ? 'mx-3' : 'mx-4'}`} />
+      {/* Mobile view tabs */}
+      <div className="flex gap-1 overflow-x-auto border-b border-line bg-surface px-2 py-1.5 scroll-thin md:hidden">
+        {VIEW_TABS.map((tab) => (
           <NavLink
-            to="/settings"
-            title={railCollapsed ? 'Settings' : undefined}
-            className={`mx-2 flex items-center gap-3 rounded-lg py-2.5 text-[13.5px] font-medium text-white/60 transition-colors hover:bg-ink-800/60 hover:text-white ${
-              railCollapsed ? 'justify-center px-0' : 'px-3'
+            key={tab.key}
+            to={tab.to}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium ${
+              isActiveTab(tab.key) ? 'bg-brand-600 text-white' : 'bg-canvas-soft text-muted'
             }`}
           >
-            <Settings className="h-[18px] w-[18px] shrink-0" />
-            {railCollapsed ? null : 'Settings'}
+            {tab.label}
           </NavLink>
-          <div className="mt-auto flex flex-col items-center gap-2 px-3 pb-2">
-            {!railCollapsed ? (
-              <p className="px-2 text-[10.5px] leading-relaxed text-white/35">
-                ArchNova prototype. Geometry and 3D model services connect later.
-              </p>
-            ) : null}
-            <button
-              onClick={() => setRailCollapsed(!railCollapsed)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/50 hover:bg-ink-800/60 hover:text-white"
-              aria-label={railCollapsed ? 'Expand menu' : 'Collapse menu'}
-              title={railCollapsed ? 'Expand menu' : 'Collapse menu'}
-            >
-              {railCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
-            </button>
-          </div>
-        </nav>
+        ))}
+      </div>
 
-        {/* Mobile workspace tabs */}
-        <div className="absolute inset-x-0 top-0 z-20 flex gap-1 overflow-x-auto border-b border-line bg-surface px-2 py-1.5 scroll-thin lg:hidden">
-          {RAIL.filter((item) => item.key !== 'home').map((item) => (
-            <NavLink
-              key={item.key}
-              to={item.to}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium ${
-                isActive(item.key) ? 'bg-brand-600 text-white' : 'bg-canvas-soft text-muted'
-              }`}
-            >
-              {item.label}
-            </NavLink>
-          ))}
-          <button
-            onClick={() => setAssistantOpen(true)}
-            className="shrink-0 rounded-full bg-canvas-soft px-3 py-1.5 text-[12.5px] font-medium text-muted"
-          >
-            Assistant
-          </button>
-        </div>
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        <ToolPalette />
 
-        <main className="min-w-0 flex-1 pt-11 lg:pt-0">
+        <main className="min-w-0 flex-1">
           <Outlet context={context} />
         </main>
 

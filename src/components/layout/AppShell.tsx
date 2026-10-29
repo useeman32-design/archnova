@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import { Menu, PencilLine, X } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
@@ -8,6 +8,13 @@ import { Logo } from './Logo'
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const location = useLocation()
+
+  /* Never leave the drawer mounted across navigations — prevents a second
+     sidebar lingering over the next page. */
+  useEffect(() => {
+    setDrawerOpen(false)
+  }, [location.pathname])
 
   return (
     <div className="flex min-h-screen bg-canvas">
