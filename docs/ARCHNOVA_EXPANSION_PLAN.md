@@ -13,7 +13,7 @@ This is the durable project log. Read it before starting each follow-up task, up
 **Milestone 1 — Generalized, backward-compatible project/site model: core foundation complete locally (commit `4e34770`).**
 **Milestone 2 — Phase 2 site-boundary geometry/editor: interactive polygon editing and explicit edge labels/derived lengths complete locally; orientation, roads, setbacks and multi-building placement remain.**
 
-The codebase has assistant commits (`9035e2b`, `df13735`), the Phase 1 foundation (`4e34770`), Phase 2 site/mobile work (`be8071e`, `f7b3de4`), Groq recovery (`7d87b99`, `b538a11`), and site-edge labels (`d93dc4f`) on `main`. Pushes completed on `main` and `gh-pages` (deployment commit `7a95cac`). After the Pages cache refreshed, the hosted URL served `assets/index-9ZZDJSFd.js` and `assets/index-BeUFGlsg.css`, matching the latest Pages build. No `.github/workflows` deployment workflow exists in this checkout; deployment is via the `gh-pages` branch. Do not put credentials in this file or in chat.
+The codebase has assistant commits (`9035e2b`, `df13735`), the Phase 1 foundation (`4e34770`), Phase 2 site/mobile work (`be8071e`, `f7b3de4`), Groq recovery (`7d87b99`, `b538a11`), site-edge labels (`d93dc4f`), and assistant diagnostics (`3af56c2`) on `main`. The diagnostics code was pushed to `main` and the build to `gh-pages` (`6cc63a3`). The new Pages build references `assets/index-BZOM6Ewe.js` and `assets/index-DqppRJBW.css`; the hosted URL still served the prior `index-9ZZDJSFd.js`/`index-BeUFGlsg.css` at the latest check, so propagation is pending and the diagnostics UI is not yet confirmed live. No `.github/workflows` deployment workflow exists; deployment is via the `gh-pages` branch. Do not put credentials in this file or in chat.
 
 **Mobile project-opening finding:** saved projects remain in each browser's `localStorage`; no cross-device API/authentication was introduced. The valid mobile dashboard-to-workspace flow is covered by tests, and the user confirmed mobile project opening now works. The missing-project explanation remains as a fallback. Per the user's scope decision, leave storage device-local and do not pursue cross-device sync unless requested.
 
@@ -118,7 +118,9 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [x] Save the Phase 2 site editor and mobile-message work in local milestone commit `be8071e` (`feat: add interactive plot boundary editing`).
 - [x] Push `main` with the Groq recovery, Phase 2 edge-label work, and publication-status checkpoints; GitHub accepted the updates.
 - [x] Push the built static bundle to `gh-pages` in commit `7a95cac` (`deploy: publish ArchNova updates`).
-- [x] Verify live Pages delivery after the cache refreshed: the hosted URL serves `assets/index-9ZZDJSFd.js` and `assets/index-BeUFGlsg.css`, matching the latest local Pages build.
+- [x] Verify the previous Pages delivery: the hosted URL served `assets/index-9ZZDJSFd.js` and `assets/index-BeUFGlsg.css`, matching that build.
+- [x] Push assistant diagnostics to `main` (`3af56c2`) and its static bundle to `gh-pages` (`6cc63a3`).
+- [ ] Verify the new diagnostics build is live. Current bundle uses `assets/index-BZOM6Ewe.js` and `assets/index-DqppRJBW.css`; the hosted URL was still returning the previous bundle at last check.
 
 ## Working rules
 
