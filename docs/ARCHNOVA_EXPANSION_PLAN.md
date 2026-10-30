@@ -109,6 +109,7 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [x] Diagnose mobile project lookup: local browser storage is device-local. Replace generic workspace not-found with an explanatory local-storage message; add regressions for opening a saved dashboard card and missing cross-device IDs.
 - [x] Run full tests, typecheck and both builds after the Groq action-recovery change. Result: 50 tests pass across 8 files; typecheck and `git diff --check` pass; production and Pages builds pass. Builds retain the >500 kB chunk warning.
 - [x] Groq regression recovery: direct design requests with no supported operation now get one strict, compact retry; valid responses still flow into the existing user-approved “Apply and save” proposal. Regression test verifies the retry and recovered action. This verifies the local request/normalization flow, not live Groq provider behavior.
+- [x] Save the Groq action-recovery fix, regression coverage, and roadmap correction in local commit `7d87b99` (`fix: recover Groq design actions`).
 - [ ] Add edge/frontage labels and per-edge measurement editing, north orientation, access points, setbacks, and site/building overlap checks.
 - [x] Per user decision, leave project storage browser-local and do not pursue a shared cross-device sync API unless requested.
 - [x] Save the Phase 2 site editor and mobile-message work in local milestone commit `be8071e` (`feat: add interactive plot boundary editing`).
