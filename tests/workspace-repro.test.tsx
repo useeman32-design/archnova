@@ -124,10 +124,12 @@ describe('workspace opens', () => {
       status: 'defined',
       source: 'user-drawn',
       area: 468,
+      edgeLabels: [{ fromVertexId: 'v1', toVertexId: 'v2', type: 'road-facing' }],
       assumptions: [],
     }
-    render(<FloorPlanDiagram rooms={[]} units="ft" plot={{ width: 30, length: 20 }} siteBoundary={boundary} boundaryEditMode boundaryDraft={boundary.vertices} />)
+    render(<FloorPlanDiagram rooms={[]} units="ft" plot={{ width: 30, length: 20 }} siteBoundary={boundary} boundaryEditMode boundaryDraft={boundary.vertices} boundaryDraftEdgeLabels={boundary.edgeLabels} />)
     expect(document.querySelectorAll('svg polygon').length).toBeGreaterThan(0)
+    expect(document.body.textContent).toContain('Road-facing · 30 ft')
     expect(screen.getByRole('button', { name: 'Move plot vertex 3' })).toBeTruthy()
     cleanup()
   })

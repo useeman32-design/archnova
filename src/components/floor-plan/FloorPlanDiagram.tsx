@@ -1,9 +1,10 @@
 import { useLayoutEffect, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import type { PlacedItem, Room, RoomCategory, SiteBoundary, SiteVertex, Units, Vec2 } from '@/types'
+import type { PlacedItem, Room, RoomCategory, SiteBoundary, SiteEdgeLabel, SiteVertex, Units, Vec2 } from '@/types'
 import { formatArea } from '@/lib/format'
 import { roomArea } from '@/lib/floorPlan'
 import { canonicalFurnitureKey, getFurnitureDimensions } from '@/lib/furniture'
 import { getFloorArchitecturalModel, pointAlongWall, wallLength, type WallThicknessSettings } from '@/lib/architecturalModel'
+import { describeSiteEdgeLabel, findSiteEdgeLabel, siteEdgeLength } from '@/lib/siteGeometry'
 
 /**
  * CAD-style 2D plan renderer.
@@ -45,6 +46,7 @@ export interface FloorPlanDiagramProps {
   siteBoundary?: SiteBoundary
   boundaryEditMode?: boolean
   boundaryDraft?: SiteVertex[]
+  boundaryDraftEdgeLabels?: SiteEdgeLabel[]
   onBoundaryAddPoint?: (point: Vec2) => void
   onBoundaryMovePoint?: (index: number, point: Vec2) => void
   className?: string
@@ -88,6 +90,7 @@ export function FloorPlanDiagram({
   siteBoundary,
   boundaryEditMode = false,
   boundaryDraft = [],
+  boundaryDraftEdgeLabels = [],
   onBoundaryAddPoint,
   onBoundaryMovePoint,
   className = '',
@@ -158,6 +161,10 @@ export function FloorPlanDiagram({
   const s = scale ?? 6
   /** Convert everything visual into screen-constant sizes. */
   const u = (px: number) => px / s
+  const edgeLabelVertices = boundaryEditMode ? boundaryDraft : siteBoundary?.vertices ?? []
+  const edgeLabelRecords = boundaryEditMode ? boundaryDraftEdgeLabels : siteBoundary?.edgeLabels
+  const canRenderEdgeLabels = showBoundary && edgeLabelVertices.length >= 3
+    && (boundaryEditMode || siteBoundary?.status === 'defined' || siteBoundary?.status === 'assumed')
 
   const toPlanPoint = (event: ReactMouseEvent<SVGSVGElement>): Vec2 | null => {
     const svg = svgRef.current
@@ -371,6 +378,22 @@ export function FloorPlanDiagram({
           strokeDasharray={`${u(6)} ${u(5)}`}
           opacity="0.7"
         />
+      ) : null}
+      {canRenderEdgeLabels ? (
+        <g aria-label="Plot edge labels" pointerEvents="none">
+          {edgeLabelVertices.map((vertex, index) => {
+            const next = edgeLabelVertices[(index + 1) % edgeLabelVertices.length]
+            const label = describeSiteEdgeLabel(findSiteEdgeLabel(edgeLabelRecords, vertex.id, next.id))
+            if (!label) return null
+            const midpointX = (vertex.x + next.x) / 2
+            const midpointY = (vertex.y + next.y) / 2
+            let angle = Math.atan2(next.y - vertex.y, next.x - vertex.x) * 180 / Math.PI
+            if (angle > 90) angle -= 180
+            if (angle < -90) angle += 180
+            const length = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(siteEdgeLength(vertex, next))
+            return <text key={`${vertex.id}-${next.id}-label`} x={midpointX} y={midpointY - u(1.5)} textAnchor="middle" dominantBaseline="middle" transform={`rotate(${angle} ${midpointX} ${midpointY})`} fontSize={u(6.5)} fontWeight="600" fill="#0f4c45" stroke="white" strokeWidth={u(2.5)} paintOrder="stroke">{label} · {length} {boundaryEditMode ? units : siteBoundary?.units ?? units}</text>
+          })}
+        </g>
       ) : null}
       {showBoundary && siteBoundary?.status === 'unknown' && !boundaryEditMode ? (
         <text x={maxX / 2} y={minY + u(3)} textAnchor="middle" fontSize={u(8)} fill="#7c6f64" pointerEvents="none">

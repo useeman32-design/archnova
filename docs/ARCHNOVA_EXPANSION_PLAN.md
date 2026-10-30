@@ -11,7 +11,7 @@ This is the durable project log. Read it before starting each follow-up task, up
 
 **Milestone 0 — Repository audit and Phase 1 plan: complete.**  
 **Milestone 1 — Generalized, backward-compatible project/site model: core foundation complete locally (commit `4e34770`).**
-**Milestone 2 — Phase 2 site-boundary geometry/editor: first interactive slice complete locally; edge frontage, setbacks, roads and multi-building placement remain.**
+**Milestone 2 — Phase 2 site-boundary geometry/editor: interactive polygon editing and explicit edge labels/derived lengths complete locally; orientation, roads, setbacks and multi-building placement remain.**
 
 The codebase has assistant commits (`9035e2b`, `df13735`), the Phase 1 foundation (`4e34770`), and the Phase 2 site/mobile slice (`be8071e`) locally on `main`, based on `origin/main` at `1f40293`. In this restored runtime, `.git/config` did not retain the remote; after restoring the public repository URL, the push failed with `could not read Username for 'https://github.com': No such device or address`. This indicates the credential provider/token is not available here, not that GitHub rejected the supplied token. The remote and Pages site are not updated. Do not put credentials in this file or in chat.
 
@@ -60,7 +60,7 @@ Extend existing domain types instead of replacing them:
 
 First slice is implemented locally: an interactive 2D boundary editor adds vertices by canvas tap/click, drags vertices, computes polygon area and edge lengths, rejects too-few/duplicate/out-of-envelope/self-crossing/zero-area boundaries, and persists actual points with provenance. The same persisted polygon is drawn in the existing 2D and Three.js views. Unknown irregular boundaries remain an explicitly labeled dimensions envelope until points are provided.
 
-Remaining Phase 2 work: stable edge records and front/rear/left/right/road-facing labels; individually measured segments; user-set north; entrances and adjacent roads; configurable setbacks; multi-structure site placement; deterministic building-boundary/setback/overlap checks; vehicle/pedestrian access, parking, roads, fences/gates, landscaping and full 2D/3D site synchronization. Use actual polygon geometry and explicit assumptions; no local regulations are invented.
+Remaining Phase 2 work: user-set north; entrances and adjacent roads; configurable setbacks; multi-structure site placement; deterministic building-boundary/setback/overlap checks; vehicle/pedestrian access, parking, roads, fences/gates, landscaping and full 2D/3D site synchronization. Stable directed edge records now support explicit standard/custom names; segment lengths remain derived from editable vertices. Use actual polygon geometry and explicit assumptions; no local regulations are invented.
 
 ### Phase 3 — expanded asset library
 
@@ -107,10 +107,11 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [x] Add the 2D plot-boundary editor: tap/click to add points, drag vertices, show area and edge lengths, validate before save, or explicitly choose a dimension-derived rectangle.
 - [x] Render the same saved site polygon in the existing 2D plan and Three.js scene; keep unknown boundaries labeled as envelopes.
 - [x] Diagnose mobile project lookup: local browser storage is device-local. Replace generic workspace not-found with an explanatory local-storage message; add regressions for opening a saved dashboard card and missing cross-device IDs.
-- [x] Run full tests, typecheck and both builds after the Groq action-recovery change. Result: 50 tests pass across 8 files; typecheck and `git diff --check` pass; production and Pages builds pass. Builds retain the >500 kB chunk warning.
+- [x] Run full tests, typecheck and both builds after Groq recovery and edge-label work. Result: 51 tests pass across 8 files; typecheck and `git diff --check` pass; production and Pages builds pass. Builds retain the >500 kB chunk warning.
 - [x] Groq regression recovery: direct design requests with no supported operation now get one strict, compact retry; valid responses still flow into the existing user-approved “Apply and save” proposal. Regression test verifies the retry and recovered action. This verifies the local request/normalization flow, not live Groq provider behavior.
+- [x] Extend Phase 2 boundary editing with optional per-edge standard labels (Front/Rear/Left/Right/Road-facing), custom names, explicit Unknown, and perimeter lengths derived from vertices. Labels persist on vertex-pair metadata and appear with lengths in the 2D site view; no directions are inferred.
 - [x] Save the Groq action-recovery fix, regression coverage, and roadmap correction in local commit `7d87b99` (`fix: recover Groq design actions`).
-- [ ] Add edge/frontage labels and per-edge measurement editing, north orientation, access points, setbacks, and site/building overlap checks.
+- [ ] Add user-set north orientation, access points, setbacks, and site/building overlap checks.
 - [x] Per user decision, leave project storage browser-local and do not pursue a shared cross-device sync API unless requested.
 - [x] Save the Phase 2 site editor and mobile-message work in local milestone commit `be8071e` (`feat: add interactive plot boundary editing`).
 - [ ] Push `main` and publish Pages when GitHub authentication is available. Latest attempt: after restoring the public origin URL, Git returned `could not read Username for 'https://github.com': No such device or address`; the token was not rejected, no credential provider was available. Do not claim remote or Pages is updated.

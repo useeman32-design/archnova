@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Compass, Crosshair, Frame, Info, MapPin, Printer, Tag, X } from 'lucide-react'
-import type { PlotShape, Room, SiteBoundary, SiteVertex, Vec2 } from '@/types'
+import type { PlotShape, Room, SiteBoundary, SiteEdgeLabel, SiteEdgeLabelType, SiteVertex, Vec2 } from '@/types'
 import { useWorkspace } from '@/pages/workspace/WorkspaceLayout'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
 import { PlanCanvas, ZoomControls, useZoom } from '@/components/floor-plan/PlanCanvas'
@@ -8,7 +8,7 @@ import { SegmentedControl } from '@/components/ui/FormControls'
 import { NumberField } from '@/components/ui/Field'
 import type { PendingPlacement } from '@/data/toolLibrary'
 import { validatePlan } from '@/lib/planValidation'
-import { classifyBoundaryShape, polygonArea, validateSiteBoundary } from '@/lib/siteGeometry'
+import { classifyBoundaryShape, findSiteEdgeLabel, polygonArea, siteEdgeLength, validateSiteBoundary } from '@/lib/siteGeometry'
 import { uid } from '@/lib/id'
 
 function IconToggle({
@@ -81,12 +81,18 @@ export function PlanEditor() {
   const [plotModalOpen, setPlotModalOpen] = useState(false)
   const [boundaryEditMode, setBoundaryEditMode] = useState(false)
   const [boundaryDraft, setBoundaryDraft] = useState<SiteVertex[]>([])
+  const [boundaryEdgeLabels, setBoundaryEdgeLabels] = useState<SiteEdgeLabel[]>([])
   const savedBoundary = project.site?.boundary
   const boundaryIssues = useMemo(() => boundaryDraft.length
     ? validateSiteBoundary(boundaryDraft, { width: project.plot.width, length: project.plot.length })
     : [], [boundaryDraft, project.plot.width, project.plot.length])
   const boundaryErrors = boundaryIssues.filter((issue) => issue.severity === 'error')
   const draftBoundaryArea = boundaryDraft.length >= 3 ? polygonArea(boundaryDraft) : 0
+  const missingCustomEdgeName = boundaryDraft.some((vertex, index) => {
+    const next = boundaryDraft[(index + 1) % boundaryDraft.length]
+    const label = findSiteEdgeLabel(boundaryEdgeLabels, vertex.id, next?.id ?? '')
+    return label?.type === 'custom' && !label.customName?.trim()
+  })
   useEffect(() => {
     setBoundaryEditMode(false)
     setBoundaryDraft([])
@@ -106,7 +112,15 @@ export function PlanEditor() {
   }
   const startBoundaryEdit = () => {
     setBoundaryDraft(savedBoundary && savedBoundary.status !== 'unknown' ? savedBoundary.vertices.map((point) => ({ ...point })) : [])
+    setBoundaryEdgeLabels(savedBoundary?.edgeLabels?.map((edge) => ({ ...edge })) ?? [])
     setBoundaryEditMode(true)
+  }
+  const updateBoundaryEdgeLabel = (fromVertexId: string, toVertexId: string, type: SiteEdgeLabelType, customName?: string) => {
+    setBoundaryEdgeLabels((previous) => {
+      const next = previous.filter((edge) => !(edge.fromVertexId === fromVertexId && edge.toVertexId === toVertexId))
+      if (type !== 'unknown') next.push({ fromVertexId, toVertexId, type, ...(customName !== undefined ? { customName } : {}) })
+      return next
+    })
   }
   const addBoundaryPoint = (point: Vec2) => {
     const x = roundSite(Math.max(0, Math.min(project.plot.width, point.x)))
@@ -122,8 +136,14 @@ export function PlanEditor() {
     setBoundaryDraft((previous) => previous.map((vertex, vertexIndex) => vertexIndex === index ? { ...vertex, x, y } : vertex))
   }
   const finishBoundaryEdit = () => {
-    if (boundaryErrors.length > 0 || boundaryDraft.length < 3) return
+    if (boundaryErrors.length > 0 || boundaryDraft.length < 3 || missingCustomEdgeName) return
     const shape = classifyBoundaryShape(boundaryDraft)
+    const edgeLabels = boundaryDraft.flatMap((vertex, index) => {
+      const next = boundaryDraft[(index + 1) % boundaryDraft.length]
+      const edge = findSiteEdgeLabel(boundaryEdgeLabels, vertex.id, next.id)
+      if (!edge || edge.type === 'unknown') return []
+      return [{ ...edge, ...(edge.type === 'custom' ? { customName: edge.customName?.trim() } : {}) }]
+    })
     const boundary: SiteBoundary = {
       id: savedBoundary?.id ?? `site:${project.id}:boundary`,
       shape,
@@ -132,6 +152,7 @@ export function PlanEditor() {
       status: 'defined',
       source: 'user-drawn',
       area: draftBoundaryArea,
+      edgeLabels,
       assumptions: [],
     }
     ctx.updateSiteBoundary(boundary, shape as PlotShape)
@@ -152,9 +173,11 @@ export function PlanEditor() {
       status: 'assumed',
       source: 'dimension-derived',
       area: project.plot.width * project.plot.length,
-      assumptions: ['Rectangular boundary derived from dimensions; frontage and north direction remain unspecified.'],
+      edgeLabels: [],
+      assumptions: ['Rectangular boundary derived from dimensions; edge labels and north direction remain unspecified unless explicitly set by the user.'],
     }
     ctx.updateSiteBoundary(boundary, shape)
+    setBoundaryEdgeLabels([])
     setBoundaryDraft(boundary.vertices)
     setBoundaryEditMode(false)
   }
@@ -275,16 +298,29 @@ export function PlanEditor() {
                 {boundaryDraft.length} vertices · area {boundaryDraft.length >= 3 ? formatSiteArea(draftBoundaryArea, units) : '—'}
               </p>
               {boundaryDraft.length >= 2 ? (
-                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10.5px] text-teal-900">
+                <div className="mt-2 space-y-2">
                   {boundaryDraft.map((vertex, index) => {
                     const next = boundaryDraft[(index + 1) % boundaryDraft.length]
-                    return <span key={vertex.id}>Edge {index + 1}: {formatSiteLength(Math.hypot(next.x - vertex.x, next.y - vertex.y))} {units}</span>
+                    const edgeLabel = findSiteEdgeLabel(boundaryEdgeLabels, vertex.id, next.id)
+                    const edgeType = edgeLabel?.type ?? 'unknown'
+                    return <div key={`${vertex.id}-${next.id}`} className="flex flex-wrap items-center gap-2 text-[10.5px] text-teal-950">
+                      <span className="min-w-28 font-medium">Edge {index + 1}: {formatSiteLength(siteEdgeLength(vertex, next))} {units}</span>
+                      <label className="flex items-center gap-1.5">
+                        <span className="sr-only">Label plot edge {index + 1}</span>
+                        <select aria-label={`Label plot edge ${index + 1}`} value={edgeType} onChange={(event) => updateBoundaryEdgeLabel(vertex.id, next.id, event.target.value as SiteEdgeLabelType, edgeLabel?.customName)} className="rounded-md border border-teal-300 bg-white px-2 py-1 text-[10.5px]">
+                          <option value="unknown">Unknown</option><option value="front">Front</option><option value="rear">Rear</option><option value="left">Left</option><option value="right">Right</option><option value="road-facing">Road-facing</option><option value="custom">Custom name</option>
+                        </select>
+                      </label>
+                      {edgeType === 'custom' ? <input aria-label={`Custom name for plot edge ${index + 1}`} value={edgeLabel?.customName ?? ''} onChange={(event) => updateBoundaryEdgeLabel(vertex.id, next.id, 'custom', event.target.value)} placeholder="Enter edge name" className="w-36 rounded-md border border-teal-300 bg-white px-2 py-1 text-[10.5px]" /> : null}
+                    </div>
                   })}
+                  <p className="text-[10px] text-teal-800">Lengths are derived from the vertices; labels are user-assigned. No frontage or compass direction is assumed.</p>
                 </div>
               ) : null}
-              {boundaryErrors.length ? (
+              {boundaryErrors.length || missingCustomEdgeName ? (
                 <ul role="alert" className="mt-2 space-y-1 text-[11px] font-medium text-red-700">
                   {boundaryErrors.map((issue) => <li key={`${issue.code}-${issue.edgeIndices?.join('-') ?? issue.vertexIndex ?? ''}`}>{issue.message}</li>)}
+                  {missingCustomEdgeName ? <li>Enter a custom name or choose another label for each custom-labeled edge.</li> : null}
                 </ul>
               ) : null}
             </div>
@@ -292,7 +328,7 @@ export function PlanEditor() {
               <button type="button" onClick={() => setBoundaryDraft([])} className="rounded-lg border border-teal-300 bg-white px-2.5 py-1.5 text-[11px] font-medium text-teal-900">Clear points</button>
               <button type="button" onClick={useDimensionRectangle} className="rounded-lg border border-teal-300 bg-white px-2.5 py-1.5 text-[11px] font-medium text-teal-900">Use dimension rectangle</button>
               <button type="button" onClick={() => setBoundaryEditMode(false)} className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-[11px] font-medium text-muted">Cancel</button>
-              <button type="button" onClick={finishBoundaryEdit} disabled={boundaryDraft.length < 3 || boundaryErrors.length > 0} className="rounded-lg bg-teal-700 px-2.5 py-1.5 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Save boundary</button>
+              <button type="button" onClick={finishBoundaryEdit} disabled={boundaryDraft.length < 3 || boundaryErrors.length > 0 || missingCustomEdgeName} className="rounded-lg bg-teal-700 px-2.5 py-1.5 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Save boundary</button>
             </div>
           </div>
         </section>
@@ -331,6 +367,7 @@ export function PlanEditor() {
             siteBoundary={project.site?.boundary}
             boundaryEditMode={boundaryEditMode}
             boundaryDraft={boundaryDraft}
+            boundaryDraftEdgeLabels={boundaryEdgeLabels}
             onBoundaryAddPoint={addBoundaryPoint}
             onBoundaryMovePoint={moveBoundaryPoint}
             showLabels={showLabels}

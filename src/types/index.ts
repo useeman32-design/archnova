@@ -55,6 +55,16 @@ export interface SiteVertex extends Vec2 {
   id: string
 }
 
+export type SiteEdgeLabelType = 'unknown' | 'front' | 'rear' | 'left' | 'right' | 'road-facing' | 'custom'
+
+/** Explicit user-assigned metadata for one directed segment; dimensions are always derived from its vertices. */
+export interface SiteEdgeLabel {
+  fromVertexId: string
+  toVertexId: string
+  type: SiteEdgeLabelType
+  customName?: string
+}
+
 /** An actual polygon when vertices are present; unknown geometry stays empty, never rectangularized. */
 export interface SiteBoundary {
   id: string
@@ -64,6 +74,8 @@ export interface SiteBoundary {
   status: BoundaryStatus
   source: BoundarySource
   area?: number
+  /** Optional explicit labels keyed to directed vertex pairs; absent segments remain unknown. */
+  edgeLabels?: SiteEdgeLabel[]
   assumptions: string[]
 }
 

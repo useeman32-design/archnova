@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SiteVertex } from '@/types'
-import { classifyBoundaryShape, pointInPolygon, polygonArea, validateSiteBoundary } from '@/lib/siteGeometry'
+import { classifyBoundaryShape, describeSiteEdgeLabel, findSiteEdgeLabel, pointInPolygon, polygonArea, siteEdgeLength, validateSiteBoundary } from '@/lib/siteGeometry'
 
 const polygon = (...points: [number, number][]): SiteVertex[] => points.map(([x, y], index) => ({ id: `v${index + 1}`, x, y }))
 
@@ -36,5 +36,18 @@ describe('site boundary geometry', () => {
     const rect = polygon([0, 0], [10, 0], [10, 8], [0, 8])
     expect(pointInPolygon({ x: 10, y: 3 }, rect)).toBe(true)
     expect(validateSiteBoundary(rect, { width: 10, length: 8 })).toEqual([])
+  })
+
+  it('derives edge lengths from vertices and resolves only explicit directional or custom labels', () => {
+    const labels = [
+      { fromVertexId: 'v1', toVertexId: 'v2', type: 'road-facing' as const },
+      { fromVertexId: 'v2', toVertexId: 'v3', type: 'custom' as const, customName: 'Access lane' },
+    ]
+    const rect = polygon([0, 0], [3, 4], [3, 10], [0, 10])
+    expect(siteEdgeLength(rect[0], rect[1])).toBe(5)
+    expect(describeSiteEdgeLabel(findSiteEdgeLabel(labels, 'v1', 'v2'))).toBe('Road-facing')
+    expect(describeSiteEdgeLabel(findSiteEdgeLabel(labels, 'v2', 'v3'))).toBe('Access lane')
+    expect(findSiteEdgeLabel(labels, 'v3', 'v4')).toBeUndefined()
+    expect(describeSiteEdgeLabel(undefined)).toBeUndefined()
   })
 })

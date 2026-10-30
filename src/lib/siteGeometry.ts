@@ -1,4 +1,4 @@
-import type { SiteVertex, Vec2 } from '@/types'
+import type { SiteEdgeLabel, SiteVertex, Vec2 } from '@/types'
 
 const EPSILON = 1e-8
 
@@ -23,6 +23,25 @@ export function polygonSignedArea(points: readonly Vec2[]): number {
 
 export function polygonArea(points: readonly Vec2[]): number {
   return Math.abs(polygonSignedArea(points))
+}
+
+/** Edge lengths are always calculated from the current vertices in the boundary's own units. */
+export function siteEdgeLength(start: Vec2, end: Vec2): number {
+  return Math.hypot(end.x - start.x, end.y - start.y)
+}
+
+export function findSiteEdgeLabel(
+  edgeLabels: readonly SiteEdgeLabel[] | undefined,
+  fromVertexId: string,
+  toVertexId: string,
+): SiteEdgeLabel | undefined {
+  return edgeLabels?.find((edge) => edge.fromVertexId === fromVertexId && edge.toVertexId === toVertexId)
+}
+
+export function describeSiteEdgeLabel(edge: SiteEdgeLabel | undefined): string | undefined {
+  if (!edge || edge.type === 'unknown') return undefined
+  if (edge.type === 'custom') return edge.customName?.trim() || undefined
+  return edge.type === 'road-facing' ? 'Road-facing' : edge.type[0].toUpperCase() + edge.type.slice(1)
 }
 
 export function polygonBounds(points: readonly Vec2[]) {
