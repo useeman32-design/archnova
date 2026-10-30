@@ -98,7 +98,7 @@ export interface WorkspaceContext {
   propsOpen: boolean
   setPropsOpen: (open: boolean) => void
   save: () => void
-  applyAssistantPlan: (plan: AssistantPlan) => Promise<ApplyAssistantPlanResult>
+  applyAssistantPlan: (plan: AssistantPlan, onProgress: (current: number, total: number, label: string) => void) => Promise<ApplyAssistantPlanResult>
   saved: boolean
   showProperties: boolean
   /* Tools */
@@ -678,11 +678,61 @@ export function WorkspaceLayout() {
     window.setTimeout(() => setSaved(false), 1800)
   }, [project, editor.rooms, editor.ornaments, editor.wallThicknesses, previewExtColor, previewRoofColor, updateProject])
 
-  const applyAssistantPlan = useCallback(async (plan: AssistantPlan): Promise<ApplyAssistantPlanResult> => {
+  const applyAssistantPlan = useCallback(async (
+    plan: AssistantPlan,
+    onProgress: (current: number, total: number, label: string) => void,
+  ): Promise<ApplyAssistantPlanResult> => {
+    const originalEditor = editor
     if (!project) return { ok: false, rooms: editor.rooms, placed: editor.placed, projectPatch: {}, appliedCount: 0, errors: ['The project is not loaded yet.'], warnings: [] }
+
+    // Validate the complete proposal first. No intermediate geometry is shown or saved unless
+    // the entire target plan passes the editor's geometric checks.
     const result = applyAssistantPlanChanges({ plan, project, rooms: editor.rooms, placed: editor.placed, wallThicknesses: editor.wallThicknesses })
     if (!result.ok) return result
     const roomsWithItems = result.rooms.map((room) => ({ ...room, items: result.placed[room.id] ?? room.items ?? [] }))
+    const targetById = new Map(roomsWithItems.map((room) => [room.id, room]))
+    const startById = new Map(editor.rooms.map((room) => [room.id, room]))
+    const totalSteps = 12
+
+    // Animate a single validated transition in the shared editor state. The same state drives
+    // the editable 2D canvas and the 3D preview, and undo receives one transaction at the end.
+    onProgress(0, totalSteps, 'Geometry passed. Animating the approved changes in 2D and 3D…')
+    for (let step = 1; step <= totalSteps; step += 1) {
+      const linear = step / totalSteps
+      const t = linear * linear * (3 - 2 * linear)
+      const frameRooms = roomsWithItems.map((target) => {
+        const start = startById.get(target.id)
+        if (!start) {
+          const scale = 0.2 + 0.8 * t
+          const centerX = target.rect.x + target.rect.w / 2
+          const centerY = target.rect.y + target.rect.h / 2
+          const w = target.rect.w * scale, h = target.rect.h * scale
+          return step === totalSteps ? target : { ...target, width: w, length: h, rect: { x: centerX - w / 2, y: centerY - h / 2, w, h }, items: [] }
+        }
+        if (step === totalSteps) return target
+        const rect = {
+          x: start.rect.x + (target.rect.x - start.rect.x) * t,
+          y: start.rect.y + (target.rect.y - start.rect.y) * t,
+          w: start.rect.w + (target.rect.w - start.rect.w) * t,
+          h: start.rect.h + (target.rect.h - start.rect.h) * t,
+        }
+        return { ...start, width: rect.w, length: rect.h, rect }
+      })
+      // Keep removed rooms visible while they contract, then drop them on the final frame.
+      if (step < totalSteps) {
+        for (const start of editor.rooms) {
+          if (targetById.has(start.id)) continue
+          const scale = 1 - 0.8 * t
+          const w = start.rect.w * scale, h = start.rect.h * scale
+          frameRooms.push({ ...start, width: w, length: h, rect: { x: start.rect.x + (start.rect.w - w) / 2, y: start.rect.y + (start.rect.h - h) / 2, w, h } })
+        }
+      }
+      const framePlaced = step === totalSteps ? result.placed : originalEditor.placed
+      setEditor((current) => ({ ...current, rooms: frameRooms, placed: framePlaced }))
+      onProgress(step, totalSteps, step === totalSteps ? 'Finishing the 2D and 3D update…' : `Rendering validated geometry · ${Math.round(linear * 100)}%`)
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 45))
+    }
+
     let floors = project.floors.map((floor) => floor.level === 1 ? { ...floor, rooms: roomsWithItems } : floor)
     if (!floors.some((floor) => floor.level === 1)) floors = [{ id: uid('floor'), name: 'Ground Floor', level: 1, rooms: roomsWithItems }, ...floors]
     const createdHouse = plan.actions.some((action) => action.type === 'create_house')
@@ -701,19 +751,27 @@ export function WorkspaceLayout() {
     }
     try {
       const updated = await updateProject(project.id, nextProjectPatch)
-      if (!updated) return { ...result, ok: false, errors: ['The plan was prepared, but the project could not be saved. Try again.'] }
-      commit((state) => ({ ...state, rooms: roomsWithItems, placed: result.placed }))
+      if (!updated) {
+        setEditor(originalEditor)
+        return { ...result, ok: false, errors: ['The plan was prepared, but the project could not be saved. The preview was rolled back. Try again.'] }
+      }
+      setEditor({ ...originalEditor, rooms: roomsWithItems, placed: result.placed })
+      past.current.push(originalEditor)
+      future.current = []
+      bumpHistory()
       setSelectedRoomId((selected) => roomsWithItems.some((room) => room.id === selected) ? selected : null)
       if (nextProjectPatch.roof) setPreviewRoof(nextProjectPatch.roof)
       setSelectedItemId(null)
       setPlacementWarning(null)
       setSaved(true)
       window.setTimeout(() => setSaved(false), 2200)
+      onProgress(totalSteps, totalSteps, 'Applied and saved. Both views now show the accepted design.')
       return { ...result, rooms: roomsWithItems }
     } catch {
-      return { ...result, ok: false, errors: ['The project could not be saved. Check local storage and try again.'] }
+      setEditor(originalEditor)
+      return { ...result, ok: false, errors: ['The project could not be saved. The preview was rolled back; check local storage and try again.'] }
     }
-  }, [project, editor.rooms, editor.placed, editor.wallThicknesses, updateProject, commit])
+  }, [project, editor, updateProject])
 
   const selectedRoom = useMemo(
     () => editor.rooms.find((room) => room.id === selectedRoomId) ?? null,

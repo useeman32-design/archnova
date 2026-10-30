@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUp, Check, Eye, EyeOff, Loader2, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react'
+import { ArrowUp, Check, Eye, EyeOff, Loader2, Settings2, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react'
 import type { ChatMessage, PlacedItem, Project, Room, Units } from '@/types'
-import { getExamplePrompts } from '@/services/aiService'
 import { DEFAULT_GROQ_MODEL, requestAssistantPlan, testGroqConnection, type AssistantAction, type AssistantPlan } from '@/services/groqAssistant'
 import type { ApplyAssistantPlanResult } from '@/lib/applyAssistantPlan'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { storageKeys } from '@/lib/storage'
 import { uid } from '@/lib/id'
-import { Badge } from '@/components/ui/Badge'
 
 const GROQ_KEY_STORAGE = 'archnova:groq-api-key'
 const GROQ_MODEL_STORAGE = 'archnova:groq-model'
@@ -27,7 +25,7 @@ export function AssistantPanel({
   rooms: Room[]
   placed: Record<string, PlacedItem[]>
   units: Units
-  onApplyPlan: (plan: AssistantPlan) => Promise<ApplyAssistantPlanResult>
+  onApplyPlan: (plan: AssistantPlan, onProgress: (current: number, total: number, label: string) => void) => Promise<ApplyAssistantPlanResult>
 }) {
   const chatKey = `${storageKeys.aiChat}:${project.id}`
   const [messages, setMessages, resetChat] = useLocalStorage<ChatMessage[]>(chatKey, [])
@@ -38,8 +36,10 @@ export function AssistantPanel({
   const [model, setModel] = useState(readSessionValue(GROQ_MODEL_STORAGE) || DEFAULT_GROQ_MODEL)
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [showKey, setShowKey] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState('')
   const [requestError, setRequestError] = useState('')
+  const [applyProgress, setApplyProgress] = useState<{ current: number; total: number; label: string } | null>(null)
   const [pendingPlan, setPendingPlan] = useState<AssistantPlan | null>(null)
   const [applyStatus, setApplyStatus] = useState<{ ok: boolean; message: string; warnings: string[] } | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -49,13 +49,14 @@ export function AssistantPanel({
   useEffect(() => {
     if (!migratedChat.current) {
       migratedChat.current = true
-      if (messages.some((message) => message.simulated || message.pending)) resetChat()
+      const oldDemoNoise = messages.some((message) => message.simulated || message.pending || (message.role === 'assistant' && /(How can I help you design your floor plan|I couldn't reach Groq|Failed to validate JSON)/i.test(message.text)))
+      if (oldDemoNoise) resetChat()
     }
   }, [messages, resetChat])
 
   useEffect(() => {
     if (open) endRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'end' })
-  }, [messages, open, busy, pendingPlan, applyStatus])
+  }, [messages, open, busy, pendingPlan, applyStatus, applyProgress])
 
   const updateApiKey = (value: string) => {
     setApiKey(value)
@@ -102,12 +103,14 @@ export function AssistantPanel({
     const text = raw.trim()
     if (!text || busy) return
     if (!apiKey.trim()) {
-      setRequestError('Paste your Groq API key above before sending a prompt.')
+      setSettingsOpen(true)
+      setRequestError('Paste your Groq API key in Groq settings before sending a prompt.')
       return
     }
     setInput('')
     setBusy(true)
     setRequestError('')
+    setApplyProgress(null)
     setPendingPlan(null)
     setApplyStatus(null)
     const pendingId = uid('msg')
@@ -118,7 +121,7 @@ export function AssistantPanel({
     setMessages((previous) => [
       ...previous,
       { id: uid('msg'), role: 'user', text, createdAt: Date.now() },
-      { id: pendingId, role: 'assistant', text: '', createdAt: Date.now(), pending: true },
+      { id: pendingId, role: 'assistant', text: `Reading the current ${rooms.length}-room plan and plot…`, createdAt: Date.now(), pending: true },
     ])
     try {
       const plan = await requestAssistantPlan({
@@ -127,16 +130,19 @@ export function AssistantPanel({
         context: { project, rooms, placed, units },
         history,
         prompt: text,
+        onProgress: (report) => {
+          setMessages((previous) => previous.map((message) => message.id === pendingId ? { ...message, text: report } : message))
+        },
       })
-      setPendingPlan(plan.actions.length || plan.project || plan.plot ? plan : null)
+      setPendingPlan(plan.actions.length || plan.project || plan.plot || plan.unsupported?.length ? plan : null)
       setMessages((previous) => previous.map((message) => message.id === pendingId
         ? { ...message, text: plan.reply || 'I have prepared a response.', pending: false }
         : message))
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The Groq request failed. Try again.'
-      setRequestError(message)
+      setRequestError('')
       setMessages((previous) => previous.map((item) => item.id === pendingId
-        ? { ...item, text: `I couldn't reach Groq: ${message}`, pending: false }
+        ? { ...item, text: message, pending: false }
         : item))
     } finally {
       setBusy(false)
@@ -148,8 +154,9 @@ export function AssistantPanel({
     setBusy(true)
     setApplyStatus(null)
     setRequestError('')
+    setApplyProgress({ current: 0, total: 1, label: 'Checking geometry before applying…' })
     try {
-      const result = await onApplyPlan(pendingPlan)
+      const result = await onApplyPlan(pendingPlan, (current, total, label) => setApplyProgress({ current, total, label }))
       if (!result.ok) {
         setApplyStatus({ ok: false, message: result.errors.join(' '), warnings: [] })
         return
@@ -162,6 +169,7 @@ export function AssistantPanel({
       setApplyStatus({ ok: false, message: error instanceof Error ? error.message : 'The design update could not be applied.', warnings: [] })
     } finally {
       setBusy(false)
+      setApplyProgress(null)
     }
   }
 
@@ -170,6 +178,7 @@ export function AssistantPanel({
     setPendingPlan(null)
     setApplyStatus(null)
     setRequestError('')
+    setApplyProgress(null)
     setInput('')
   }
 
@@ -184,70 +193,55 @@ export function AssistantPanel({
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white"><Sparkles className="h-4 w-4" /></span>
           <div>
             <p className="text-[14px] font-semibold leading-tight text-ink-text">AI Assistant</p>
-            <p className="text-[11px] text-muted">Groq design copilot · {project.name}</p>
+            <p className="text-[11px] text-muted">{project.name}</p>
           </div>
-          <Badge tone="violet">Beta</Badge>
         </div>
         <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setSettingsOpen((open) => !open)} aria-expanded={settingsOpen} className={`flex h-8 w-8 items-center justify-center rounded-lg ${settingsOpen ? 'bg-brand-50 text-brand-700' : 'text-muted hover:bg-canvas-soft hover:text-ink-text'}`} aria-label={settingsOpen ? 'Hide Groq settings' : 'Groq settings'} title="Groq settings"><Settings2 className="h-4 w-4" /></button>
           <button type="button" onClick={clearConversation} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text" aria-label="Clear conversation" title="Clear conversation"><Trash2 className="h-4 w-4" /></button>
           <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text" aria-label="Close assistant"><X className="h-4 w-4" /></button>
         </div>
       </div>
 
-      <section className="space-y-2.5 border-b border-line bg-brand-50/60 px-3.5 py-3" aria-label="Groq API settings">
-        <div className="flex items-center justify-between gap-2">
-          <label htmlFor="groq-api-key" className="text-[11px] font-semibold uppercase tracking-wide text-brand-900">Groq API key</label>
-          <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="ml-auto text-[10px] font-medium text-brand-700 underline underline-offset-2">Get a key</a>
-          <button type="button" onClick={() => void testKey()} disabled={testingKey || !apiKey.trim()} className="rounded-md border border-brand-200 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-800 disabled:opacity-50">
-            {testingKey ? 'Checking…' : 'Check models'}
-          </button>
-        </div>
-        <div className="flex gap-1.5">
-          <input
-            id="groq-api-key"
-            type={showKey ? 'text' : 'password'}
-            value={apiKey}
-            onChange={(event) => updateApiKey(event.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="Paste gsk_… API key"
-            className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-3 py-2 text-[12px] text-ink-text placeholder:text-faint focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          />
-          <button type="button" onClick={() => setShowKey((visible) => !visible)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand-200 bg-white text-muted" aria-label={showKey ? 'Hide API key' : 'Show API key'}>
-            {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-          {apiKey ? <button type="button" onClick={() => updateApiKey('')} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand-200 bg-white text-muted" aria-label="Clear API key" title="Clear API key"><X className="h-4 w-4" /></button> : null}
-        </div>
-        <div className="flex items-center gap-2">
-          <label htmlFor="groq-model" className="shrink-0 text-[11px] font-medium text-brand-900">Model ID</label>
-          <input id="groq-model" list="groq-model-options" value={model} onChange={(event) => updateModel(event.target.value)} placeholder={DEFAULT_GROQ_MODEL} className="min-w-0 flex-1 rounded-md border border-brand-200 bg-white px-2 py-1.5 text-[11px] text-ink-text focus:border-brand-500 focus:outline-none" />
-          <datalist id="groq-model-options">{availableModels.map((id) => <option key={id} value={id} />)}</datalist>
-        </div>
-        <p className="text-[10px] leading-relaxed text-brand-900/75">Key stays in this browser tab’s session storage, not in your project or chat. Your prompt and room summary go directly from this browser to Groq.</p>
-        {connectionStatus ? <p role="status" className={`text-[10.5px] leading-relaxed ${/verified/i.test(connectionStatus) ? 'text-emerald-700' : 'text-brand-900'}`}>{/verified/i.test(connectionStatus) ? <Check className="mr-1 inline h-3 w-3" /> : null}{connectionStatus}</p> : null}
-      </section>
+      {settingsOpen ? (
+        <section className="space-y-2.5 border-b border-line bg-brand-50/60 px-3.5 py-3" aria-label="Groq API settings">
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="groq-api-key" className="text-[11px] font-semibold uppercase tracking-wide text-brand-900">Groq API key</label>
+            <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="ml-auto text-[10px] font-medium text-brand-700 underline underline-offset-2">Get a key</a>
+            <button type="button" onClick={() => void testKey()} disabled={testingKey || !apiKey.trim()} className="rounded-md border border-brand-200 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-800 disabled:opacity-50">
+              {testingKey ? 'Checking…' : 'Check models'}
+            </button>
+          </div>
+          <div className="flex gap-1.5">
+            <input id="groq-api-key" type={showKey ? 'text' : 'password'} value={apiKey} onChange={(event) => updateApiKey(event.target.value)} autoComplete="off" spellCheck={false} placeholder="Paste Groq API key" className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-3 py-2 text-[12px] text-ink-text placeholder:text-faint focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
+            <button type="button" onClick={() => setShowKey((visible) => !visible)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand-200 bg-white text-muted" aria-label={showKey ? 'Hide API key' : 'Show API key'}>{showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+            {apiKey ? <button type="button" onClick={() => updateApiKey('')} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand-200 bg-white text-muted" aria-label="Clear API key" title="Clear API key"><X className="h-4 w-4" /></button> : null}
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="groq-model" className="shrink-0 text-[11px] font-medium text-brand-900">Model</label>
+            <input id="groq-model" list="groq-model-options" value={model} onChange={(event) => updateModel(event.target.value)} placeholder={DEFAULT_GROQ_MODEL} className="min-w-0 flex-1 rounded-md border border-brand-200 bg-white px-2 py-1.5 text-[11px] text-ink-text focus:border-brand-500 focus:outline-none" />
+            <datalist id="groq-model-options">{availableModels.map((id) => <option key={id} value={id} />)}</datalist>
+          </div>
+          <p className="text-[10px] leading-relaxed text-brand-900/75">The key is kept in this tab only. Groq receives your prompt and a summary of this project.</p>
+          {connectionStatus ? <p role="status" className={`text-[10.5px] leading-relaxed ${/verified/i.test(connectionStatus) ? 'text-emerald-700' : 'text-brand-900'}`}>{/verified/i.test(connectionStatus) ? <Check className="mr-1 inline h-3 w-3" /> : null}{connectionStatus}</p> : null}
+        </section>
+      ) : null}
 
       <div className="flex-1 space-y-4 overflow-y-auto scroll-thin p-4">
         {messages.length === 0 ? (
-          <div className="space-y-4 animate-fade-in">
-            <div className="rounded-2xl rounded-tl-sm border border-line bg-canvas-soft/70 p-4">
-              <p className="text-[14px] font-semibold text-ink-text">Describe the house or change you want.</p>
-              <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">With a key connected, I can propose a room layout, add doors/windows and furniture, resize or rename rooms, and set finishes. Review proposed edits before applying; accepted changes update the 2D/3D model and save into this project.</p>
-            </div>
-            <div>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">Try a prompt</p>
-              {getExamplePrompts().map((prompt) => <button key={prompt} type="button" onClick={() => { setInput(prompt); inputRef.current?.focus() }} className="mb-2 block w-full rounded-xl border border-line bg-surface p-3 text-left text-[12px] leading-relaxed text-ink-text transition-colors hover:border-brand-300 hover:bg-brand-50/50">{prompt}</button>)}
-            </div>
+          <div className="rounded-xl border border-line bg-canvas-soft/60 px-3.5 py-3 text-[12.5px] text-muted">
+            <p className="font-medium text-ink-text">What would you like to design or change?</p>
+            <p className="mt-1">Describe it below. Proposed edits will appear here for review before they update the project.</p>
           </div>
         ) : messages.map((message) => (
           <div key={message.id} className={message.role === 'user' ? 'flex justify-end' : ''}>
             <div className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${message.role === 'user' ? 'bg-brand-600 text-white' : 'border border-line bg-canvas-soft/70 text-ink-text'}`}>
-              {message.pending ? <span className="inline-flex items-center gap-1.5 text-muted"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-500" />Thinking with Groq…</span> : message.text}
+              {message.pending ? <span className="inline-flex items-center gap-1.5 text-muted"><Loader2 className="h-3.5 w-3.5 animate-spin text-brand-600" />{message.text || 'Connecting to Groq…'}</span> : message.text}
             </div>
           </div>
         ))}
 
-        {pendingPlan ? <PlanPreview plan={pendingPlan} onApply={() => void applyPlan()} onDiscard={() => { setPendingPlan(null); setApplyStatus(null) }} busy={busy} /> : null}
+        {pendingPlan ? <PlanPreview plan={pendingPlan} onApply={() => void applyPlan()} onDiscard={() => { setPendingPlan(null); setApplyStatus(null); setApplyProgress(null) }} busy={busy} progress={applyProgress} /> : null}
         {applyStatus ? <div role={applyStatus.ok ? 'status' : 'alert'} className={`rounded-xl border p-3 text-[12px] leading-relaxed ${applyStatus.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
           <p className="font-medium">{applyStatus.message}</p>
           {applyStatus.warnings.map((warning, index) => <p key={index} className="mt-1 text-[11px]">Check: {warning}</p>)}
@@ -258,7 +252,7 @@ export function AssistantPanel({
 
       <form className="border-t border-line p-3" onSubmit={(event) => { event.preventDefault(); void send(input) }}>
         <div className="flex items-end gap-2">
-          <textarea ref={inputRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(input) } }} rows={2} placeholder="e.g. Create a 3-bedroom bungalow on my 50 × 50 ft plot…" className="max-h-32 min-h-[44px] w-full resize-y rounded-xl border border-line bg-canvas-soft/60 px-3 py-2.5 text-[13px] text-ink-text placeholder:text-faint focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
+          <textarea ref={inputRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(input) } }} rows={2} placeholder="Describe a design change…" className="max-h-32 min-h-[44px] w-full resize-y rounded-xl border border-line bg-canvas-soft/60 px-3 py-2.5 text-[13px] text-ink-text placeholder:text-faint focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
           <button type="submit" disabled={busy || !input.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm shadow-brand-600/25 transition-colors hover:bg-brand-700 disabled:opacity-50" aria-label="Send message">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
           </button>
@@ -269,9 +263,10 @@ export function AssistantPanel({
   )
 }
 
-function PlanPreview({ plan, onApply, onDiscard, busy }: { plan: AssistantPlan; onApply: () => void; onDiscard: () => void; busy: boolean }) {
-  const hasChanges = plan.actions.length > 0 || Boolean(plan.project) || Boolean(plan.plot)
-  if (!hasChanges) return null
+function PlanPreview({ plan, onApply, onDiscard, busy, progress }: { plan: AssistantPlan; onApply: () => void; onDiscard: () => void; busy: boolean; progress: { current: number; total: number; label: string } | null }) {
+  const hasApplicableChanges = plan.actions.length > 0 || Boolean(plan.project) || Boolean(plan.plot)
+  const hasUnsupported = Boolean(plan.unsupported?.length)
+  if (!hasApplicableChanges && !hasUnsupported) return null
   return (
     <section className="rounded-xl border border-brand-200 bg-brand-50/70 p-3" aria-label="Proposed design edits">
       <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-brand-700" /><h3 className="text-[12.5px] font-semibold text-brand-900">Review proposed edits</h3></div>
@@ -280,10 +275,12 @@ function PlanPreview({ plan, onApply, onDiscard, busy }: { plan: AssistantPlan; 
         {plan.plot ? <li className="rounded-md bg-white/80 px-2.5 py-1.5 text-[11px] text-ink-text">Adjust plot dimensions{plan.plot.width ? ` to ${plan.plot.width}` : ''}{plan.plot.length ? ` × ${plan.plot.length}` : ''}{plan.plot.units ? ` ${plan.plot.units}` : ''}</li> : null}
         {plan.project ? <li className="rounded-md bg-white/80 px-2.5 py-1.5 text-[11px] text-ink-text">Update project details: {Object.keys(plan.project).join(', ')}</li> : null}
       </ul>
-      <p className="mt-2 text-[10px] leading-relaxed text-brand-900/75">The editor checks geometry before applying. This is a conceptual design aid, not building-code or permit validation.</p>
+      {plan.unsupported?.length ? <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10.5px] text-amber-900"><strong>Not supported yet:</strong> {plan.unsupported.join(' ')}</div> : null}
+      <p className="mt-2 text-[10px] leading-relaxed text-brand-900/75">Geometry is checked before applying; this is not building-code or permit validation.</p>
+      {progress ? <div role="status" className="mt-2 rounded-md bg-white/80 px-2.5 py-2 text-[10.5px] text-brand-900"><div className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /><span>{progress.total > 1 ? `${Math.min(progress.current, progress.total)} / ${progress.total} · ` : ''}{progress.label}</span></div><div className="mt-1.5 h-1 overflow-hidden rounded bg-brand-100"><div className="h-full rounded bg-brand-600 transition-[width] duration-200" style={{ width: `${Math.max(4, Math.min(100, progress.current / Math.max(progress.total, 1) * 100))}%` }} /></div></div> : null}
       <div className="mt-2.5 flex gap-2">
-        <button type="button" onClick={onApply} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-[11.5px] font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}Apply and save</button>
-        <button type="button" onClick={onDiscard} disabled={busy} className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-[11.5px] font-medium text-brand-800 disabled:opacity-50">Discard</button>
+        {hasApplicableChanges ? <button type="button" onClick={onApply} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-[11.5px] font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}Apply and save</button> : <span className="flex-1 py-2 text-[10.5px] text-amber-900">No supported edits are ready to apply.</span>}
+        <button type="button" onClick={onDiscard} disabled={busy} className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-[11.5px] font-medium text-brand-800 disabled:opacity-50">Dismiss</button>
       </div>
     </section>
   )

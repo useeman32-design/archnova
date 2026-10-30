@@ -7,27 +7,32 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('Groq assistant client', () => {
   it('sends project context to Groq and safely parses the structured action plan', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      choices: [{ message: { content: JSON.stringify({
-        reply: 'I will add a study.',
-        actions: [{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 9, x: 2, y: 3 } }],
-      }) } }],
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    const streamedPlan = JSON.stringify({
+      reply: 'I will add a study.',
+      actions: [{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 9, x: 2, y: 3 } }],
+      unsupported: ['An upper floor needs a separate design workflow.'],
+    })
+    const chunks = [...streamedPlan].map((token) => `data: ${JSON.stringify({ choices: [{ delta: { content: token } }] })}\n`).join('')
+    const fetchMock = vi.fn().mockResolvedValue(new Response(`${chunks}data: [DONE]\n`, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
     vi.stubGlobal('fetch', fetchMock)
     const project = createProjectFromForm(defaultNewProjectForm())
+    const progress = vi.fn()
     const plan = await requestAssistantPlan({
       apiKey: 'gsk-test-user-key', model: DEFAULT_GROQ_MODEL,
       context: { project, rooms: [], placed: {}, units: project.plot.units },
-      history: [], prompt: 'Add a study to this project.',
+      history: [], prompt: 'Add a study to this project.', onProgress: progress,
     })
     expect(fetchMock).toHaveBeenCalledOnce()
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toContain('/chat/completions')
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer gsk-test-user-key')
     const body = JSON.parse(String(init.body))
-    expect(body.response_format).toEqual({ type: 'json_object' })
+    expect(body.stream).toBe(true)
+    expect(body.response_format).toBeUndefined()
     expect(body.messages.some((message: { content: string }) => message.content.includes(project.name))).toBe(true)
     expect(plan.actions).toEqual([{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 9, x: 2, y: 3 } }])
+    expect(plan.unsupported).toEqual(['An upper floor needs a separate design workflow.'])
+    expect(progress).toHaveBeenCalledWith(expect.stringContaining('Groq is'))
   })
 
   it('converts provider auth failures into a useful key error without exposing the key', async () => {
