@@ -12,7 +12,7 @@ This is the durable project log. Read it before starting each follow-up task, up
 **Milestone 0 — Repository audit and Phase 1 plan: complete.**  
 **Milestone 1 — Generalized, backward-compatible project/site model: core milestone complete locally; remaining Phase 1 verification/review is tracked below.**
 
-The codebase currently has two unpushed local commits (`9035e2b`, `df13735`) for the assistant house-plan fix and typed-approval handling. The local branch is `main`, based on `origin/main` at `1f40293`. Pushes currently fail because this runtime cannot access GitHub credentials; do not claim the remote or Pages site is updated. Do not put credentials in this file or in chat.
+The codebase has the assistant fix commits (`9035e2b`, `df13735`) and the Phase 1 foundation commit (`4e34770`) locally on `main`, based on `origin/main` at `1f40293`. The latest push attempt failed with `could not read Username for 'https://github.com': No such device or address`; this is a missing credential-provider/runtime issue, not a rejected-token response. The remote and Pages site are not updated. Do not put credentials in this file or in chat.
 
 ## Repository audit — existing implementation
 
@@ -98,8 +98,8 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [x] Pass concise purpose, brief, building and site-boundary metadata to the current assistant context and instruct it not to claim unsupported planning operations.
 - [x] Add Phase 1 regression tests for legacy migration, polygon provenance, non-residential project creation, building/floor synchronization and plot updates.
 - [x] Run full tests, typecheck and both builds. Result: 42 tests pass; typecheck, production build and Pages build pass. Builds retain the pre-existing >500 kB chunk warning.
-- [ ] Save a milestone commit locally.
-- [ ] Push `main` and publish Pages when authenticated repository access is restored; until then report the blocker explicitly.
+- [x] Save the Phase 1 foundation checkpoint locally as `4e34770` (`feat: add generalized architectural project model`).
+- [ ] Push `main` and publish Pages: attempted after the checkpoint commit, but Git could not prompt for a GitHub username because no credential provider/token was available in this runtime. Retry only after secure authentication is restored; do not claim the remote or Pages deployment is current.
 
 ## Working rules
 
