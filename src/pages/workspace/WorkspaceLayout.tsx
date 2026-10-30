@@ -11,7 +11,7 @@ import {
   SlidersHorizontal,
   Sparkles,
 } from 'lucide-react'
-import type { ArchitecturalWall, Element, FinishOption, LandscapeItem, PlacedItem, Project, Room, RoomShape, Units, Vec2, WallOpening } from '@/types'
+import type { ArchitecturalWall, Element, FinishOption, LandscapeItem, PlacedItem, PlotShape, Project, Room, RoomShape, SiteBoundary, Units, Vec2, WallOpening } from '@/types'
 import { useProjects } from '@/hooks/useProjects'
 import { uid } from '@/lib/id'
 import { ROOM_FURNITURE } from '@/data/catalog'
@@ -29,7 +29,7 @@ import { StatusBadge } from '@/components/ui/Badge'
 import { PropertiesPanel } from '@/components/editor/PropertiesPanel'
 import { ToolPalette } from '@/components/editor/ToolPalette'
 import { AssistantPanel } from '@/components/ai-assistant/AssistantPanel'
-import { NotFoundPage } from '@/pages/NotFoundPage'
+import { MissingProjectPage } from '@/pages/workspace/MissingProjectPage'
 
 export type ToolId =
   | 'select'
@@ -88,6 +88,7 @@ export interface WorkspaceContext {
   wallThicknesses: { exterior: number; interior: number }
   setWallThickness: (kind: 'exterior' | 'interior', value: number) => void
   setPlotDimensions: (width: number, length: number) => void
+  updateSiteBoundary: (boundary: SiteBoundary, plotShape: PlotShape) => void
   assistantOpen: boolean
   setAssistantOpen: (open: boolean) => void
   propsOpen: boolean
@@ -675,6 +676,21 @@ export function WorkspaceLayout() {
     void updateProject(project.id, { plot: { ...project.plot, width, length }, floors, landscape: ornaments })
   }, [commit, editor.ornaments, editor.rooms, project, updateProject])
 
+  const updateSiteBoundary = useCallback((boundary: SiteBoundary, plotShape: PlotShape) => {
+    if (!project) return
+    const previousSite = project.site ?? { northDirectionDegrees: null, orientationSource: 'unknown' as const, assumptions: [] }
+    const site = {
+      ...previousSite,
+      assumptions: boundary.source === 'user-drawn'
+        ? previousSite.assumptions.filter((assumption) => !assumption.includes('no polygon has been fabricated'))
+        : previousSite.assumptions,
+      boundary,
+    }
+    void updateProject(project.id, { site, plot: { ...project.plot, shape: plotShape } })
+    setSaved(true)
+    window.setTimeout(() => setSaved(false), 1800)
+  }, [project, updateProject])
+
   const toggleFurniture = useCallback(
     (roomId: string, item: string) => {
       const canonical = canonicalItem(item)
@@ -930,7 +946,7 @@ export function WorkspaceLayout() {
   }
 
   if (!project || !previewProject) {
-    return <NotFoundPage />
+    return <MissingProjectPage />
   }
 
   const segment = location.pathname
@@ -976,6 +992,7 @@ export function WorkspaceLayout() {
     wallThicknesses: editor.wallThicknesses,
     setWallThickness,
     setPlotDimensions,
+    updateSiteBoundary,
     assistantOpen,
     setAssistantOpen,
     propsOpen,

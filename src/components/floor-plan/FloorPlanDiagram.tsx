@@ -1,5 +1,5 @@
 import { useLayoutEffect, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import type { PlacedItem, Room, RoomCategory, Units, Vec2 } from '@/types'
+import type { PlacedItem, Room, RoomCategory, SiteBoundary, SiteVertex, Units, Vec2 } from '@/types'
 import { formatArea } from '@/lib/format'
 import { roomArea } from '@/lib/floorPlan'
 import { canonicalFurnitureKey, getFurnitureDimensions } from '@/lib/furniture'
@@ -42,6 +42,11 @@ export interface FloorPlanDiagramProps {
   wallThicknesses?: WallThicknessSettings
   /** Plot extents keep an empty, start-from-scratch project drawable. */
   plot?: { width: number; length: number }
+  siteBoundary?: SiteBoundary
+  boundaryEditMode?: boolean
+  boundaryDraft?: SiteVertex[]
+  onBoundaryAddPoint?: (point: Vec2) => void
+  onBoundaryMovePoint?: (index: number, point: Vec2) => void
   className?: string
   showLabels?: boolean
   showDimensions?: boolean
@@ -80,6 +85,11 @@ export function FloorPlanDiagram({
   units,
   wallThicknesses,
   plot,
+  siteBoundary,
+  boundaryEditMode = false,
+  boundaryDraft = [],
+  onBoundaryAddPoint,
+  onBoundaryMovePoint,
   className = '',
   showLabels = true,
   showDimensions = false,
@@ -183,6 +193,7 @@ export function FloorPlanDiagram({
   } | null>(null)
   const treeDrag = useRef<{ mode: 'move' | 'resize'; id: string; startX: number; startY: number; x: number; y: number; scale: number } | null>(null)
   const itemDrag = useRef<{ roomId: string; item: PlacedItem } | null>(null)
+  const boundaryDrag = useRef<number | null>(null)
 
   /* Early return AFTER every hook — changing hook order between renders
      crashes React ("Rendered more hooks than during the previous render"). */
@@ -284,9 +295,33 @@ export function FloorPlanDiagram({
     onEditEnd?.()
   }
 
+  const startBoundaryDrag = (event: ReactPointerEvent<SVGCircleElement>, index: number) => {
+    if (!boundaryEditMode) return
+    event.stopPropagation()
+    boundaryDrag.current = index
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const moveBoundaryDrag = (event: ReactPointerEvent<SVGCircleElement>) => {
+    const index = boundaryDrag.current
+    if (index === null) return
+    const point = clientToPlan(event.clientX, event.clientY)
+    if (point) onBoundaryMovePoint?.(index, point)
+  }
+
+  const endBoundaryDrag = (event: ReactPointerEvent<SVGCircleElement>) => {
+    if (boundaryDrag.current === null) return
+    boundaryDrag.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+  }
+
   const handleBackgroundClick = (event: ReactMouseEvent<SVGSVGElement>) => {
     const point = toPlanPoint(event)
     if (!point) return
+    if (boundaryEditMode) {
+      onBoundaryAddPoint?.(point)
+      return
+    }
     if (measure) {
       setMeasurePts((prev) => (prev.length >= 2 ? [point] : [...prev, point]))
       return
@@ -311,9 +346,20 @@ export function FloorPlanDiagram({
       role="img"
       aria-label="Floor plan diagram"
       onClick={handleBackgroundClick}
-      style={{ cursor: measure ? 'crosshair' : undefined }}
+      style={{ cursor: boundaryEditMode || measure ? 'crosshair' : undefined, touchAction: boundaryEditMode ? 'none' : undefined }}
     >
-      {showBoundary ? (
+      {showBoundary && siteBoundary && siteBoundary.status !== 'unknown' && siteBoundary.vertices.length >= 3 ? (
+        <polygon
+          points={siteBoundary.vertices.map((point) => `${point.x},${point.y}`).join(' ')}
+          fill={siteBoundary.status === 'defined' ? 'rgba(15,118,110,0.035)' : 'none'}
+          stroke="#0f766e"
+          strokeWidth={u(1.25)}
+          strokeDasharray={siteBoundary.status === 'assumed' ? `${u(6)} ${u(4)}` : undefined}
+          strokeLinejoin="round"
+        >
+          <title>{siteBoundary.status === 'assumed' ? 'Dimension-derived plot boundary (assumed)' : 'Defined site boundary'}</title>
+        </polygon>
+      ) : showBoundary ? (
         <rect
           x={plot ? 0 : minX - 2}
           y={plot ? 0 : minY - 2}
@@ -325,6 +371,42 @@ export function FloorPlanDiagram({
           strokeDasharray={`${u(6)} ${u(5)}`}
           opacity="0.7"
         />
+      ) : null}
+      {showBoundary && siteBoundary?.status === 'unknown' && !boundaryEditMode ? (
+        <text x={maxX / 2} y={minY + u(3)} textAnchor="middle" fontSize={u(8)} fill="#7c6f64" pointerEvents="none">
+          Plot dimensions envelope · actual boundary unknown
+        </text>
+      ) : null}
+      {boundaryEditMode ? (
+        <g aria-label="Editable plot boundary">
+          {boundaryDraft.length >= 3 ? (
+            <polygon points={boundaryDraft.map((point) => `${point.x},${point.y}`).join(' ')} fill="rgba(15,118,110,0.08)" stroke="none" pointerEvents="none" />
+          ) : null}
+          {boundaryDraft.length >= 2 ? (
+            <polyline points={boundaryDraft.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="#0f766e" strokeWidth={u(1.5)} strokeDasharray={boundaryDraft.length >= 3 ? undefined : `${u(4)} ${u(3)}`} pointerEvents="none" />
+          ) : null}
+          {boundaryDraft.map((point, index) => (
+            <circle
+              key={point.id}
+              cx={point.x}
+              cy={point.y}
+              r={u(1.7)}
+              fill="#ffffff"
+              stroke="#0f766e"
+              strokeWidth={u(0.7)}
+              className="cursor-move"
+              aria-label={`Move plot vertex ${index + 1}`}
+              role="button"
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => startBoundaryDrag(event, index)}
+              onPointerMove={moveBoundaryDrag}
+              onPointerUp={endBoundaryDrag}
+              onPointerCancel={endBoundaryDrag}
+            >
+              <title>{`Plot vertex ${index + 1}: ${fmt(point.x)}, ${fmt(point.y)} ${units} — drag to move`}</title>
+            </circle>
+          ))}
+        </g>
       ) : null}
 
       {!hasRooms ? (

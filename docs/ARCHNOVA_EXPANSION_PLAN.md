@@ -2,7 +2,7 @@
 
 **Product:** ArchNova by Pixel Studios  
 **Tagline:** Design Your Vision. Build Your Future.  
-**Status:** Phase 1 in progress  
+**Status:** Phase 2 in progress — plot-boundary geometry/editor slice
 **Last updated:** 2026-10-30
 
 This is the durable project log. Read it before starting each follow-up task, update the milestone status after meaningful work, and keep the application buildable. This plan is based on the user's expansion brief and the existing repository audit; it is not a claim of professional or regulatory approval.
@@ -10,9 +10,12 @@ This is the durable project log. Read it before starting each follow-up task, up
 ## Current milestone
 
 **Milestone 0 — Repository audit and Phase 1 plan: complete.**  
-**Milestone 1 — Generalized, backward-compatible project/site model: core milestone complete locally; remaining Phase 1 verification/review is tracked below.**
+**Milestone 1 — Generalized, backward-compatible project/site model: core foundation complete locally (commit `4e34770`).**
+**Milestone 2 — Phase 2 site-boundary geometry/editor: first interactive slice complete locally; edge frontage, setbacks, roads and multi-building placement remain.**
 
 The codebase has the assistant fix commits (`9035e2b`, `df13735`) and the Phase 1 foundation commit (`4e34770`) locally on `main`, based on `origin/main` at `1f40293`. The latest push attempt failed with `could not read Username for 'https://github.com': No such device or address`; this is a missing credential-provider/runtime issue, not a rejected-token response. The remote and Pages site are not updated. Do not put credentials in this file or in chat.
+
+**Mobile project-opening finding:** saved projects currently live in each browser's `localStorage`. A desktop-created project ID therefore has no corresponding data on a phone unless the project is also stored there; there is no cross-device API/authentication configured. A valid dashboard card opens the workspace in the mobile route test. The former generic “Page not found” for a missing ID now explains the device-local storage limitation and offers local navigation. This is an explanatory UX fix, not cloud sync. Actual cross-device access requires a shared PHP/MySQL project service and account/authorization contract; no endpoint or credentials were assumed.
 
 ## Repository audit — existing implementation
 
@@ -36,7 +39,7 @@ The codebase has the assistant fix commits (`9035e2b`, `df13735`) and the Phase 
 - `src/data/catalog.ts`, `src/data/toolLibrary.ts`, and `src/data/assets.ts` provide option lists and a small placeable catalogue. `assets.ts` explicitly labels real GLTF models and textures as future work; many displayed assets are placeholders/procedural representations.
 - `src/components/ai-assistant/AssistantPanel.tsx`: chat UI with review/apply behavior, but no dynamic structured clarification cards or project-brief stage yet.
 - `src/services/costService.ts` and `src/services/exportService.ts` exist as limited service seams; do not imply real current pricing or professional construction-document exports without auditing their actual implementation.
-- Tests cover workspace startup, room plans, AI plan application, validation, units and model geometry. There is no broad site-polygon or project-migration test coverage yet.
+- Tests now cover workspace/mobile-missing-project routing, room plans, AI plan application, project migration, site polygon area/containment/self-intersection and outline rendering. Current site geometry covers editable vertices and basic geometric checks; it does not yet model named front/rear/road-facing edges, per-edge dimensions, setbacks, roads, access, or multiple-building placement.
 
 ## Technical implementation plan
 
@@ -55,7 +58,9 @@ Extend existing domain types instead of replacing them:
 
 ### Phase 2 — advanced site planning
 
-Polygon editing and area/edge metadata, boundary-specific dimensions/frontage/road edges/entrances/north, setbacks, multiple structures, access/circulation, parking, fences/gates and landscape. Use actual polygon geometry and explicit assumptions. Build deterministic polygon/site validation separately from AI.
+First slice is implemented locally: an interactive 2D boundary editor adds vertices by canvas tap/click, drags vertices, computes polygon area and edge lengths, rejects too-few/duplicate/out-of-envelope/self-crossing/zero-area boundaries, and persists actual points with provenance. The same persisted polygon is drawn in the existing 2D and Three.js views. Unknown irregular boundaries remain an explicitly labeled dimensions envelope until points are provided.
+
+Remaining Phase 2 work: stable edge records and front/rear/left/right/road-facing labels; individually measured segments; user-set north; entrances and adjacent roads; configurable setbacks; multi-structure site placement; deterministic building-boundary/setback/overlap checks; vehicle/pedestrian access, parking, roads, fences/gates, landscaping and full 2D/3D site synchronization. Use actual polygon geometry and explicit assumptions; no local regulations are invented.
 
 ### Phase 3 — expanded asset library
 
@@ -97,9 +102,16 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [x] Add explicit assumption handling: dimension-derived rectangles are marked assumed; irregular/corner plots without points remain unknown and have no fabricated vertices; unknown north/frontage remain unknown.
 - [x] Pass concise purpose, brief, building and site-boundary metadata to the current assistant context and instruct it not to claim unsupported planning operations.
 - [x] Add Phase 1 regression tests for legacy migration, polygon provenance, non-residential project creation, building/floor synchronization and plot updates.
-- [x] Run full tests, typecheck and both builds. Result: 42 tests pass; typecheck, production build and Pages build pass. Builds retain the pre-existing >500 kB chunk warning.
 - [x] Save the Phase 1 foundation checkpoint locally as `4e34770` (`feat: add generalized architectural project model`).
-- [ ] Push `main` and publish Pages: attempted after the checkpoint commit, but Git could not prompt for a GitHub username because no credential provider/token was available in this runtime. Retry only after secure authentication is restored; do not claim the remote or Pages deployment is current.
+- [x] Add pure polygon area, containment, shape classification and deterministic boundary validation in `src/lib/siteGeometry.ts`.
+- [x] Add the 2D plot-boundary editor: tap/click to add points, drag vertices, show area and edge lengths, validate before save, or explicitly choose a dimension-derived rectangle.
+- [x] Render the same saved site polygon in the existing 2D plan and Three.js scene; keep unknown boundaries labeled as envelopes.
+- [x] Diagnose mobile project lookup: local browser storage is device-local. Replace generic workspace not-found with an explanatory local-storage message; add regressions for opening a saved dashboard card and missing cross-device IDs.
+- [x] Run full tests, typecheck and both builds. Result: 49 tests pass; typecheck, production build and Pages build pass. Builds retain the >500 kB chunk warning.
+- [ ] Add edge/frontage labels and per-edge measurement editing, north orientation, access points, setbacks, and site/building overlap checks.
+- [ ] Implement a shared project API for actual desktop-to-phone sync only after the deployment endpoint and account/auth contract are specified; do not represent localStorage as cloud sync.
+- [ ] Save the Phase 2 site editor and mobile-message work in a local milestone commit.
+- [ ] Push `main` and publish Pages when GitHub authentication is available. Last push error: `could not read Username for 'https://github.com': No such device or address`; the token was not rejected, no credential provider was available. Do not claim remote or Pages is updated.
 
 ## Working rules
 

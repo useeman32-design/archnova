@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { OrbitControls, TransformControls, Edges } from '@react-three/drei'
-import { CanvasTexture, RepeatWrapping, SRGBColorSpace, Shape, type Mesh, type Object3D } from 'three'
-import type { ArchitecturalWall, FinishOption, PlacedItem, Project, Room, WallOpening } from '@/types'
+import { CanvasTexture, DoubleSide, RepeatWrapping, SRGBColorSpace, Shape, type Mesh, type Object3D } from 'three'
+import type { ArchitecturalWall, FinishOption, PlacedItem, Project, Room, SiteVertex, WallOpening } from '@/types'
 import { getFloorArchitecturalModel, wallLength, wallSolidSections, type WallThicknessSettings } from '@/lib/architecturalModel'
 import { canonicalFurnitureKey, getFurnitureDimensions } from '@/lib/furniture'
 
@@ -321,6 +321,10 @@ function ExteriorScene({
     interior: project.preferences.interiorWallThickness ?? (project.plot.units === 'ft' ? 0.375 : 0.12),
   }
   const wallTexture = useMemo(() => makeFloorTexture(project.preferences.exteriorFinish, plotW * S, plotL * S), [project.preferences.exteriorFinish, plotW, plotL])
+  const boundaryShape = useMemo(() => {
+    const vertices = project.site?.boundary?.vertices ?? []
+    return project.site?.boundary?.status !== 'unknown' && vertices.length >= 3 ? makeSiteShape(vertices, plotW, plotL, S) : null
+  }, [project.site?.boundary?.vertices, project.site?.boundary?.status, plotW, plotL])
   useEffect(() => () => wallTexture.dispose(), [wallTexture])
   const topLevel = Math.max(...project.floors.map((f) => f.level), 1)
   const buildingRooms = project.floors.flatMap((floor) => floor.rooms.filter((room) => !FLAT_CATEGORIES.has(room.category)))
@@ -347,6 +351,13 @@ function ExteriorScene({
         <planeGeometry args={[plotW * S + 8, plotL * S + 8]} />
         <meshStandardMaterial color="#dfe4e8" />
       </mesh>
+      {boundaryShape ? (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]} receiveShadow>
+          <shapeGeometry args={[boundaryShape]} />
+          <meshStandardMaterial color="#e8efd9" roughness={0.98} side={DoubleSide} />
+          <Edges color="#0f766e" threshold={1} />
+        </mesh>
+      ) : null}
 
       {project.floors.flatMap((floor) =>
         floor.rooms.map((room) => {
@@ -561,6 +572,18 @@ function OpeningFixture({ opening, wallThickness, wallLength }: { opening: WallO
       {opening.style === 'casement' || opening.style === 'sliding' ? <mesh position={[0, 0, wallThickness * 0.32]}><boxGeometry args={[0.018, height, 0.012]} />{frame}</mesh> : null}
     </group>
   )
+}
+
+function makeSiteShape(vertices: SiteVertex[], plotWidth: number, plotLength: number, scale: number): Shape {
+  const points = vertices.map((vertex) => ({
+    x: (vertex.x - plotWidth / 2) * scale,
+    y: (plotLength / 2 - vertex.y) * scale,
+  }))
+  const shape = new Shape()
+  shape.moveTo(points[0].x, points[0].y)
+  for (const point of points.slice(1)) shape.lineTo(point.x, point.y)
+  shape.closePath()
+  return shape
 }
 
 function makeRoomShape(room: Room, scale: number): Shape {

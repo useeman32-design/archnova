@@ -13,7 +13,7 @@ import { ASSETS } from '@/data/assets'
 import { variantFromAsset } from '@/data/toolLibrary'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
 import { roomArea } from '@/lib/floorPlan'
-import type { Room } from '@/types'
+import type { Room, SiteBoundary } from '@/types'
 
 const captured: unknown[] = []
 
@@ -110,6 +110,28 @@ describe('workspace opens', () => {
     cleanup()
   })
 
+  it('renders a defined site polygon and draggable vertex handles in boundary edit mode', () => {
+    const boundary: SiteBoundary = {
+      id: 'test-boundary',
+      shape: 'irregular',
+      vertices: [
+        { id: 'v1', x: 0, y: 0 },
+        { id: 'v2', x: 30, y: 0 },
+        { id: 'v3', x: 22, y: 18 },
+        { id: 'v4', x: 0, y: 18 },
+      ],
+      units: 'ft',
+      status: 'defined',
+      source: 'user-drawn',
+      area: 468,
+      assumptions: [],
+    }
+    render(<FloorPlanDiagram rooms={[]} units="ft" plot={{ width: 30, length: 20 }} siteBoundary={boundary} boundaryEditMode boundaryDraft={boundary.vertices} />)
+    expect(document.querySelectorAll('svg polygon').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Move plot vertex 3' })).toBeTruthy()
+    cleanup()
+  })
+
   it('home seeds projects, then /workspace/:id renders without the crash fallback', async () => {
     // Pass 1: home page — seeds localStorage via projectService.list()
     render(
@@ -138,6 +160,27 @@ describe('workspace opens', () => {
       // success looks like the project header + plan editor mounted
       expect(text).toMatch(/Floor Plan|Save|Assistant/)
     }, { timeout: 8000 })
+    cleanup()
+  }, 30000)
+
+  it('opens a saved project from its dashboard card into the workspace route', async () => {
+    localStorage.clear()
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    await waitFor(() => expect(projectIdsFromStorage().length).toBeGreaterThan(0), { timeout: 5000 })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0])
+    await waitFor(() => {
+      expect(document.body.textContent).toMatch(/Save|Assistant/)
+      expect(document.body.textContent).not.toContain('Project not available on this device')
+    }, { timeout: 8000 })
+    cleanup()
+  }, 30000)
+
+  it('explains when a project link points to data not stored on this device', async () => {
+    localStorage.clear()
+    render(<MemoryRouter initialEntries={['/workspace/created-on-another-device']}><App /></MemoryRouter>)
+    expect(await screen.findByText('Project not available on this device', {}, { timeout: 8000 })).toBeTruthy()
+    expect(document.body.textContent).toContain('saves projects in this browser only')
+    expect(document.body.textContent).not.toContain("The page you were looking for isn't part of this prototype yet.")
     cleanup()
   }, 30000)
 

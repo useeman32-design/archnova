@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Compass, Crosshair, Frame, Info, Printer, Tag, X } from 'lucide-react'
-import type { Room, Vec2 } from '@/types'
+import { AlertTriangle, Compass, Crosshair, Frame, Info, MapPin, Printer, Tag, X } from 'lucide-react'
+import type { PlotShape, Room, SiteBoundary, SiteVertex, Vec2 } from '@/types'
 import { useWorkspace } from '@/pages/workspace/WorkspaceLayout'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
 import { PlanCanvas, ZoomControls, useZoom } from '@/components/floor-plan/PlanCanvas'
@@ -8,6 +8,8 @@ import { SegmentedControl } from '@/components/ui/FormControls'
 import { NumberField } from '@/components/ui/Field'
 import type { PendingPlacement } from '@/data/toolLibrary'
 import { validatePlan } from '@/lib/planValidation'
+import { classifyBoundaryShape, polygonArea, validateSiteBoundary } from '@/lib/siteGeometry'
+import { uid } from '@/lib/id'
 
 function IconToggle({
   active,
@@ -57,17 +59,38 @@ export function PlanEditor() {
   const [showAreas, setShowAreas] = useState(true)
   const [showCompass, setShowCompass] = useState(true)
   const [showPlanCheck, setShowPlanCheck] = useState(false)
-  const planIssues = useMemo(() => validatePlan(
-    rooms,
-    { width: project.plot.width, length: project.plot.length, units },
-    ctx.walls,
-    ctx.openings,
-    ctx.placed,
-  ), [rooms, project.plot.width, project.plot.length, units, ctx.walls, ctx.openings, ctx.placed])
+  const planIssues = useMemo(() => {
+    const roomIssues = validatePlan(
+      rooms,
+      { width: project.plot.width, length: project.plot.length, units },
+      ctx.walls,
+      ctx.openings,
+      ctx.placed,
+    )
+    const boundary = project.site?.boundary
+    const siteIssues = boundary && boundary.status !== 'unknown' && boundary.vertices.length
+      ? validateSiteBoundary(boundary.vertices, { width: project.plot.width, length: project.plot.length }).map((issue) => ({ ...issue, code: `site-${issue.code}` }))
+      : boundary?.status === 'unknown'
+        ? [{ code: 'site-boundary-unknown', severity: 'warning' as const, message: 'Actual plot boundary is unknown; the dashed rectangle is only a dimensions envelope.' }]
+        : []
+    return [...roomIssues, ...siteIssues]
+  }, [rooms, project.plot.width, project.plot.length, units, project.site?.boundary, ctx.walls, ctx.openings, ctx.placed])
   const planErrorCount = planIssues.filter((issue) => issue.severity === 'error').length
   const [plotWidth, setPlotWidth] = useState(String(project.plot.width))
   const [plotLength, setPlotLength] = useState(String(project.plot.length))
   const [plotModalOpen, setPlotModalOpen] = useState(false)
+  const [boundaryEditMode, setBoundaryEditMode] = useState(false)
+  const [boundaryDraft, setBoundaryDraft] = useState<SiteVertex[]>([])
+  const savedBoundary = project.site?.boundary
+  const boundaryIssues = useMemo(() => boundaryDraft.length
+    ? validateSiteBoundary(boundaryDraft, { width: project.plot.width, length: project.plot.length })
+    : [], [boundaryDraft, project.plot.width, project.plot.length])
+  const boundaryErrors = boundaryIssues.filter((issue) => issue.severity === 'error')
+  const draftBoundaryArea = boundaryDraft.length >= 3 ? polygonArea(boundaryDraft) : 0
+  useEffect(() => {
+    setBoundaryEditMode(false)
+    setBoundaryDraft([])
+  }, [project.id])
   useEffect(() => {
     setPlotWidth(String(project.plot.width))
     setPlotLength(String(project.plot.length))
@@ -81,6 +104,61 @@ export function PlanEditor() {
       setPlotLength(String(project.plot.length))
     }
   }
+  const startBoundaryEdit = () => {
+    setBoundaryDraft(savedBoundary && savedBoundary.status !== 'unknown' ? savedBoundary.vertices.map((point) => ({ ...point })) : [])
+    setBoundaryEditMode(true)
+  }
+  const addBoundaryPoint = (point: Vec2) => {
+    const x = roundSite(Math.max(0, Math.min(project.plot.width, point.x)))
+    const y = roundSite(Math.max(0, Math.min(project.plot.length, point.y)))
+    setBoundaryDraft((previous) => {
+      if (previous.some((vertex) => Math.hypot(vertex.x - x, vertex.y - y) < 0.25)) return previous
+      return [...previous, { id: uid('site-vertex'), x, y }]
+    })
+  }
+  const moveBoundaryPoint = (index: number, point: Vec2) => {
+    const x = roundSite(Math.max(0, Math.min(project.plot.width, point.x)))
+    const y = roundSite(Math.max(0, Math.min(project.plot.length, point.y)))
+    setBoundaryDraft((previous) => previous.map((vertex, vertexIndex) => vertexIndex === index ? { ...vertex, x, y } : vertex))
+  }
+  const finishBoundaryEdit = () => {
+    if (boundaryErrors.length > 0 || boundaryDraft.length < 3) return
+    const shape = classifyBoundaryShape(boundaryDraft)
+    const boundary: SiteBoundary = {
+      id: savedBoundary?.id ?? `site:${project.id}:boundary`,
+      shape,
+      vertices: boundaryDraft,
+      units,
+      status: 'defined',
+      source: 'user-drawn',
+      area: draftBoundaryArea,
+      assumptions: [],
+    }
+    ctx.updateSiteBoundary(boundary, shape as PlotShape)
+    setBoundaryEditMode(false)
+  }
+  const useDimensionRectangle = () => {
+    const shape: PlotShape = Math.abs(project.plot.width - project.plot.length) < 1e-6 ? 'square' : 'rectangle'
+    const boundary: SiteBoundary = {
+      id: savedBoundary?.id ?? `site:${project.id}:boundary`,
+      shape,
+      vertices: [
+        { id: `site:${project.id}:v1`, x: 0, y: 0 },
+        { id: `site:${project.id}:v2`, x: project.plot.width, y: 0 },
+        { id: `site:${project.id}:v3`, x: project.plot.width, y: project.plot.length },
+        { id: `site:${project.id}:v4`, x: 0, y: project.plot.length },
+      ],
+      units,
+      status: 'assumed',
+      source: 'dimension-derived',
+      area: project.plot.width * project.plot.length,
+      assumptions: ['Rectangular boundary derived from dimensions; frontage and north direction remain unspecified.'],
+    }
+    ctx.updateSiteBoundary(boundary, shape)
+    setBoundaryDraft(boundary.vertices)
+    setBoundaryEditMode(false)
+  }
+
   const clientToPlan = useRef<((x: number, y: number) => Vec2 | null) | null>(null)
 
   const measure = ctx.tool === 'measure'
@@ -155,6 +233,15 @@ export function PlanEditor() {
         <button type="button" onClick={() => setPlotModalOpen(true)} className="flex h-8 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-[11.5px] font-medium text-muted hover:bg-canvas-soft" title="Set plot dimensions">
           <Frame className="h-3.5 w-3.5" /> Plot Size
         </button>
+        <button
+          type="button"
+          onClick={() => boundaryEditMode ? setBoundaryEditMode(false) : startBoundaryEdit()}
+          aria-pressed={boundaryEditMode}
+          className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11.5px] font-medium ${boundaryEditMode ? 'border-teal-600 bg-teal-50 text-teal-800' : 'border-line bg-surface text-muted hover:bg-canvas-soft'}`}
+          title="Draw or edit the actual plot boundary"
+        >
+          <MapPin className="h-3.5 w-3.5" /> Boundary
+        </button>
         <ZoomControls zoom={zoom} setZoom={setZoom} />
         <IconToggle
           active={measure}
@@ -176,6 +263,41 @@ export function PlanEditor() {
         </div>
       </div>
 
+      {boundaryEditMode ? (
+        <section aria-label="Plot boundary editor" className="shrink-0 border-b border-teal-200 bg-teal-50/80 px-3 py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <h3 className="text-[12.5px] font-semibold text-teal-950">Edit actual plot boundary</h3>
+              <p className="mt-1 text-[11.5px] leading-relaxed text-teal-900">
+                Tap inside the plot envelope to add points; drag the handles to adjust them. The outline is not treated as a real boundary until you save at least three valid vertices.
+              </p>
+              <p className="mt-1 text-[11px] font-medium text-teal-900" aria-live="polite">
+                {boundaryDraft.length} vertices · area {boundaryDraft.length >= 3 ? formatSiteArea(draftBoundaryArea, units) : '—'}
+              </p>
+              {boundaryDraft.length >= 2 ? (
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10.5px] text-teal-900">
+                  {boundaryDraft.map((vertex, index) => {
+                    const next = boundaryDraft[(index + 1) % boundaryDraft.length]
+                    return <span key={vertex.id}>Edge {index + 1}: {formatSiteLength(Math.hypot(next.x - vertex.x, next.y - vertex.y))} {units}</span>
+                  })}
+                </div>
+              ) : null}
+              {boundaryErrors.length ? (
+                <ul role="alert" className="mt-2 space-y-1 text-[11px] font-medium text-red-700">
+                  {boundaryErrors.map((issue) => <li key={`${issue.code}-${issue.edgeIndices?.join('-') ?? issue.vertexIndex ?? ''}`}>{issue.message}</li>)}
+                </ul>
+              ) : null}
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button type="button" onClick={() => setBoundaryDraft([])} className="rounded-lg border border-teal-300 bg-white px-2.5 py-1.5 text-[11px] font-medium text-teal-900">Clear points</button>
+              <button type="button" onClick={useDimensionRectangle} className="rounded-lg border border-teal-300 bg-white px-2.5 py-1.5 text-[11px] font-medium text-teal-900">Use dimension rectangle</button>
+              <button type="button" onClick={() => setBoundaryEditMode(false)} className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-[11px] font-medium text-muted">Cancel</button>
+              <button type="button" onClick={finishBoundaryEdit} disabled={boundaryDraft.length < 3 || boundaryErrors.length > 0} className="rounded-lg bg-teal-700 px-2.5 py-1.5 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Save boundary</button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {showPlanCheck ? (
         <section aria-label="Plan checks" className="max-h-44 shrink-0 overflow-y-auto border-b border-line bg-white px-4 py-2.5">
           <div className="flex items-center justify-between gap-3">
@@ -184,7 +306,7 @@ export function PlanEditor() {
           </div>
           {planIssues.length ? (
             <ul className="mt-2 grid gap-1 sm:grid-cols-2">
-              {planIssues.map((issue, index) => <li key={`${issue.code}-${issue.roomId ?? ''}-${index}`} className={`rounded px-2 py-1 text-[11px] ${issue.severity === 'error' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-800'}`}>{issue.severity === 'error' ? 'Error: ' : 'Check: '}{issue.message}</li>)}
+              {planIssues.map((issue, index) => <li key={`${issue.code}-${'roomId' in issue ? issue.roomId ?? '' : ''}-${index}`} className={`rounded px-2 py-1 text-[11px] ${issue.severity === 'error' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-800'}`}>{issue.severity === 'error' ? 'Error: ' : 'Check: '}{issue.message}</li>)}
             </ul>
           ) : <p className="mt-2 text-[11px] font-medium text-emerald-700">No geometry conflicts detected in this plan.</p>}
         </section>
@@ -206,6 +328,11 @@ export function PlanEditor() {
             units={units}
             wallThicknesses={wallThicknesses}
             plot={{ width: project.plot.width, length: project.plot.length }}
+            siteBoundary={project.site?.boundary}
+            boundaryEditMode={boundaryEditMode}
+            boundaryDraft={boundaryDraft}
+            onBoundaryAddPoint={addBoundaryPoint}
+            onBoundaryMovePoint={moveBoundaryPoint}
             showLabels={showLabels}
             showDimensions={showDimensions}
             showAreas={showAreas}
@@ -316,4 +443,17 @@ export function PlanEditor() {
       })() : null}
     </div>
   )
+}
+
+function roundSite(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+function formatSiteArea(area: number, units: 'ft' | 'm'): string {
+  const suffix = units === 'ft' ? 'ft²' : 'm²'
+  return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(area)} ${suffix}`
+}
+
+function formatSiteLength(length: number): string {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(length)
 }
