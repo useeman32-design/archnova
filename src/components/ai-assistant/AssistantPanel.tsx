@@ -151,9 +151,11 @@ export function AssistantPanel({
           setMessages((previous) => previous.map((message) => message.id === pendingId ? { ...message, text: report } : message))
         },
       })
-      setPendingPlan(plan.actions.length || plan.project || plan.plot || plan.wallThicknesses || plan.unsupported?.length ? plan : null)
+      const hasApplicableChanges = plan.actions.length > 0 || Boolean(plan.project) || Boolean(plan.plot) || Boolean(plan.wallThicknesses)
+      setPendingPlan(hasApplicableChanges ? plan : null)
+      const visibleReply = !hasApplicableChanges && plan.unsupported?.length ? `${plan.reply}\n\n${plan.unsupported.join(' ')}` : plan.reply
       setMessages((previous) => previous.map((message) => message.id === pendingId
-        ? { ...message, text: plan.reply || 'I have prepared a response.', pending: false }
+        ? { ...message, text: visibleReply || 'I have prepared a response.', pending: false }
         : message))
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The Groq request failed. Try again.'

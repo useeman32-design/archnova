@@ -46,6 +46,54 @@ describe('Groq assistant client', () => {
     expect(progress).toHaveBeenCalledWith(expect.stringContaining('Groq is'))
   })
 
+  it('normalizes a room-by-room create_house response and uses room defaults for omitted dimensions', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const planText = JSON.stringify({
+      reply: 'Created your home.',
+      plot: { width: 50, length: 50, units: 'ft' },
+      actions: [{ type: 'create_house', replaceExisting: true, rooms: [
+        { name: 'Bedroom One', category: 'bedroom', width: 12, length: 12 },
+        { name: 'Primary Bedroom', type: 'bedroom' },
+        { name: 'Kitchen', category: 'kitchen', dimensions: { width: 12, length: 10 } },
+      ] }],
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: planText } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: 'ft' },
+      history: [], prompt: 'Create a house with a 50 by 50 plot and at least two bedrooms and one kitchen.',
+    })
+    expect(plan.actions).toEqual([{
+      type: 'create_house', replaceExisting: true, rooms: [
+        { name: 'Bedroom One', category: 'bedroom', width: 12, length: 12 },
+        { name: 'Primary Bedroom', category: 'bedroom', width: 12, length: 12 },
+        { name: 'Kitchen', category: 'kitchen', width: 12, length: 10 },
+      ],
+    }])
+    expect(plan.plot).toEqual({ width: 50, length: 50, units: 'ft' })
+    expect(plan.reply).toMatch(/proposal for review/i)
+    expect(plan.reply).not.toMatch(/^Created/i)
+    expect(plan.assumptions).toContain('Standard room dimensions were used for any room whose size was omitted.')
+  })
+
+  it('does not tell the user a house was created when the returned action is invalid', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const planText = JSON.stringify({
+      reply: 'Created your home.', plot: { width: 50, length: 50, units: 'ft' },
+      actions: [{ type: 'create_house', rooms: [{ name: 'Unknown', category: 'invented-room', width: 12, length: 12 }] }],
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: planText } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: 'ft' },
+      history: [], prompt: 'Create a house on a 50 by 50 plot.',
+    })
+    expect(plan.actions).toEqual([])
+    expect(plan.plot).toBeUndefined()
+    expect(plan.reply).toMatch(/not created/i)
+    expect(plan.unsupported?.join(' ')).toMatch(/create_house/i)
+  })
+
   it('converts provider auth failures into a useful key error without exposing the key', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { message: 'invalid key text' } }), { status: 401 }))
     vi.stubGlobal('fetch', fetchMock)
@@ -65,7 +113,7 @@ describe('Groq assistant client', () => {
     await expect(requestAssistantPlan({
       apiKey: 'key', model: DEFAULT_GROQ_MODEL,
       context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
-      history: [{ role: 'user', content: 'old' }, { role: 'assistant', content: 'old answer' }], prompt: 'Add a tree.',
+      history: [{ role: 'user', content: 'old' }, { role: 'assistant', content: 'old answer' }], prompt: 'Tell me one design tip.'
     })).resolves.toMatchObject({ reply: 'Done.' })
     expect(fetchMock).toHaveBeenCalledTimes(2)
     const retryBody = JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))
@@ -84,7 +132,7 @@ describe('Groq assistant client', () => {
     const pending = requestAssistantPlan({
       apiKey: 'key', model: DEFAULT_GROQ_MODEL,
       context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
-      history: [], prompt: 'Add a tree.', onProgress: progress,
+      history: [], prompt: 'Tell me one design tip.', onProgress: progress,
     })
     await vi.advanceTimersByTimeAsync(2)
     await vi.advanceTimersByTimeAsync(2)
