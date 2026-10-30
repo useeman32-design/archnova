@@ -108,7 +108,23 @@ export async function requestAssistantPlan(options: {
   if (!response.ok) throw new Error(groqErrorMessage(response.status, errorPayload?.error?.message))
   const content = await readGroqContent(response, options.onProgress)
   options.onProgress?.('Checking the returned design operations…')
-  return normalizePlan(parsePlanJson(content), context.units, prompt)
+  const firstRaw = parsePlanJson(content)
+  const firstPlan = normalizePlan(firstRaw, context.units, prompt)
+  if (!needsActionRecovery(firstRaw, firstPlan, prompt)) return firstPlan
+
+  options.onProgress?.('The model replied without an editable operation. Retrying once with strict action instructions…')
+  try {
+    const recoveryMessages = buildActionRecoveryMessages(context, prompt)
+    const recoveryResponse = await groqFetchWithRetry(endpoint, makeChatRequest(apiKey, selectedModel, recoveryMessages, 900), options.onProgress)
+    if (!recoveryResponse.ok) return firstPlan
+    const recoveryContent = await readGroqContent(recoveryResponse, options.onProgress)
+    options.onProgress?.('Validating the recovered design operation…')
+    const recoveryPlan = normalizePlan(parsePlanJson(recoveryContent), context.units, prompt)
+    return recoveryPlan
+  } catch {
+    // Keep the first model response available; the UI reports that no edits are ready.
+    return firstPlan
+  }
 }
 
 function makeChatRequest(apiKey: string, model: string, messages: { role: string; content: string }[], maxCompletionTokens: number): RequestInit {
@@ -128,6 +144,28 @@ function buildRequestMessages(context: GroqContext, history: { role: 'user' | 'a
     ...prior,
     { role: 'user', content: prompt.slice(0, 2800) },
   ]
+}
+
+function buildActionRecoveryMessages(context: GroqContext, prompt: string): { role: string; content: string }[] {
+  const messages = buildRequestMessages(context, [], prompt, true)
+  const finalUser = messages.pop()!
+  return [
+    ...messages,
+    { role: 'system', content: 'ACTION RECOVERY: Your previous response did not contain an editable operation for this direct design request. Re-read the current state and exact supported action schemas above. If the request is a clear supported edit, return the exact valid action JSON now; do not answer with conversational agreement or a description of what you would do. If a target or critical detail is genuinely ambiguous, ask one concise clarification question. If unsupported, explain that and return actions: []. Never claim a change was applied.' },
+    finalUser,
+  ]
+}
+
+function needsActionRecovery(value: unknown, plan: AssistantPlan, prompt: string): boolean {
+  if (!isDirectDesignRequest(prompt) || hasPlanChanges(plan) || isClarificationReply(plan.reply)) return false
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const data = value as Record<string, unknown>
+  const rawActions = Array.isArray(data.actions) ? data.actions : Array.isArray(data.rooms) ? data.rooms : []
+  return rawActions.length === 0
+}
+
+function hasPlanChanges(plan: AssistantPlan): boolean {
+  return plan.actions.length > 0 || Boolean(plan.project) || Boolean(plan.plot) || Boolean(plan.wallThicknesses)
 }
 
 function compactHistory(history: { role: 'user' | 'assistant'; content: string }[], count: number): { role: 'user' | 'assistant'; content: string }[] {
@@ -601,8 +639,9 @@ function isKnownFurniture(value: string): boolean {
 function nonNegative(value: unknown): number | undefined { const n = finite(value); return n !== undefined && n >= 0 && n <= 1000 ? n : undefined }
 
 function isDirectDesignRequest(prompt: string): boolean {
-  if (/\b(how|why|what does|explain)\b/i.test(prompt)) return false
-  return /\b(create|build|generate|add|place|move|resize|remove|delete|change|set|update|replace|rename)\b/i.test(prompt)
+  if (/^\s*(?:how|why|what does|explain)\b/i.test(prompt)) return false
+  if (/^\s*(?:tell me|give me)\b[\s\S]{0,120}\b(?:tip|advice|idea|explain|about|difference|how|why)\b/i.test(prompt)) return false
+  return /\b(design|create|build|generate|add|give|place|put|move|resize|remove|delete|change|set|update|replace|rename|edit|adjust|furnish|decorate|install|paint|apply|style|rotate|position|expand|extend|reduce|increase|make)\b/i.test(prompt)
     || /^\s*design\s+(?:a|an|the|my|our)\s+(?:house|home|room|kitchen|bathroom|bedroom|layout|garden|site)\b/i.test(prompt)
 }
 function isClarificationReply(reply: string): boolean {

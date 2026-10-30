@@ -2,7 +2,7 @@
 
 **Product:** ArchNova by Pixel Studios  
 **Tagline:** Design Your Vision. Build Your Future.  
-**Status:** Phase 2 in progress — plot-boundary geometry/editor slice
+**Status:** Phase 2 in progress — plot-boundary geometry/editor slice; Groq action-recovery fix verified locally
 **Last updated:** 2026-10-30
 
 This is the durable project log. Read it before starting each follow-up task, update the milestone status after meaningful work, and keep the application buildable. This plan is based on the user's expansion brief and the existing repository audit; it is not a claim of professional or regulatory approval.
@@ -15,7 +15,7 @@ This is the durable project log. Read it before starting each follow-up task, up
 
 The codebase has assistant commits (`9035e2b`, `df13735`), the Phase 1 foundation (`4e34770`), and the Phase 2 site/mobile slice (`be8071e`) locally on `main`, based on `origin/main` at `1f40293`. In this restored runtime, `.git/config` did not retain the remote; after restoring the public repository URL, the push failed with `could not read Username for 'https://github.com': No such device or address`. This indicates the credential provider/token is not available here, not that GitHub rejected the supplied token. The remote and Pages site are not updated. Do not put credentials in this file or in chat.
 
-**Mobile project-opening finding:** saved projects currently live in each browser's `localStorage`. A desktop-created project ID therefore has no corresponding data on a phone unless the project is also stored there; there is no cross-device API/authentication configured. A valid dashboard card opens the workspace in the mobile route test. The former generic “Page not found” for a missing ID now explains the device-local storage limitation and offers local navigation. This is an explanatory UX fix, not cloud sync. Actual cross-device access requires a shared PHP/MySQL project service and account/authorization contract; no endpoint or credentials were assumed.
+**Mobile project-opening finding:** saved projects remain in each browser's `localStorage`; no cross-device API/authentication was introduced. The valid mobile dashboard-to-workspace flow is covered by tests, and the user confirmed mobile project opening now works. The missing-project explanation remains as a fallback. Per the user's scope decision, leave storage device-local and do not pursue cross-device sync unless requested.
 
 ## Repository audit — existing implementation
 
@@ -107,9 +107,10 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [x] Add the 2D plot-boundary editor: tap/click to add points, drag vertices, show area and edge lengths, validate before save, or explicitly choose a dimension-derived rectangle.
 - [x] Render the same saved site polygon in the existing 2D plan and Three.js scene; keep unknown boundaries labeled as envelopes.
 - [x] Diagnose mobile project lookup: local browser storage is device-local. Replace generic workspace not-found with an explanatory local-storage message; add regressions for opening a saved dashboard card and missing cross-device IDs.
-- [x] Run full tests, typecheck and both builds. Result: 49 tests pass; typecheck, production build and Pages build pass. Builds retain the >500 kB chunk warning.
+- [x] Run full tests, typecheck and both builds after the Groq action-recovery change. Result: 50 tests pass across 8 files; typecheck and `git diff --check` pass; production and Pages builds pass. Builds retain the >500 kB chunk warning.
+- [x] Groq regression recovery: direct design requests with no supported operation now get one strict, compact retry; valid responses still flow into the existing user-approved “Apply and save” proposal. Regression test verifies the retry and recovered action. This verifies the local request/normalization flow, not live Groq provider behavior.
 - [ ] Add edge/frontage labels and per-edge measurement editing, north orientation, access points, setbacks, and site/building overlap checks.
-- [ ] Implement a shared project API for actual desktop-to-phone sync only after the deployment endpoint and account/auth contract are specified; do not represent localStorage as cloud sync.
+- [x] Per user decision, leave project storage browser-local and do not pursue a shared cross-device sync API unless requested.
 - [x] Save the Phase 2 site editor and mobile-message work in local milestone commit `be8071e` (`feat: add interactive plot boundary editing`).
 - [ ] Push `main` and publish Pages when GitHub authentication is available. Latest attempt: after restoring the public origin URL, Git returned `could not read Username for 'https://github.com': No such device or address`; the token was not rejected, no credential provider was available. Do not claim remote or Pages is updated.
 

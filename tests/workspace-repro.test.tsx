@@ -167,7 +167,8 @@ describe('workspace opens', () => {
     localStorage.clear()
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
     await waitFor(() => expect(projectIdsFromStorage().length).toBeGreaterThan(0), { timeout: 5000 })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0])
+    const openButtons = await screen.findAllByRole('button', { name: 'Open' }, { timeout: 5000 })
+    fireEvent.click(openButtons[0])
     await waitFor(() => {
       expect(document.body.textContent).toMatch(/Save|Assistant/)
       expect(document.body.textContent).not.toContain('Project not available on this device')

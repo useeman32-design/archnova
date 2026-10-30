@@ -46,6 +46,27 @@ describe('Groq assistant client', () => {
     expect(progress).toHaveBeenCalledWith(expect.stringContaining('Groq is'))
   })
 
+  it('retries a direct edit once when Groq replies conversationally without an operation', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const jsonResponse = (content: unknown) => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ reply: 'Sure, I can help add that.', actions: [] }))
+      .mockResolvedValueOnce(jsonResponse({ reply: 'I prepared the study.', actions: [{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 10 } }] }))
+    vi.stubGlobal('fetch', fetchMock)
+    const progress = vi.fn()
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [], prompt: 'Add a study room.', onProgress: progress,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const recoveryBody = JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))
+    expect(recoveryBody.max_completion_tokens).toBe(900)
+    expect(recoveryBody.messages.some((message: { content: string }) => message.content.includes('ACTION RECOVERY'))).toBe(true)
+    expect(plan.actions).toEqual([{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 10 } }])
+    expect(progress).toHaveBeenCalledWith(expect.stringContaining('Retrying once'))
+  })
+
   it('normalizes a room-by-room create_house response and uses room defaults for omitted dimensions', async () => {
     const project = createProjectFromForm(defaultNewProjectForm())
     const planText = JSON.stringify({
