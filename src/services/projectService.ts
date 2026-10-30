@@ -2,6 +2,7 @@ import type { NewProjectForm, Project } from '@/types'
 import { loadJSON, saveJSON, storageKeys } from '@/lib/storage'
 import { createSampleProjects } from '@/data/projects'
 import { createProjectFromForm } from '@/lib/projectFactory'
+import { mergeProjectModelUpdate, normalizeProjectModel } from '@/lib/projectModel'
 import { uid } from '@/lib/id'
 
 /**
@@ -25,8 +26,12 @@ export interface ProjectService {
 export function createLocalProjectService(): ProjectService {
   function read(): Project[] {
     const stored = loadJSON<Project[] | null>(storageKeys.projects, null)
-    if (Array.isArray(stored) && stored.length > 0) return stored
-    const samples = createSampleProjects()
+    if (Array.isArray(stored) && stored.length > 0) {
+      const normalized = stored.map(normalizeProjectModel)
+      if (JSON.stringify(normalized) !== JSON.stringify(stored)) saveJSON(storageKeys.projects, normalized)
+      return normalized
+    }
+    const samples = createSampleProjects().map(normalizeProjectModel)
     saveJSON(storageKeys.projects, samples)
     return samples
   }
@@ -58,7 +63,11 @@ export function createLocalProjectService(): ProjectService {
       const projects = read()
       const index = projects.findIndex((p) => p.id === id)
       if (index === -1) return undefined
-      const updated: Project = { ...projects[index], ...patch, id, updatedAt: new Date().toISOString() }
+      const updated = mergeProjectModelUpdate(projects[index], {
+        ...patch,
+        id,
+        updatedAt: new Date().toISOString(),
+      })
       projects[index] = updated
       write(projects)
       return updated

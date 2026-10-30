@@ -1,4 +1,5 @@
 import type {
+  BuildingCategory,
   BuildingType,
   FinishOption,
   OutdoorFeature,
@@ -12,11 +13,85 @@ export interface Option<T extends string> {
   description: string
 }
 
+export const BUILDING_CATEGORIES: Option<BuildingCategory>[] = [
+  { value: 'residential', label: 'Residential', description: 'Homes, apartments and housing developments' },
+  { value: 'government', label: 'Government', description: 'Ministries and public administration' },
+  { value: 'institutional', label: 'Institutional', description: 'Healthcare, education, civic and religious uses' },
+  { value: 'commercial', label: 'Commercial', description: 'Offices, retail, hospitality and mixed use' },
+  { value: 'industrial', label: 'Industrial', description: 'Factories, workshops and warehouses' },
+  { value: 'agricultural', label: 'Agricultural', description: 'Agricultural and storage facilities' },
+  { value: 'mixed-use', label: 'Mixed use', description: 'A project combining more than one primary use' },
+  { value: 'other', label: 'Other', description: 'A custom project purpose' },
+]
+
+export const BUILDING_USES: Record<BuildingCategory, Option<string>[]> = {
+  residential: [
+    { value: 'bungalow', label: 'Bungalow', description: 'Single-storey home' },
+    { value: 'duplex', label: 'Duplex', description: 'Multi-level family home' },
+    { value: 'detached', label: 'Detached house', description: 'Standalone home' },
+    { value: 'semi-detached', label: 'Semi-detached house', description: 'Paired home' },
+    { value: 'flats', label: 'Apartments / block of flats', description: 'Multi-unit residential building' },
+    { value: 'mansion', label: 'Mansion', description: 'Large private residence' },
+    { value: 'residential-estate', label: 'Residential estate', description: 'Multiple homes on a shared site' },
+    { value: 'other', label: 'Other residential', description: 'Custom residential use' },
+  ],
+  government: [
+    { value: 'ministry', label: 'Ministry / government headquarters', description: 'Government administration' },
+    { value: 'local-government-office', label: 'Local government office', description: 'Local civic administration' },
+    { value: 'police-station', label: 'Police station', description: 'Public safety facility' },
+    { value: 'fire-service', label: 'Fire service building', description: 'Emergency-response facility' },
+    { value: 'court', label: 'Court', description: 'Judicial facility' },
+    { value: 'public-administration', label: 'Public administration', description: 'Public-service offices' },
+    { value: 'other', label: 'Other government', description: 'Custom government use' },
+  ],
+  institutional: [
+    { value: 'hospital', label: 'Hospital', description: 'Healthcare facility' },
+    { value: 'medical-center', label: 'Medical center', description: 'Outpatient or specialist care' },
+    { value: 'school', label: 'School', description: 'Primary or secondary education' },
+    { value: 'university', label: 'University', description: 'Higher education' },
+    { value: 'religious-institution', label: 'Religious institution', description: 'Worship and community spaces' },
+    { value: 'research-laboratory', label: 'Research laboratory', description: 'Research and testing facility' },
+    { value: 'other', label: 'Other institution', description: 'Custom institutional use' },
+  ],
+  commercial: [
+    { value: 'office-complex', label: 'Office complex', description: 'Commercial offices' },
+    { value: 'shopping-plaza', label: 'Shopping plaza', description: 'Retail shops and services' },
+    { value: 'shopping-mall', label: 'Shopping mall', description: 'Large multi-tenant retail' },
+    { value: 'supermarket', label: 'Supermarket', description: 'Food and general retail' },
+    { value: 'retail-shop', label: 'Retail shop', description: 'Individual retail premises' },
+    { value: 'restaurant', label: 'Restaurant', description: 'Food service' },
+    { value: 'hotel', label: 'Hotel', description: 'Guest accommodation' },
+    { value: 'event-center', label: 'Event center', description: 'Assembly and events' },
+    { value: 'bank', label: 'Bank', description: 'Financial services' },
+    { value: 'business-center', label: 'Business center', description: 'Flexible offices and services' },
+    { value: 'other', label: 'Other commercial', description: 'Custom commercial use' },
+  ],
+  industrial: [
+    { value: 'warehouse', label: 'Warehouse', description: 'Goods storage and distribution' },
+    { value: 'factory', label: 'Factory', description: 'Manufacturing facility' },
+    { value: 'workshop', label: 'Workshop', description: 'Production or repair work' },
+    { value: 'storage-facility', label: 'Storage facility', description: 'Specialized storage' },
+    { value: 'other', label: 'Other industrial', description: 'Custom industrial use' },
+  ],
+  agricultural: [
+    { value: 'agricultural-facility', label: 'Agricultural facility', description: 'Farm and processing support' },
+    { value: 'research-laboratory', label: 'Agricultural research laboratory', description: 'Research and testing' },
+    { value: 'storage-facility', label: 'Agricultural storage', description: 'Crop and equipment storage' },
+    { value: 'other', label: 'Other agricultural', description: 'Custom agricultural use' },
+  ],
+  'mixed-use': [
+    { value: 'commercial-residential', label: 'Commercial + residential', description: 'Retail or office with homes' },
+    { value: 'office-retail', label: 'Office + retail', description: 'Workspaces and shops' },
+    { value: 'custom-mixed-use', label: 'Custom mixed use', description: 'User-defined combination' },
+  ],
+  other: [{ value: 'custom', label: 'Custom purpose', description: 'Describe the intended use' }],
+}
+
 export const BUILDING_TYPES: Option<BuildingType>[] = [
   { value: 'bungalow', label: 'Bungalow', description: 'Single-storey home on one floor' },
-  { value: 'duplex', label: 'Duplex', description: 'Two identical units sharing a wall' },
+  { value: 'duplex', label: 'Duplex', description: 'Multi-level family home' },
   { value: 'detached', label: 'Detached', description: 'Standalone house on its own plot' },
-  { value: 'semi-detached', label: 'Semi-detached', description: 'Paired house sharing one wall' },
+  { value: 'semi-detached', label: 'Semi-detached', description: 'Paired house sharing a wall' },
   { value: 'flats', label: 'Block of flats', description: 'Multi-storey apartment block' },
   { value: 'other', label: 'Other', description: 'Something custom' },
 ]

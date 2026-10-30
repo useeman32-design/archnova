@@ -33,7 +33,7 @@ export function ProjectStep({ form, update, errors }: StepProps & { form: NewPro
         <TextField
           label="Project name"
           required
-          placeholder="e.g. 3 Bedroom Bungalow"
+          placeholder="e.g. Gusau Ministry Headquarters"
           value={form.name}
           onChange={(event) => update('name', event.target.value)}
           error={errors.name}

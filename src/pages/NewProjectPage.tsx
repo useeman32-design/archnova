@@ -22,7 +22,7 @@ const STEP_DEFS: (Step & { label: string })[] = [
   { id: 'plot', label: 'Plot dimensions', short: 'Plot' },
   { id: 'site', label: 'Shape & constraints', short: 'Site' },
   { id: 'building', label: 'Building type', short: 'Type' },
-  { id: 'beds', label: 'Bedrooms & bathrooms', short: 'Beds' },
+  { id: 'beds', label: 'Building scale / project scope', short: 'Scope' },
   { id: 'spaces', label: 'Rooms & spaces', short: 'Spaces' },
   { id: 'outdoor', label: 'Outdoor features', short: 'Outdoor' },
   { id: 'style', label: 'Style & roof', short: 'Style' },
@@ -56,7 +56,7 @@ export function NewProjectPage() {
       if (!(form.plotWidth > 0)) next.plotWidth = 'Enter a plot width.'
       if (!(form.plotLength > 0)) next.plotLength = 'Enter a plot length.'
     }
-    if (index === 4) {
+    if (index === 4 && (form.purpose?.category ?? 'residential') === 'residential') {
       if (form.bedrooms < 1) next.bedrooms = 'You need at least one bedroom.'
     }
     if (index === 9) {

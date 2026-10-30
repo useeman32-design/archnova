@@ -73,7 +73,7 @@ const SYSTEM_INSTRUCTIONS = `You are ArchNova's design copilot. Answer brief que
 Return exactly one JSON object: {"reply":"short helpful answer","actions":[],"project":{},"plot":{},"wallThicknesses":{},"assumptions":[],"unsupported":[]}. Omit unused fields. Greetings/general questions use actions:[]. For a supported design request, provide the matching action(s); never answer as if created/applied unless an action is present. Edits are only proposals until approved.
 STRICT ACTION SHAPES: use these exact keys and numeric dimensions. create_house: {"type":"create_house","replaceExisting":true,"rooms":[{"name":"Bedroom 1","category":"bedroom","width":12,"length":12},{"name":"Kitchen","category":"kitchen","width":10,"length":10}],"plot":{"width":50,"length":50,"units":"ft"}}. Each room needs name, category, width, length; x/y are optional and auto-arranged if omitted. Do not use roomCount, roomType, dimensions objects, or prose in place of these keys. If the user asks for a house but leaves room count open, make a sensible compact starter plan and state assumptions; honour explicit minimums. Keep every room inside the plot and avoid overlap. add_room: {"type":"add_room","room":{"name":"Study","category":"study","width":10,"length":10}}. resize_room: {"type":"resize_room","room":"exact room name or ID","width":12,"length":10}; move_room: {"type":"move_room","room":"exact room name or ID","x":2,"y":3}; rename_room: {"type":"rename_room","room":"exact room name or ID","name":"Office"}; remove_room: {"type":"remove_room","room":"exact room name or ID"}.
 Other actions: set_room_shape {room,shape,outline?}; add_opening {room,kind:door|window,width?,height?,label?,wall?,offset?,style?}; edit_opening {room,opening,...}; remove_opening {room,opening}; add_furniture {room,item}; edit_furniture {room,item,x?,z?,width?,depth?,height?,rotationDegrees?,scale?}; remove_furniture {room,item}; set_room_finish {room,finish}; set_wall_thickness {kind:exterior|interior,value}; add_site_item {kind,x,y,width?,length?,rotationDegrees?,scale?}; edit_site_item {site,x?,y?,width?,length?,rotationDegrees?,scale?}; remove_site_item {site}.
-Editable project fields: name, location, buildingType, bedrooms, bathrooms, style, budget; preferences: exteriorFinish, interiorFinish, exteriorColor, roofColor, wall thicknesses, outdoor features, notes; plot width/length/units/shape. Plot shape is metadata; drawn boundary remains rectangular. Units are ft or m. Categories: bedroom, bathroom, kitchen, living, dining, study, garage, storage, porch, balcony, laundry, garden, pool, circulation, other. Valid site kinds: palm, conifer, shrub, flower, hedge, car, person, fence, gate, street-light, path, road. Site dimensions/coordinates use plot units; furniture x/z are room-relative normalized positions; rotationDegrees is degrees. Door styles: single-hinged, double-hinged, sliding, pocket, folding. Window styles: casement, sliding, bay, fixed. Use only catalog furniture and finishes. Wall is a side (north/east/south/west) or current ID.
+Editable project fields: name, location, legacy buildingType, bedrooms, bathrooms, style, budget; preferences: exteriorFinish, interiorFinish, exteriorColor, roofColor, wall thicknesses, outdoor features, notes; plot width/length/units/shape. Project purpose metadata may describe residential, government, institutional, commercial, industrial, agricultural, mixed-use, or custom use, but current room/site operations do not generate purpose-specific institutional layouts or edit actual site polygons. For unsupported project-scale generation or irregular-boundary operations, state the limitation and do not fabricate completion. Boundary status and vertices in context are authoritative; an unknown boundary is not a rectangular polygon. Never infer frontage or north when unspecified. Units are ft or m. Categories: bedroom, bathroom, kitchen, living, dining, study, garage, storage, porch, balcony, laundry, garden, pool, circulation, other. Valid site kinds: palm, conifer, shrub, flower, hedge, car, person, fence, gate, street-light, path, road. Site dimensions/coordinates use plot units; furniture x/z are room-relative normalized positions; rotationDegrees is degrees. Door styles: single-hinged, double-hinged, sliding, pocket, folding. Window styles: casement, sliding, bay, fixed. Use only catalog furniture and finishes. Wall is a side (north/east/south/west) or current ID.
 Do not claim upper floors, stairs, structural roof framing, plumbing/electrical, construction documents, real exports, or cost estimates. Roof form/color are visual only. Keep responses concise, assumptions/unsupported brief, actions ≤25.`
 
 export function localSmallTalkReply(prompt: string): string | null {
@@ -194,6 +194,33 @@ function summarizeContext(context: GroqContext, compact = false) {
       name: context.project.name,
       location: context.project.location,
       buildingType: context.project.buildingType,
+      purpose: context.project.purpose ?? { category: context.project.buildingType === 'other' ? 'other' : 'residential', use: context.project.buildingType },
+      brief: context.project.brief ? {
+        goals: context.project.brief.goals?.slice(0, 200),
+        requiredSpaces: context.project.brief.requiredSpaces.slice(0, compact ? 12 : 24),
+        constraints: context.project.brief.constraints.slice(0, 12),
+        assumptions: context.project.brief.assumptions.slice(0, 12),
+      } : undefined,
+      buildings: (context.project.buildings ?? []).slice(0, compact ? 4 : 8).map((building) => ({
+        id: building.id,
+        name: building.name,
+        role: building.role,
+        purpose: building.purpose,
+        floors: building.floors.map((floor) => ({ level: floor.level, name: floor.name, roomCount: floor.rooms.length })).slice(0, 12),
+      })),
+      site: context.project.site ? {
+        northDirectionDegrees: context.project.site.northDirectionDegrees,
+        orientationSource: context.project.site.orientationSource,
+        boundary: context.project.site.boundary ? {
+          shape: context.project.site.boundary.shape,
+          status: context.project.site.boundary.status,
+          source: context.project.site.boundary.source,
+          units: context.project.site.boundary.units,
+          area: context.project.site.boundary.area,
+          vertices: context.project.site.boundary.vertices.slice(0, compact ? 8 : 16),
+          assumptions: context.project.site.boundary.assumptions.slice(0, 6),
+        } : undefined,
+      } : undefined,
       bedrooms: context.project.bedrooms,
       bathrooms: context.project.bathrooms,
       style: context.project.style,

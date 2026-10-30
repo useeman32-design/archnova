@@ -10,6 +10,71 @@ export type Units = 'ft' | 'm'
 
 export type PlotShape = 'square' | 'rectangle' | 'narrow' | 'irregular' | 'corner'
 
+/** Use-level classification; intentionally separate from legacy house typology. */
+export type BuildingCategory =
+  | 'residential'
+  | 'government'
+  | 'institutional'
+  | 'commercial'
+  | 'industrial'
+  | 'agricultural'
+  | 'mixed-use'
+  | 'other'
+
+export interface ProjectPurpose {
+  category: BuildingCategory
+  /** Extensible use label (e.g. ministry, hospital, shopping plaza, bungalow). */
+  use: string
+  description?: string
+  capacity?: { value: number; unit: string }
+}
+
+export interface SpaceRequirement {
+  id: string
+  name: string
+  category: string
+  quantity: number
+  minimumArea?: number
+  units?: Units
+  notes?: string
+}
+
+export interface ProjectBrief {
+  purpose: ProjectPurpose
+  goals?: string
+  requiredSpaces: SpaceRequirement[]
+  constraints: string[]
+  preferences: string[]
+  assumptions: string[]
+}
+
+export type BoundaryStatus = 'defined' | 'assumed' | 'unknown'
+export type BoundarySource = 'user-drawn' | 'survey-import' | 'dimension-derived' | 'ai-recommended' | 'unknown'
+
+export interface SiteVertex extends Vec2 {
+  id: string
+}
+
+/** An actual polygon when vertices are present; unknown geometry stays empty, never rectangularized. */
+export interface SiteBoundary {
+  id: string
+  shape: PlotShape | 'polygon'
+  vertices: SiteVertex[]
+  units: Units
+  status: BoundaryStatus
+  source: BoundarySource
+  area?: number
+  assumptions: string[]
+}
+
+export interface SiteModel {
+  boundary?: SiteBoundary
+  /** Degrees clockwise from drawing +Y; null means the direction is not known. */
+  northDirectionDegrees?: number | null
+  orientationSource?: 'user-specified' | 'survey-import' | 'assumed' | 'unknown'
+  assumptions: string[]
+}
+
 export type BuildingType =
   | 'bungalow'
   | 'duplex'
@@ -191,6 +256,17 @@ export interface Floor {
   openings?: WallOpening[]
 }
 
+/** One independently identifiable structure within a shared project/site. */
+export interface Building {
+  id: string
+  name: string
+  purpose: ProjectPurpose
+  role: 'primary' | 'secondary' | 'service' | 'other'
+  floors: Floor[]
+  footprint?: SiteBoundary
+  assumptions: string[]
+}
+
 export interface Plot {
   width: number
   length: number
@@ -217,7 +293,15 @@ export interface Project {
   id: string
   name: string
   status: ProjectStatus
+  /** Legacy residential typology, retained for existing views and saved projects. */
   buildingType: BuildingType
+  /** General project use, independent of the legacy house typology. */
+  purpose?: ProjectPurpose
+  brief?: ProjectBrief
+  /** Actual site geometry and orientation; optional for older projects. */
+  site?: SiteModel
+  /** Multi-building model. `floors` below remains the primary-building compatibility view. */
+  buildings?: Building[]
   location: string
   plot: Omit<Plot, 'constraints'>
   bedrooms: number
@@ -246,6 +330,8 @@ export interface NewProjectForm {
   plotShape: PlotShape
   constraints: string[]
   buildingType: BuildingType
+  /** Optional generalized use; omitted legacy drafts are inferred as residential. */
+  purpose?: ProjectPurpose
   bedrooms: number
   bathrooms: number
   rooms: string[]

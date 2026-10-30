@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Copy, MapPin, Ruler, ArrowUpRight, Clock } from 'lucide-react'
+import { Copy, MapPin, Ruler, ArrowUpRight, Clock, Building2 } from 'lucide-react'
 import type { Project } from '@/types'
 import { StatusBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -15,6 +15,8 @@ export function ProjectCard({
 }) {
   const navigate = useNavigate()
   const outdoor = project.preferences.outdoor
+  const isResidential = (project.purpose?.category ?? (project.buildingType === 'other' ? 'other' : 'residential')) === 'residential'
+  const purposeLabel = project.purpose?.description || project.purpose?.use.split('-').join(' ') || project.buildingType
 
   return (
     <div
@@ -30,15 +32,23 @@ export function ProjectCard({
       }}
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-canvas-soft">
-        <HouseIllustration
-          roof={project.roof}
-          exterior={project.preferences.exteriorFinish}
-          showPool={outdoor.includes('pool')}
-          showGarage={outdoor.includes('garage')}
-          showGarden={outdoor.includes('garden') || outdoor.includes('terrace')}
-          variant={project.thumbnailSeed}
-          className="h-full w-full transition-transform duration-500 group-hover:scale-[1.03]"
-        />
+        {isResidential ? (
+          <HouseIllustration
+            roof={project.roof}
+            exterior={project.preferences.exteriorFinish}
+            showPool={outdoor.includes('pool')}
+            showGarage={outdoor.includes('garage')}
+            showGarden={outdoor.includes('garden') || outdoor.includes('terrace')}
+            variant={project.thumbnailSeed}
+            className="h-full w-full transition-transform duration-500 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-brand-50 to-canvas-soft text-center">
+            <Building2 className="h-12 w-12 text-brand-600" />
+            <p className="mt-2 text-sm font-semibold capitalize text-ink-text">{purposeLabel}</p>
+            <p className="mt-1 text-[11px] text-muted">Project brief · layout pending</p>
+          </div>
+        )}
         <div className="absolute left-3 top-3">
           <StatusBadge status={project.status} />
         </div>

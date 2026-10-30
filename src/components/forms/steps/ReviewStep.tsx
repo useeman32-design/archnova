@@ -7,7 +7,8 @@ import { HouseIllustration } from '@/components/illustrations/HouseIllustration'
 import { formatDimensions, formatMoney } from '@/lib/format'
 import {
   ARCHITECTURAL_STYLES,
-  BUILDING_TYPES,
+  BUILDING_CATEGORIES,
+  BUILDING_USES,
   EXTERIOR_FINISHES,
   INTERIOR_FINISHES,
   OUTDOOR_FEATURES,
@@ -24,6 +25,13 @@ export function ReviewStep({
   form,
   onJump,
 }: StepProps & { form: NewProjectForm; onJump: (index: number) => void }) {
+  const purpose = form.purpose ?? (form.buildingType === 'other'
+    ? { category: 'other' as const, use: 'custom' }
+    : { category: 'residential' as const, use: form.buildingType })
+  const categoryLabel = labelIn(BUILDING_CATEGORIES, purpose.category)
+  const purposeLabel = BUILDING_USES[purpose.category].find((option) => option.value === purpose.use)?.label
+    ?? purpose.description
+    ?? purpose.use
   return (
     <StepShell
       icon={<Check className="h-5 w-5" />}
@@ -49,14 +57,15 @@ export function ReviewStep({
             />
           </Group>
 
-          <Group icon={<Building2 className="h-4 w-4" />} title="Building" onEdit={() => onJump(3)}>
-            <ReviewRow label="Type" value={labelIn(BUILDING_TYPES, form.buildingType)} />
-            <ReviewRow label="Bedrooms / bathrooms" value={`${form.bedrooms} / ${form.bathrooms}`} />
+          <Group icon={<Building2 className="h-4 w-4" />} title="Building purpose" onEdit={() => onJump(3)}>
+            <ReviewRow label="Category" value={categoryLabel} />
+            <ReviewRow label="Intended use" value={purpose.description || purposeLabel} />
+            {purpose.category === 'residential' ? <ReviewRow label="Bedrooms / bathrooms" value={`${form.bedrooms} / ${form.bathrooms}`} /> : null}
           </Group>
 
           <Group icon={<LayoutGrid className="h-4 w-4" />} title="Spaces & outdoor" onEdit={() => onJump(5)}>
             <ReviewRow
-              label="Extra rooms"
+              label={purpose.category === 'residential' ? 'Extra rooms' : 'Required spaces'}
               value={form.rooms.length ? form.rooms.map((r) => labelIn(ROOM_OPTIONS, r)).join(', ') : 'None selected'}
             />
             <ReviewRow
@@ -87,14 +96,22 @@ export function ReviewStep({
         <div className="space-y-5 lg:sticky lg:top-4 lg:self-start">
           <div className="overflow-hidden rounded-xl border border-line">
             <div className="aspect-[4/3] bg-canvas-soft">
-              <HouseIllustration
-                roof={form.roof}
-                exterior={form.exteriorFinish}
-                showPool={form.outdoor.includes('pool')}
-                showGarage={form.outdoor.includes('garage')}
-                showGarden={form.outdoor.includes('garden') || form.outdoor.includes('terrace')}
-                className="h-full w-full"
-              />
+              {purpose.category === 'residential' ? (
+                <HouseIllustration
+                  roof={form.roof}
+                  exterior={form.exteriorFinish}
+                  showPool={form.outdoor.includes('pool')}
+                  showGarage={form.outdoor.includes('garage')}
+                  showGarden={form.outdoor.includes('garden') || form.outdoor.includes('terrace')}
+                  className="h-full w-full"
+                />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+                  <Building2 className="h-10 w-10 text-brand-600" />
+                  <p className="mt-3 text-sm font-semibold text-ink-text">{purpose.description || purposeLabel}</p>
+                  <p className="mt-1 text-xs text-muted">Generalized project brief · no generated floor plan yet</p>
+                </div>
+              )}
             </div>
           </div>
           <div className="rounded-xl border border-line bg-surface p-4">
@@ -103,16 +120,23 @@ export function ReviewStep({
               <Badge tone="brand">Preview</Badge>
             </div>
             <p className="mt-2 text-[12px] leading-relaxed text-muted">
-              ArchNova will use this brief to produce a starting floor plan and 3D preview. This
-              prototype creates a demonstration project only — no design is actually generated yet.
+              {purpose.category === 'residential'
+                ? 'This prototype creates a conceptual residential starter layout for review; it is not professionally validated.'
+                : 'This project purpose and brief will be saved with an empty ground-floor workspace. Purpose-specific spaces and layouts are not generated in this phase.'}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded-md bg-canvas-soft px-2.5 py-1 text-[11.5px] font-medium text-muted">
-                {form.bedrooms} bed{form.bedrooms > 1 ? 's' : ''}
-              </span>
-              <span className="rounded-md bg-canvas-soft px-2.5 py-1 text-[11.5px] font-medium text-muted">
-                {form.bathrooms} bath{form.bathrooms !== 1 ? 's' : ''}
-              </span>
+              {purpose.category === 'residential' ? (
+                <>
+                  <span className="rounded-md bg-canvas-soft px-2.5 py-1 text-[11.5px] font-medium text-muted">
+                    {form.bedrooms} bed{form.bedrooms > 1 ? 's' : ''}
+                  </span>
+                  <span className="rounded-md bg-canvas-soft px-2.5 py-1 text-[11.5px] font-medium text-muted">
+                    {form.bathrooms} bath{form.bathrooms !== 1 ? 's' : ''}
+                  </span>
+                </>
+              ) : (
+                <span className="rounded-md bg-canvas-soft px-2.5 py-1 text-[11.5px] font-medium text-muted">{categoryLabel}</span>
+              )}
               <span className="rounded-md bg-canvas-soft px-2.5 py-1 text-[11.5px] font-medium text-muted">
                 {formatDimensions(form.plotWidth, form.plotLength, form.units)}
               </span>

@@ -10,6 +10,7 @@ export function defaultNewProjectForm(): NewProjectForm {
     plotShape: 'rectangle',
     constraints: [],
     buildingType: 'bungalow',
+    purpose: { category: 'residential', use: 'bungalow' },
     bedrooms: 3,
     bathrooms: 2,
     rooms: ['living'],
