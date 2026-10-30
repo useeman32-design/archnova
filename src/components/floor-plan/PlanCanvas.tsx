@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Maximize, ZoomIn, ZoomOut } from 'lucide-react'
 
 /**
@@ -22,6 +22,20 @@ export function PlanCanvas({
   const [dragging, setDragging] = useState(false)
   const last = useState<{ x: number; y: number } | null>(null)
   const [ref, setRef] = useState<HTMLDivElement | null>(null)
+  const pendingAnchor = useRef<{ clientX: number; clientY: number; xRatio: number; yRatio: number } | null>(null)
+
+  useLayoutEffect(() => {
+    const anchor = pendingAnchor.current
+    if (!ref || !anchor) return
+    const containerRect = ref.getBoundingClientRect()
+    const svgRect = ref.querySelector('svg')?.getBoundingClientRect()
+    const contentRect = svgRect ?? containerRect
+    const pointX = contentRect.left - containerRect.left + ref.scrollLeft + anchor.xRatio * contentRect.width
+    const pointY = contentRect.top - containerRect.top + ref.scrollTop + anchor.yRatio * contentRect.height
+    ref.scrollLeft += pointX - (anchor.clientX - containerRect.left)
+    ref.scrollTop += pointY - (anchor.clientY - containerRect.top)
+    pendingAnchor.current = null
+  }, [zoom, ref])
 
   return (
     <div
@@ -37,7 +51,17 @@ export function PlanCanvas({
         if (event.ctrlKey) {
           if (ref) { ref.scrollLeft += event.deltaX || event.deltaY; ref.scrollTop += event.deltaY }
         } else {
-          setZoom(Math.max(0.4, Math.min(3, zoom * Math.exp(-event.deltaY * 0.0012))))
+          const nextZoom = Math.max(0.4, Math.min(3, zoom * Math.exp(-event.deltaY * 0.0012)))
+          if (nextZoom === zoom || !ref) return
+          const target = ref.querySelector('svg') ?? ref
+          const rect = target.getBoundingClientRect()
+          pendingAnchor.current = {
+            clientX: event.clientX,
+            clientY: event.clientY,
+            xRatio: rect.width ? (event.clientX - rect.left) / rect.width : 0.5,
+            yRatio: rect.height ? (event.clientY - rect.top) / rect.height : 0.5,
+          }
+          setZoom(nextZoom)
         }
       }}
       onPointerDown={

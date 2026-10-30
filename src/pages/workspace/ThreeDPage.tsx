@@ -4,6 +4,7 @@ import { ArrowLeft, Box, Brush, Eye, EyeOff, Layers, Mountain, Move, Plane, Scal
 import type { FinishOption } from '@/types'
 import { useWorkspace } from './WorkspaceLayout'
 import { MassingViewerSafe } from '@/components/3d-viewer/MassingViewer'
+import { PropertiesPanel } from '@/components/editor/PropertiesPanel'
 import { SegmentedControl } from '@/components/ui/FormControls'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -36,13 +37,6 @@ function materialSwatch(value: FinishOption): string {
   }
   return patterns[value]
 }
-
-const CATEGORIES = [
-  { icon: <Sofa className="h-4 w-4" />, label: 'Furniture', note: 'Interior tool' },
-  { icon: <Square className="h-4 w-4" />, label: 'Walls & openings', note: 'Door / Window tools' },
-  { icon: <Layers className="h-4 w-4" />, label: 'Roof & structure', note: 'Roof tool' },
-  { icon: <Mountain className="h-4 w-4" />, label: 'Site & landscape', note: 'Trees tool' },
-]
 
 export function ThreeDPage() {
   const navigate = useNavigate()
@@ -125,7 +119,7 @@ export function ThreeDPage() {
           onEditEnd={ctx.endEdit}
           ornaments={ctx.ornaments}
           placed={ctx.placed}
-          selectedItemId={mode === 'interior' ? ctx.selectedItemId : null}
+          selectedItemId={ctx.selectedItemId}
           onSelectItem={ctx.selectItem}
           selectedSiteId={ctx.selectedSiteId}
           onSelectSite={ctx.selectSite}
@@ -197,22 +191,40 @@ export function ThreeDPage() {
           <h2 className="text-[14px] font-semibold text-ink-text">Materials & view</h2>
         </div>
 
-        {selectedRoom ? (
-          <div className="mb-5 rounded-xl border border-brand-200 bg-brand-50/50 p-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate text-[13px] font-semibold text-ink-text">{selectedRoom.name}</p>
-                <p className="mt-0.5 text-[11px] text-muted capitalize">{selectedRoom.category} · {selectedRoom.width} × {selectedRoom.length} {ctx.units} · {(selectedRoom.width * selectedRoom.length).toLocaleString()} sq {ctx.units}</p>
-              </div>
-              {mode === 'exterior' ? <button onClick={() => setMode('interior')} className="shrink-0 rounded-lg bg-brand-600 px-2.5 py-1.5 text-[11px] font-semibold text-white">Enter room</button> : null}
-            </div>
-            <p className="mb-1.5 mt-3 text-[11px] font-semibold text-muted">Room finish</p>
-            <div className="flex flex-wrap gap-1">
-              {INTERIOR_FINISHES.map((option) => <button key={option.value} onClick={() => ctx.setRoomFinish(selectedRoom.id, option.value)} className={`rounded-full px-2 py-1 text-[10.5px] font-medium ${ (selectedRoom.finish ?? interior) === option.value ? 'bg-brand-600 text-white' : 'bg-white text-muted ring-1 ring-line' }`}>{option.label}</button>)}
-            </div>
-            {ctx.placed[selectedRoom.id]?.length ? <p className="mt-2 text-[11px] text-muted">Placed: {ctx.placed[selectedRoom.id].join(' · ')}</p> : null}
+        {selectedRoom || ctx.selectedSite ? (
+          <div className="mb-5 h-[min(58vh,620px)] min-h-[320px] overflow-hidden rounded-xl border border-line">
+            <PropertiesPanel
+              room={selectedRoom}
+              units={ctx.units}
+              onClose={() => { ctx.selectItem(null); ctx.selectSite(null); ctx.selectRoom(null) }}
+              onRename={ctx.renameRoom}
+              onResize={ctx.resizeRoom}
+              onSetShape={ctx.setRoomShape}
+              wallThicknesses={ctx.wallThicknesses}
+              onSetWallThickness={ctx.setWallThickness}
+              walls={ctx.walls}
+              openings={ctx.openings}
+              placed={ctx.placed}
+              selectedItem={ctx.selectedItem}
+              selectedItemRoomId={ctx.selectedItemRoomId}
+              selectedSite={ctx.selectedSite}
+              onUpdateSite={ctx.updateOrnament}
+              onRemoveSite={ctx.removeOrnament}
+              onSelectItem={ctx.selectItem}
+              onUpdatePlacedItem={ctx.updatePlacedItem}
+              onRemovePlacedItem={ctx.removePlacedItem}
+              onDuplicatePlacedItem={ctx.duplicatePlacedItem}
+              onUpdateRoomElement={ctx.updateRoomElement}
+              onRemoveRoomElement={ctx.removeRoomElement}
+              onToggleFurniture={ctx.toggleFurniture}
+              showRoomFinish={false}
+            />
           </div>
-        ) : null}
+        ) : (
+          <div className="mb-5 rounded-xl border border-dashed border-line px-3 py-5 text-center text-[11.5px] text-muted">
+            Select a room in the 3D view to inspect its details and actual elements.
+          </div>
+        )}
 
         {mode === 'interior' ? (
           <div className="mb-5">
@@ -293,28 +305,7 @@ export function ThreeDPage() {
             </p>
           </div>
 
-          <div>
-            <p className="mb-2 text-[12px] font-medium text-ink-text">Element categories</p>
-            <div className="space-y-2">
-              {CATEGORIES.map((category) => (
-                <div
-                  key={category.label}
-                  className="flex items-center justify-between rounded-lg border border-line px-3 py-2.5"
-                >
-                  <span className="flex items-center gap-2 text-[12.5px] text-muted">
-                    {category.icon}
-                    {category.label}
-                  </span>
-                  <span className="text-[10.5px] font-medium uppercase tracking-wide text-brand-700">
-                    {category.note}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-2 text-[11.5px] leading-relaxed text-faint">
-              Drag library tiles from the left palette onto this view to add objects to the selected room or site. The current catalog uses editable schematic 3D models; richer manufacturer models can be connected later.
-            </p>
-          </div>
+
         </div>
       </aside>
     </div>

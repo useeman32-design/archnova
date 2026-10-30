@@ -104,7 +104,7 @@ export default function MassingCanvas(props: MassingCanvasProps) {
 
   useEffect(() => {
     setSelectedItemObj(props.selectedItemId ? (itemRefs.current.get(props.selectedItemId) ?? null) : null)
-  }, [props.selectedItemId, props.placed])
+  }, [props.selectedItemId, props.placed, mode])
 
   useEffect(() => {
     setSelectedSiteObj(props.selectedSiteId ? (siteRefs.current.get(props.selectedSiteId) ?? null) : null)
@@ -177,10 +177,14 @@ export default function MassingCanvas(props: MassingCanvasProps) {
           selectedId={selectedId ?? null}
           onSelectRoom={onSelectRoom}
           meshRefs={meshRefs}
+          itemRefs={itemRefs}
           siteRefs={siteRefs}
           selectedSiteId={props.selectedSiteId ?? null}
           onSelectSite={props.onSelectSite}
           ornaments={props.ornaments ?? []}
+          placed={props.placed ?? {}}
+          selectedItemId={props.selectedItemId ?? null}
+          onSelectItem={props.onSelectItem}
           roofVisible={roofVisible}
         />
       )}
@@ -219,7 +223,7 @@ export default function MassingCanvas(props: MassingCanvasProps) {
         />
       ) : null}
 
-      {mode === 'interior' && selectedItemObj && selectedRoom ? (
+      {(mode === 'interior' || (mode === 'exterior' && topDown)) && selectedItemObj && selectedRoom ? (
         <TransformControls
           object={selectedItemObj}
           mode="translate"
@@ -287,20 +291,28 @@ function ExteriorScene({
   selectedId,
   onSelectRoom,
   meshRefs,
+  itemRefs,
   siteRefs,
   selectedSiteId,
   onSelectSite,
   ornaments,
+  placed,
+  selectedItemId,
+  onSelectItem,
   roofVisible,
 }: {
   project: Project
   selectedId: string | null
   onSelectRoom?: (id: string | null) => void
   meshRefs: React.MutableRefObject<Map<string, Mesh>>
+  itemRefs: React.MutableRefObject<Map<string, Object3D>>
   siteRefs: React.MutableRefObject<Map<string, Object3D>>
   selectedSiteId: string | null
   onSelectSite?: (id: string | null) => void
   ornaments: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string; width?: number; length?: number }[]
+  placed: Record<string, PlacedItem[]>
+  selectedItemId: string | null
+  onSelectItem?: (id: string | null) => void
   roofVisible: boolean
 }) {
   const { width: plotW, length: plotL } = project.plot
@@ -382,6 +394,28 @@ function ExteriorScene({
           />
         ))
       })}
+
+      {project.floors.flatMap((floor) => floor.rooms.filter((room) => !FLAT_CATEGORIES.has(room.category)).map((room) => {
+        const items = placed[room.id] ?? room.items ?? []
+        const [cx, cz] = toWorld(room.rect.x + room.rect.w / 2, room.rect.y + room.rect.h / 2)
+        const floorY = (floor.level - 1) * (WALL_H + SLAB) + 0.03
+        return <group key={`top-items-${room.id}`} position={[cx, floorY, cz]}>
+          {items.map((item) => {
+            const defaults = getFurnitureDimensions(item.item, room.units)
+            return <group
+              key={item.id}
+              ref={(obj) => { if (obj) itemRefs.current.set(item.id, obj); else itemRefs.current.delete(item.id) }}
+              position={[item.x * room.rect.w * S, 0, item.z * room.rect.h * S]}
+              rotation={[0, item.rotation, 0]}
+              scale={item.scale}
+              onClick={(event) => { event.stopPropagation(); onSelectItem?.(item.id) }}
+            >
+              <FurniturePiece item={item.item} width={item.width ?? defaults.width} depth={item.depth ?? defaults.depth} height={item.height ?? defaults.height} color={item.color} />
+              {selectedItemId === item.id ? <Edges color="#1a56f5" /> : null}
+            </group>
+          })}
+        </group>
+      }))}
 
       {ornaments.map((site) => {
         const [sx, sz] = toWorld(site.x, site.y)

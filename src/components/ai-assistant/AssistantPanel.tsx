@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AppWindow, ArrowUp, BedDouble, Box, Car, Check, DoorOpen, Eye, EyeOff, Fence, Flower2, Home, Lamp, Loader2, Settings2, ShieldCheck, Sofa, Sparkles, Sprout, TreePalm, Trash2, Trees, X } from 'lucide-react'
 import type { ArchitecturalWall, ChatMessage, PlacedItem, Project, Room, RoomCategory, Units } from '@/types'
-import { DEFAULT_GROQ_MODEL, requestAssistantPlan, testGroqConnection, type AssistantAction, type AssistantPlan, type AssistantSiteItem } from '@/services/groqAssistant'
+import { DEFAULT_GROQ_MODEL, localSmallTalkReply, requestAssistantPlan, testGroqConnection, type AssistantAction, type AssistantPlan, type AssistantSiteItem } from '@/services/groqAssistant'
 import type { ApplyAssistantPlanResult } from '@/lib/applyAssistantPlan'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { storageKeys } from '@/lib/storage'
@@ -109,6 +109,16 @@ export function AssistantPanel({
   const send = async (raw: string) => {
     const text = raw.trim()
     if (!text || busy) return
+    const smallTalk = localSmallTalkReply(text)
+    if (smallTalk) {
+      setInput('')
+      setRequestError('')
+      setMessages((previous) => [...previous,
+        { id: uid('msg'), role: 'user', text, createdAt: Date.now() },
+        { id: uid('msg'), role: 'assistant', text: smallTalk, createdAt: Date.now() },
+      ])
+      return
+    }
     if (!apiKey.trim()) {
       setSettingsOpen(true)
       setRequestError('Paste your Groq API key in Groq settings before sending a prompt.')

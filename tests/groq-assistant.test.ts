@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { requestAssistantPlan, testGroqConnection, DEFAULT_GROQ_MODEL } from '@/services/groqAssistant'
+import { localSmallTalkReply, requestAssistantPlan, testGroqConnection, DEFAULT_GROQ_MODEL } from '@/services/groqAssistant'
 import { createProjectFromForm } from '@/lib/projectFactory'
 import { defaultNewProjectForm } from '@/lib/defaultForm'
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('Groq assistant client', () => {
-  it('sends project context to Groq and safely parses the structured action plan', async () => {
+  it('answers simple greetings locally without spending Groq tokens', () => {
+    expect(localSmallTalkReply('hello')).toMatch(/Hi!/)
+    expect(localSmallTalkReply('Thanks!')).toMatch(/welcome/i)
+    expect(localSmallTalkReply('Add a window to the kitchen')).toBeNull()
+  })
+
+  it('sends compact project context with a bounded completion budget', async () => {
     const streamedPlan = JSON.stringify({
       reply: 'I will add a study.',
       actions: [{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 9, x: 2, y: 3 } }],
@@ -28,7 +34,9 @@ describe('Groq assistant client', () => {
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer gsk-test-user-key')
     const body = JSON.parse(String(init.body))
     expect(body.stream).toBe(true)
+    expect(body.max_completion_tokens).toBe(1400)
     expect(body.response_format).toBeUndefined()
+    expect(JSON.stringify(body.messages).length).toBeLessThan(16000)
     expect(body.messages.some((message: { content: string }) => message.content.includes(project.name))).toBe(true)
     expect(body.messages[1].content).toContain('furnitureItems')
     expect(body.messages[1].content).toContain('single-hinged')
@@ -46,6 +54,23 @@ describe('Groq assistant client', () => {
       apiKey: 'secret-test-key', model: DEFAULT_GROQ_MODEL,
       context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units }, history: [], prompt: 'Make a plan',
     })).rejects.toThrow(/Groq rejected this API key/)
+  })
+
+  it('retries token-budget failures once with no history and a smaller project summary', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const success = new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ reply: 'Done.', actions: [] }) } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    const tooLarge = new Response(JSON.stringify({ error: { message: 'Request too large for model; requested 12406 tokens, TPM limit 8000' } }), { status: 400 })
+    const fetchMock = vi.fn().mockResolvedValueOnce(tooLarge).mockResolvedValueOnce(success)
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [{ role: 'user', content: 'old' }, { role: 'assistant', content: 'old answer' }], prompt: 'Add a tree.',
+    })).resolves.toMatchObject({ reply: 'Done.' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const retryBody = JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))
+    expect(retryBody.max_completion_tokens).toBe(650)
+    expect(retryBody.messages).toHaveLength(3)
   })
 
   it('retries transient rate limits twice and reports retry progress', async () => {

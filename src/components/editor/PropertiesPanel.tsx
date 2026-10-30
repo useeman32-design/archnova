@@ -50,6 +50,8 @@ export interface PropertiesPanelProps {
   onToggleFurniture?: (roomId: string, item: string) => void
   onSetFinish?: (roomId: string, finish: FinishOption, color?: string) => void
   onViewIn3D?: (roomId: string) => void
+  /** Hide the room-specific finish control when a global interior finish is used. */
+  showRoomFinish?: boolean
   /** Desktop: collapse the panel to a slim strip. */
   onCollapse?: () => void
 }
@@ -80,6 +82,7 @@ export function PropertiesPanel({
   onToggleFurniture,
   onSetFinish,
   onViewIn3D,
+  showRoomFinish = true,
   onCollapse,
 }: PropertiesPanelProps) {
   const [tab, setTab] = useState<PropertyTab>('elements')
@@ -241,7 +244,7 @@ export function PropertiesPanel({
               />
             </div>
 
-            <div className="space-y-2.5 rounded-xl border border-line p-3">
+            {showRoomFinish ? <div className="space-y-2.5 rounded-xl border border-line p-3">
               <div>
                 <p className="text-[12px] font-semibold text-ink-text">Room finish</p>
                 <p className="mt-0.5 text-[11px] text-muted">Choose a floor material for this room.</p>
@@ -270,7 +273,7 @@ export function PropertiesPanel({
               <Button size="sm" variant="secondary" className="w-full" onClick={() => onViewIn3D?.(room.id)} icon={<Box className="h-3.5 w-3.5" />}>
                 Preview room in 3D
               </Button>
-            </div>
+            </div> : null}
 
             <div className="flex items-center justify-between rounded-lg bg-canvas-soft px-3.5 py-3">
               <span className="text-[13px] text-muted">Area</span>
