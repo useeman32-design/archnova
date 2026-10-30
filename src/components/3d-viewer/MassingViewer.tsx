@@ -17,6 +17,8 @@ const MassingCanvas = lazy(() => import('./MassingCanvas'))
 export interface MassingProps {
   project: Project
   mode?: 'exterior' | 'interior'
+  roofVisible?: boolean
+  topDown?: boolean
   className?: string
   selectedId?: string | null
   onSelectRoom?: (id: string | null) => void
@@ -25,7 +27,7 @@ export interface MassingProps {
   onResizeLive?: (id: string, w: number, h: number) => void
   onEditBegin?: () => void
   onEditEnd?: () => void
-  ornaments?: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string }[]
+  ornaments?: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string; width?: number; length?: number }[]
   placed?: Record<string, PlacedItem[]>
   selectedItemId?: string | null
   onSelectItem?: (id: string | null) => void

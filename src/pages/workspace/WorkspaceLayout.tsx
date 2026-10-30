@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, useParams, useOutletContext, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
+  ChevronLeft,
   Box,
   Boxes,
   DraftingCompass,
@@ -10,7 +11,7 @@ import {
   SlidersHorizontal,
   Sparkles,
 } from 'lucide-react'
-import type { ArchitecturalWall, Element, FinishOption, PlacedItem, Project, Room, RoomShape, Units, Vec2, WallOpening } from '@/types'
+import type { ArchitecturalWall, Element, FinishOption, LandscapeItem, PlacedItem, Project, Room, RoomShape, Units, Vec2, WallOpening } from '@/types'
 import { useProjects } from '@/hooks/useProjects'
 import { uid } from '@/lib/id'
 import { ROOM_FURNITURE } from '@/data/catalog'
@@ -42,13 +43,7 @@ export type ToolId =
   | 'finish'
   | 'measure'
 
-export interface Ornament extends Vec2 {
-  id: string
-  kind?: string
-  rotation: number
-  scale: number
-  color: string
-}
+export interface Ornament extends LandscapeItem {}
 
 export interface EditorState {
   rooms: Room[]
@@ -97,6 +92,9 @@ export interface WorkspaceContext {
   setAssistantOpen: (open: boolean) => void
   propsOpen: boolean
   setPropsOpen: (open: boolean) => void
+  propsCollapsed: boolean
+  setPropsCollapsed: (collapsed: boolean) => void
+  openRoomDetails: (roomId: string) => void
   save: () => void
   applyAssistantPlan: (plan: AssistantPlan, onProgress: (current: number, total: number, label: string) => void) => Promise<ApplyAssistantPlanResult>
   saved: boolean
@@ -111,7 +109,7 @@ export interface WorkspaceContext {
   placementWarning: string | null
   clearPlacementWarning: () => void
   placeInterior: (roomId: string, item: string, target?: Vec2) => void
-  addTreeAt: (point: Vec2, kind?: string) => void
+  addTreeAt: (point: Vec2, kind?: string, size?: { width?: number; length?: number }) => void
   /* Editing with history */
   beginEdit: () => void
   liveEdit: (fn: (state: EditorState) => EditorState) => void
@@ -161,6 +159,8 @@ export function WorkspaceLayout() {
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [propsOpen, setPropsOpen] = useState(false)
+  const [propsCollapsed, setPropsCollapsed] = useState(false)
+  const [roomDetailsOpen, setRoomDetailsOpen] = useState(false)
   const [saved, setSaved] = useState(false)
   const [tool, setTool] = useState<ToolId>('select')
   const [pending, setPending] = useState<PendingPlacement | null>(null)
@@ -343,6 +343,13 @@ export function WorkspaceLayout() {
     if (roomId && window.matchMedia('(max-width: 1023px)').matches) {
       setPropsOpen(true)
     }
+  }, [])
+
+  const openRoomDetails = useCallback((roomId: string) => {
+    setSelectedRoomId(roomId)
+    setSelectedItemId(null)
+    setSelectedSiteId(null)
+    setRoomDetailsOpen(true)
   }, [])
 
   const selectItem = useCallback((itemId: string | null) => {
@@ -556,13 +563,37 @@ export function WorkspaceLayout() {
   }, [commit])
 
   const addTreeAt = useCallback(
-    (point: Vec2, kind?: string) => {
+    (point: Vec2, kind?: string, size?: { width?: number; length?: number }) => {
+      if (!project) return
+      const ft = units === 'ft'
+      const defaults: Record<string, { width: number; length: number }> = {
+        palm: { width: ft ? 3 : 0.9, length: ft ? 3 : 0.9 }, conifer: { width: ft ? 3 : 0.9, length: ft ? 3 : 0.9 },
+        shrub: { width: ft ? 2 : 0.6, length: ft ? 2 : 0.6 }, flower: { width: ft ? 2 : 0.6, length: ft ? 2 : 0.6 }, hedge: { width: ft ? 2 : 0.6, length: ft ? 8 : 2.4 },
+        car: { width: ft ? 7 : 2.1, length: ft ? 14 : 4.3 },
+        fence: { width: ft ? 0.35 : 0.1, length: ft ? 10 : 3 },
+        gate: { width: ft ? 12 : 3.6, length: ft ? 0.5 : 0.15 },
+        road: { width: ft ? 16 : 5, length: ft ? 60 : 18 },
+        path: { width: ft ? 4 : 1.2, length: ft ? 24 : 7.2 },
+        'street-light': { width: ft ? 0.5 : 0.15, length: ft ? 0.5 : 0.15 },
+        person: { width: ft ? 1 : 0.3, length: ft ? 1 : 0.3 },
+      }
+      const base = defaults[kind ?? ''] ?? { width: ft ? 2 : 0.6, length: ft ? 2 : 0.6 }
+      const width = size?.width ?? base.width, length = size?.length ?? base.length
+      if (width > project.plot.width || length > project.plot.length) {
+        setPlacementWarning(`${kind ?? 'Site object'} is larger than the current plot and could not be placed.`)
+        return
+      }
+      const halfWidth = width / 2, halfLength = length / 2
+      const x = Math.max(halfWidth, Math.min(project.plot.width - halfWidth, point.x))
+      const y = Math.max(halfLength, Math.min(project.plot.length - halfLength, point.y))
+      if (x !== point.x || y !== point.y) setPlacementWarning(`Placed ${kind ?? 'site object'} at the nearest in-bounds location.`)
+      else setPlacementWarning(null)
       commit((state) => ({
         ...state,
-        ornaments: [...state.ornaments, { id: uid('site'), x: round1(point.x), y: round1(point.y), kind, rotation: 0, scale: 1, color: kind === 'car' ? '#53677e' : kind === 'person' ? '#455f87' : '#4f8a3f' }],
+        ornaments: [...state.ornaments, { id: uid('site'), x: round1(x), y: round1(y), kind, rotation: 0, scale: 1, color: kind === 'car' ? '#53677e' : kind === 'person' ? '#455f87' : kind === 'road' ? '#555b62' : kind === 'path' ? '#c9c4b9' : kind === 'fence' || kind === 'gate' ? '#6c6254' : '#4f8a3f', width, length }],
       }))
     },
-    [commit],
+    [commit, project, setPlacementWarning, units],
   )
 
   const setRoomShape = useCallback(
@@ -626,18 +657,23 @@ export function WorkspaceLayout() {
 
   const setPlotDimensions = useCallback((width: number, length: number) => {
     if (!project || !(width > 0) || !(length > 0) || (width === project.plot.width && length === project.plot.length)) return
-    commit((state) => ({
-      ...state,
-      rooms: state.rooms.map((room) => {
-        const w = Math.min(room.rect.w, width)
-        const h = Math.min(room.rect.h, length)
-        const x = Math.max(0, Math.min(width - w, room.rect.x))
-        const y = Math.max(0, Math.min(length - h, room.rect.y))
-        return { ...room, width: w, length: h, rect: { x, y, w, h } }
-      }),
-    }))
-    void updateProject(project.id, { plot: { ...project.plot, width, length } })
-  }, [commit, project, updateProject])
+    const clampRooms = (rooms: Room[]) => rooms.map((room) => {
+      const w = Math.min(room.rect.w, width)
+      const h = Math.min(room.rect.h, length)
+      const x = Math.max(0, Math.min(width - w, room.rect.x))
+      const y = Math.max(0, Math.min(length - h, room.rect.y))
+      return { ...room, width: w, length: h, rect: { x, y, w, h } }
+    })
+    const rooms = clampRooms(editor.rooms)
+    const ornaments = editor.ornaments.map((item) => {
+      const halfWidth = Math.min(width / 2, Math.max(0.25, (item.width ?? 1.5) * item.scale / 2))
+      const halfLength = Math.min(length / 2, Math.max(0.25, (item.length ?? 1.5) * item.scale / 2))
+      return { ...item, x: Math.max(halfWidth, Math.min(width - halfWidth, item.x)), y: Math.max(halfLength, Math.min(length - halfLength, item.y)) }
+    })
+    const floors = project.floors.map((floor) => ({ ...floor, rooms: floor.level === 1 ? rooms : clampRooms(floor.rooms) }))
+    commit((state) => ({ ...state, rooms, ornaments }))
+    void updateProject(project.id, { plot: { ...project.plot, width, length }, floors, landscape: ornaments })
+  }, [commit, editor.ornaments, editor.rooms, project, updateProject])
 
   const toggleFurniture = useCallback(
     (roomId: string, item: string) => {
@@ -673,81 +709,141 @@ export function WorkspaceLayout() {
     const floors = project.floors.map((floor) =>
       floor.level === 1 ? { ...floor, rooms: editor.rooms } : floor,
     )
-    void updateProject(project.id, { floors, landscape: editor.ornaments, preferences: { ...project.preferences, exteriorColor: previewExtColor, roofColor: previewRoofColor, exteriorWallThickness: editor.wallThicknesses.exterior, interiorWallThickness: editor.wallThicknesses.interior } })
+    void updateProject(project.id, { roof: previewRoof, floors, landscape: editor.ornaments, preferences: { ...project.preferences, roof: previewRoof, exteriorFinish: previewExt, interiorFinish: previewInt, exteriorColor: previewExtColor, roofColor: previewRoofColor, exteriorWallThickness: editor.wallThicknesses.exterior, interiorWallThickness: editor.wallThicknesses.interior } })
     setSaved(true)
     window.setTimeout(() => setSaved(false), 1800)
-  }, [project, editor.rooms, editor.ornaments, editor.wallThicknesses, previewExtColor, previewRoofColor, updateProject])
+  }, [project, editor.rooms, editor.ornaments, editor.wallThicknesses, previewRoof, previewExt, previewInt, previewExtColor, previewRoofColor, updateProject])
 
   const applyAssistantPlan = useCallback(async (
     plan: AssistantPlan,
     onProgress: (current: number, total: number, label: string) => void,
   ): Promise<ApplyAssistantPlanResult> => {
     const originalEditor = editor
-    if (!project) return { ok: false, rooms: editor.rooms, placed: editor.placed, projectPatch: {}, appliedCount: 0, errors: ['The project is not loaded yet.'], warnings: [] }
+    if (!project) return { ok: false, rooms: editor.rooms, placed: editor.placed, ornaments: editor.ornaments, wallThicknesses: editor.wallThicknesses, projectPatch: {}, appliedCount: 0, errors: ['The project is not loaded yet.'], warnings: [] }
+    const liveProject: Project = {
+      ...project,
+      roof: previewRoof,
+      preferences: {
+        ...project.preferences,
+        roof: previewRoof,
+        exteriorFinish: previewExt,
+        interiorFinish: previewInt,
+        exteriorColor: previewExtColor,
+        roofColor: previewRoofColor,
+        exteriorWallThickness: editor.wallThicknesses.exterior,
+        interiorWallThickness: editor.wallThicknesses.interior,
+      },
+    }
 
-    // Validate the complete proposal first. No intermediate geometry is shown or saved unless
-    // the entire target plan passes the editor's geometric checks.
-    const result = applyAssistantPlanChanges({ plan, project, rooms: editor.rooms, placed: editor.placed, wallThicknesses: editor.wallThicknesses })
+    // Validate the complete proposed target state first. Do not show partial or unchecked geometry.
+    const result = applyAssistantPlanChanges({ plan, project: liveProject, rooms: editor.rooms, placed: editor.placed, ornaments: editor.ornaments, wallThicknesses: editor.wallThicknesses, units })
     if (!result.ok) return result
     const roomsWithItems = result.rooms.map((room) => ({ ...room, items: result.placed[room.id] ?? room.items ?? [] }))
     const targetById = new Map(roomsWithItems.map((room) => [room.id, room]))
     const startById = new Map(editor.rooms.map((room) => [room.id, room]))
-    const totalSteps = 12
+    const targetUnits = result.projectPatch.plot?.units ?? project.plot.units
+    const unitConversion = targetUnits !== project.plot.units
+    const totalSteps = unitConversion ? 1 : 12
 
-    // Animate a single validated transition in the shared editor state. The same state drives
-    // the editable 2D canvas and the 3D preview, and undo receives one transaction at the end.
-    onProgress(0, totalSteps, 'Geometry passed. Animating the approved changes in 2D and 3D…')
-    for (let step = 1; step <= totalSteps; step += 1) {
-      const linear = step / totalSteps
-      const t = linear * linear * (3 - 2 * linear)
-      const frameRooms = roomsWithItems.map((target) => {
-        const start = startById.get(target.id)
-        if (!start) {
-          const scale = 0.2 + 0.8 * t
-          const centerX = target.rect.x + target.rect.w / 2
-          const centerY = target.rect.y + target.rect.h / 2
-          const w = target.rect.w * scale, h = target.rect.h * scale
-          return step === totalSteps ? target : { ...target, width: w, length: h, rect: { x: centerX - w / 2, y: centerY - h / 2, w, h }, items: [] }
+    // Unit conversion is atomic to avoid briefly drawing converted geometry against the old plot scale.
+    onProgress(0, totalSteps, unitConversion
+      ? 'Geometry passed. Converting the full project to the requested units…'
+      : 'Geometry passed. Animating approved changes in 2D and 3D…')
+    if (unitConversion) {
+      onProgress(1, 1, 'Unit conversion is ready; synchronizing the project scale…')
+    } else {
+      for (let step = 1; step <= totalSteps; step += 1) {
+        const linear = step / totalSteps
+        const t = linear * linear * (3 - 2 * linear)
+        const framePlaced: Record<string, PlacedItem[]> = {}
+        const roomIds = new Set([...Object.keys(editor.placed), ...Object.keys(result.placed)])
+        for (const roomId of roomIds) {
+          const from = editor.placed[roomId] ?? []
+          const to = result.placed[roomId] ?? []
+          const fromById = new Map(from.map((item) => [item.id, item]))
+          const toById = new Map(to.map((item) => [item.id, item]))
+          const frame: PlacedItem[] = []
+          for (const target of to) {
+            const previous = fromById.get(target.id)
+            if (!previous) {
+              frame.push(step === totalSteps ? target : { ...target, scale: target.scale * (0.2 + 0.8 * t) })
+            } else if (step === totalSteps) frame.push(target)
+            else {
+              const angleDelta = Math.atan2(Math.sin(target.rotation - previous.rotation), Math.cos(target.rotation - previous.rotation))
+              frame.push({
+                ...previous,
+                x: previous.x + (target.x - previous.x) * t,
+                z: previous.z + (target.z - previous.z) * t,
+                width: previous.width === undefined || target.width === undefined ? target.width ?? previous.width : previous.width + (target.width - previous.width) * t,
+                depth: previous.depth === undefined || target.depth === undefined ? target.depth ?? previous.depth : previous.depth + (target.depth - previous.depth) * t,
+                height: previous.height === undefined || target.height === undefined ? target.height ?? previous.height : previous.height + (target.height - previous.height) * t,
+                rotation: previous.rotation + angleDelta * t,
+                scale: previous.scale + (target.scale - previous.scale) * t,
+                ...(t >= 0.95 ? { color: target.color } : {}),
+              })
+            }
+          }
+          if (step < totalSteps) for (const previous of from) if (!toById.has(previous.id)) frame.push({ ...previous, scale: previous.scale * (1 - 0.8 * t) })
+          framePlaced[roomId] = frame
         }
-        if (step === totalSteps) return target
-        const rect = {
-          x: start.rect.x + (target.rect.x - start.rect.x) * t,
-          y: start.rect.y + (target.rect.y - start.rect.y) * t,
-          w: start.rect.w + (target.rect.w - start.rect.w) * t,
-          h: start.rect.h + (target.rect.h - start.rect.h) * t,
-        }
-        return { ...start, width: rect.w, length: rect.h, rect }
-      })
-      // Keep removed rooms visible while they contract, then drop them on the final frame.
-      if (step < totalSteps) {
-        for (const start of editor.rooms) {
-          if (targetById.has(start.id)) continue
+        const frameRooms = roomsWithItems.map((target) => {
+          const start = startById.get(target.id)
+          if (!start) {
+            const scale = 0.2 + 0.8 * t
+            const centerX = target.rect.x + target.rect.w / 2
+            const centerY = target.rect.y + target.rect.h / 2
+            const w = target.rect.w * scale, h = target.rect.h * scale
+            return step === totalSteps ? target : { ...target, width: w, length: h, rect: { x: centerX - w / 2, y: centerY - h / 2, w, h }, items: framePlaced[target.id] ?? [] }
+          }
+          if (step === totalSteps) return target
+          const rect = {
+            x: start.rect.x + (target.rect.x - start.rect.x) * t,
+            y: start.rect.y + (target.rect.y - start.rect.y) * t,
+            w: start.rect.w + (target.rect.w - start.rect.w) * t,
+            h: start.rect.h + (target.rect.h - start.rect.h) * t,
+          }
+          return { ...start, width: rect.w, length: rect.h, rect, items: framePlaced[target.id] ?? [] }
+        })
+        if (step < totalSteps) for (const start of editor.rooms) if (!targetById.has(start.id)) {
           const scale = 1 - 0.8 * t
           const w = start.rect.w * scale, h = start.rect.h * scale
-          frameRooms.push({ ...start, width: w, length: h, rect: { x: start.rect.x + (start.rect.w - w) / 2, y: start.rect.y + (start.rect.h - h) / 2, w, h } })
+          frameRooms.push({ ...start, width: w, length: h, rect: { x: start.rect.x + (start.rect.w - w) / 2, y: start.rect.y + (start.rect.h - h) / 2, w, h }, items: framePlaced[start.id] ?? [] })
         }
+        const startSites = new Map(editor.ornaments.map((site) => [site.id, site]))
+        const targetSites = new Map(result.ornaments.map((site) => [site.id, site]))
+        const frameOrnaments = result.ornaments.map((target) => {
+          const start = startSites.get(target.id)
+          if (!start) return step === totalSteps ? target : { ...target, x: target.x, y: target.y, scale: target.scale * (0.2 + 0.8 * t) }
+          if (step === totalSteps) return target
+          const angleDelta = Math.atan2(Math.sin(target.rotation - start.rotation), Math.cos(target.rotation - start.rotation))
+          return { ...start, x: start.x + (target.x - start.x) * t, y: start.y + (target.y - start.y) * t, rotation: start.rotation + angleDelta * t, scale: start.scale + (target.scale - start.scale) * t, ...(t >= 0.95 ? { color: target.color } : {}) }
+        })
+        if (step < totalSteps) for (const start of editor.ornaments) if (!targetSites.has(start.id)) frameOrnaments.push({ ...start, scale: start.scale * (1 - 0.8 * t) })
+        const frameThicknesses = {
+          exterior: editor.wallThicknesses.exterior + (result.wallThicknesses.exterior - editor.wallThicknesses.exterior) * t,
+          interior: editor.wallThicknesses.interior + (result.wallThicknesses.interior - editor.wallThicknesses.interior) * t,
+        }
+        setEditor((current) => ({ ...current, rooms: frameRooms, placed: framePlaced, ornaments: frameOrnaments, wallThicknesses: frameThicknesses }))
+        onProgress(step, totalSteps, step === totalSteps ? 'Finishing the synchronized 2D and 3D update…' : `Rendering validated changes · ${Math.round(linear * 100)}%`)
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 45))
       }
-      const framePlaced = step === totalSteps ? result.placed : originalEditor.placed
-      setEditor((current) => ({ ...current, rooms: frameRooms, placed: framePlaced }))
-      onProgress(step, totalSteps, step === totalSteps ? 'Finishing the 2D and 3D update…' : `Rendering validated geometry · ${Math.round(linear * 100)}%`)
-      await new Promise<void>((resolve) => window.setTimeout(resolve, 45))
     }
 
-    let floors = project.floors.map((floor) => floor.level === 1 ? { ...floor, rooms: roomsWithItems } : floor)
-    if (!floors.some((floor) => floor.level === 1)) floors = [{ id: uid('floor'), name: 'Ground Floor', level: 1, rooms: roomsWithItems }, ...floors]
-    const createdHouse = plan.actions.some((action) => action.type === 'create_house')
+    const floors = liveProject.floors.map((floor) => floor.level === 1
+      ? { ...floor, rooms: roomsWithItems }
+      : unitConversion ? { ...floor, rooms: floor.rooms.map((room) => convertRoomUnits(room, targetUnits)) } : floor)
+    if (!floors.some((floor) => floor.level === 1)) floors.unshift({ id: uid('floor'), name: 'Ground Floor', level: 1, rooms: roomsWithItems })
     const nextProjectPatch: Partial<Project> = {
       ...result.projectPatch,
       floors,
+      landscape: result.ornaments,
       preferences: {
-        ...project.preferences,
+        ...liveProject.preferences,
+        ...(result.projectPatch.preferences ?? {}),
         ...(result.projectPatch.style ? { style: result.projectPatch.style } : {}),
         ...(result.projectPatch.roof ? { roof: result.projectPatch.roof } : {}),
+        ...(unitConversion ? { exteriorWallThickness: result.wallThicknesses.exterior, interiorWallThickness: result.wallThicknesses.interior } : {}),
       },
-    }
-    if (createdHouse) {
-      if (nextProjectPatch.bedrooms === undefined) nextProjectPatch.bedrooms = roomsWithItems.filter((room) => room.category === 'bedroom').length
-      if (nextProjectPatch.bathrooms === undefined) nextProjectPatch.bathrooms = roomsWithItems.filter((room) => room.category === 'bathroom').length
     }
     try {
       const updated = await updateProject(project.id, nextProjectPatch)
@@ -755,23 +851,30 @@ export function WorkspaceLayout() {
         setEditor(originalEditor)
         return { ...result, ok: false, errors: ['The plan was prepared, but the project could not be saved. The preview was rolled back. Try again.'] }
       }
-      setEditor({ ...originalEditor, rooms: roomsWithItems, placed: result.placed })
+      setEditor({ ...originalEditor, rooms: roomsWithItems, placed: result.placed, ornaments: result.ornaments, wallThicknesses: result.wallThicknesses })
+      setUnitsState(targetUnits)
       past.current.push(originalEditor)
       future.current = []
       bumpHistory()
       setSelectedRoomId((selected) => roomsWithItems.some((room) => room.id === selected) ? selected : null)
       if (nextProjectPatch.roof) setPreviewRoof(nextProjectPatch.roof)
+      const preferences = nextProjectPatch.preferences!
+      setPreviewExt(preferences.exteriorFinish)
+      setPreviewInt(preferences.interiorFinish)
+      setPreviewExtColor(preferences.exteriorColor ?? defaultExteriorColor(preferences.exteriorFinish))
+      setPreviewRoofColor(preferences.roofColor ?? '#33415c')
       setSelectedItemId(null)
+      setSelectedSiteId(null)
       setPlacementWarning(null)
       setSaved(true)
       window.setTimeout(() => setSaved(false), 2200)
-      onProgress(totalSteps, totalSteps, 'Applied and saved. Both views now show the accepted design.')
+      onProgress(totalSteps, totalSteps, 'Applied and saved. The accepted design is synchronized across the workspace.')
       return { ...result, rooms: roomsWithItems }
     } catch {
       setEditor(originalEditor)
       return { ...result, ok: false, errors: ['The project could not be saved. The preview was rolled back; check local storage and try again.'] }
     }
-  }, [project, editor, updateProject])
+  }, [project, editor, units, previewRoof, previewExt, previewInt, previewExtColor, previewRoofColor, updateProject])
 
   const selectedRoom = useMemo(
     () => editor.rooms.find((room) => room.id === selectedRoomId) ?? null,
@@ -877,6 +980,9 @@ export function WorkspaceLayout() {
     setAssistantOpen,
     propsOpen,
     setPropsOpen,
+    propsCollapsed,
+    setPropsCollapsed,
+    openRoomDetails,
     save,
     applyAssistantPlan,
     saved,
@@ -1004,12 +1110,17 @@ export function WorkspaceLayout() {
         </main>
 
         {((showProperties && Boolean(selectedRoomId)) || Boolean(selectedItemId) || Boolean(selectedSiteId)) ? (
-          <div className="fixed inset-0 z-50 hidden items-center justify-center bg-ink-950/25 p-5 backdrop-blur-[2px] lg:flex" onClick={() => { selectRoom(null); selectItem(null); selectSite(null) }}>
-            <div className="flex max-h-[86vh] w-[min(520px,94vw)] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl" onClick={(event) => event.stopPropagation()}>
+          propsCollapsed ? (
+            <button type="button" onClick={() => setPropsCollapsed(false)} className="hidden h-full w-9 shrink-0 items-center justify-center border-l border-line bg-surface text-muted hover:bg-canvas-soft lg:flex" aria-label="Expand properties panel" title="Expand properties">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          ) : (
+            <aside className="hidden h-full min-h-0 w-[min(360px,34vw)] min-w-[300px] shrink-0 border-l border-line bg-surface lg:block" aria-label="Room properties panel">
               <PropertiesPanel
                 room={selectedRoom ?? selectedItemRoom}
                 units={units}
                 onClose={() => { selectRoom(null); selectItem(null); selectSite(null) }}
+                onCollapse={() => setPropsCollapsed(true)}
                 onRename={renameRoom}
                 onResize={resizeRoom}
                 onSetShape={setRoomShape}
@@ -1033,6 +1144,37 @@ export function WorkspaceLayout() {
                 onSetFinish={setRoomFinish}
                 onViewIn3D={(roomId) => navigate(`/workspace/${id}/3d?room=${encodeURIComponent(roomId)}`)}
               />
+            </aside>
+          )
+        ) : null}
+
+        {roomDetailsOpen && selectedRoom ? (
+          <div className="fixed inset-0 z-[65] flex items-center justify-center bg-ink-950/45 p-4 backdrop-blur-sm" onClick={() => setRoomDetailsOpen(false)}>
+            <div role="dialog" aria-modal="true" aria-label={`${selectedRoom.name} room details`} className="flex h-[min(88vh,760px)] min-h-0 w-[min(560px,96vw)] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl" onClick={(event) => event.stopPropagation()}>
+              <PropertiesPanel
+                room={selectedRoom}
+                units={units}
+                onClose={() => setRoomDetailsOpen(false)}
+                onRename={renameRoom}
+                onResize={resizeRoom}
+                onSetShape={setRoomShape}
+                wallThicknesses={editor.wallThicknesses}
+                onSetWallThickness={setWallThickness}
+                walls={architecturalModel.walls}
+                openings={architecturalModel.openings}
+                placed={editor.placed}
+                selectedItem={selectedItem}
+                selectedItemRoomId={selectedItemRoomId}
+                onSelectItem={selectItem}
+                onUpdatePlacedItem={updatePlacedItem}
+                onRemovePlacedItem={removePlacedItem}
+                onDuplicatePlacedItem={duplicatePlacedItem}
+                onUpdateRoomElement={updateRoomElement}
+                onRemoveRoomElement={removeRoomElement}
+                onToggleFurniture={toggleFurniture}
+                onSetFinish={setRoomFinish}
+                onViewIn3D={(roomId) => navigate(`/workspace/${id}/3d?room=${encodeURIComponent(roomId)}`)}
+              />
             </div>
           </div>
         ) : null}
@@ -1041,9 +1183,12 @@ export function WorkspaceLayout() {
           key={project.id}
           open={assistantOpen}
           onClose={() => setAssistantOpen(false)}
-          project={project}
+          project={previewProject}
           rooms={editor.rooms}
           placed={editor.placed}
+          ornaments={editor.ornaments}
+          wallThicknesses={editor.wallThicknesses}
+          walls={architecturalModel.walls}
           units={units}
           onApplyPlan={applyAssistantPlan}
         />

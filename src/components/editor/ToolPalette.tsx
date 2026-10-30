@@ -288,6 +288,18 @@ function VariantTile({
   )
 }
 
+function finishSwatch(value: string): string {
+  const patterns: Record<string, string> = {
+    render: 'linear-gradient(135deg,#eeeae3,#d6d1c8)', paint: 'linear-gradient(135deg,#fafafa,#dfe8f0)',
+    brick: 'repeating-linear-gradient(0deg,#b97861 0 7px,#eee3d8 8px 9px)', stone: 'repeating-linear-gradient(45deg,#c8c1b2 0 12px,#aaa394 13px,#d7d1c6 15px)',
+    wood: 'repeating-linear-gradient(0deg,#c9a97f 0 7px,#8b6747 8px,#d8bc98 9px)', glass: 'linear-gradient(135deg,#d9f0fb 0 40%,#8eb5ca 42%,#e9f8ff 50%,#bfdbe8 62%)',
+    tile: 'repeating-linear-gradient(0deg,#e8e4db 0 12px,#89929b 13px,#e8e4db 14px)', marble: 'linear-gradient(135deg,#eee9df,#c2c4c2 42%,#f7f4ed 60%,#d6d1c7)',
+    concrete: 'repeating-linear-gradient(45deg,#c4c5c2 0 3px,#b5b7b6 4px,#c7c8c6 6px)', carpet: 'repeating-linear-gradient(90deg,#8a8790 0 2px,#a09da5 3px,#89868e 4px)',
+    terrazzo: 'radial-gradient(#6d8794 1px,transparent 2px),radial-gradient(#b87861 1px,transparent 2px),#d6d2c9', metal: 'repeating-linear-gradient(90deg,#87929a 0 5px,#c0c8ce 6px,#87929a 8px)',
+  }
+  return patterns[value] ?? 'linear-gradient(135deg,#e5e7eb,#cbd5e1)'
+}
+
 function SwatchSection({
   title,
   options,
@@ -302,15 +314,17 @@ function SwatchSection({
   return (
     <div>
       <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">{title}</p>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="grid grid-cols-2 gap-2">
         {options.map((option) => (
           <button
             key={option.value}
             onClick={() => onPick(option.value)}
-            className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
-              current === option.value ? 'bg-brand-600 text-white' : 'bg-canvas-soft text-muted hover:text-ink-text'
+            aria-pressed={current === option.value}
+            className={`flex flex-col gap-1.5 rounded-lg border p-2 text-left text-[11px] font-medium transition-colors ${
+              current === option.value ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-200' : 'border-line bg-white text-muted hover:bg-canvas-soft'
             }`}
           >
+            <span className="h-9 w-full rounded-md border border-black/10" style={{ background: finishSwatch(option.value) }} />
             {option.label}
           </button>
         ))}

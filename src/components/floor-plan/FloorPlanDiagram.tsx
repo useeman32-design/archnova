@@ -1,5 +1,5 @@
 import { useLayoutEffect, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import type { Room, RoomCategory, Units, Vec2 } from '@/types'
+import type { PlacedItem, Room, RoomCategory, Units, Vec2 } from '@/types'
 import { formatArea } from '@/lib/format'
 import { roomArea } from '@/lib/floorPlan'
 import { canonicalFurnitureKey, getFurnitureDimensions } from '@/lib/furniture'
@@ -55,11 +55,16 @@ export interface FloorPlanDiagramProps {
   /** Receives background clicks in plan units (used by placement tools). */
   onCanvasClick?: (point: Vec2) => void
   /** Individually selectable, moveable and scalable landscape/site objects. */
-  trees?: (Vec2 & { id: string; kind?: string; scale: number; rotation: number; color: string })[]
+  trees?: (Vec2 & { id: string; kind?: string; scale: number; rotation: number; color: string; width?: number; length?: number })[]
   selectedTreeId?: string | null
   onSelectTree?: (id: string | null) => void
   onMoveTree?: (id: string, x: number, y: number) => void
   onResizeTree?: (id: string, scale: number) => void
+  placed?: Record<string, PlacedItem[]>
+  selectedItemId?: string | null
+  onSelectItem?: (id: string | null) => void
+  onMoveItem?: (roomId: string, itemId: string, x: number, z: number) => void
+  onDoubleClickRoom?: (room: Room) => void
   /* Direct manipulation (select tool) */
   dragEnabled?: boolean
   onEditBegin?: () => void
@@ -90,6 +95,11 @@ export function FloorPlanDiagram({
   onSelectTree,
   onMoveTree,
   onResizeTree,
+  placed = {},
+  selectedItemId = null,
+  onSelectItem,
+  onMoveItem,
+  onDoubleClickRoom,
   dragEnabled = false,
   onEditBegin,
   onEditEnd,
@@ -172,6 +182,7 @@ export function FloorPlanDiagram({
     orig: { x: number; y: number; w: number; h: number }
   } | null>(null)
   const treeDrag = useRef<{ mode: 'move' | 'resize'; id: string; startX: number; startY: number; x: number; y: number; scale: number } | null>(null)
+  const itemDrag = useRef<{ roomId: string; item: PlacedItem } | null>(null)
 
   /* Early return AFTER every hook — changing hook order between renders
      crashes React ("Rendered more hooks than during the previous render"). */
@@ -244,6 +255,31 @@ export function FloorPlanDiagram({
   const endTreeDrag = (event: ReactPointerEvent<SVGGElement>) => {
     if (!treeDrag.current) return
     treeDrag.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    onEditEnd?.()
+  }
+
+  const startItemDrag = (event: ReactPointerEvent<SVGGElement>, room: Room, item: PlacedItem) => {
+    event.stopPropagation()
+    onSelectItem?.(item.id)
+    if (!dragEnabled) return
+    itemDrag.current = { roomId: room.id, item }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    onEditBegin?.()
+  }
+  const moveItemDrag = (event: ReactPointerEvent<SVGGElement>) => {
+    const state = itemDrag.current
+    if (!state) return
+    const point = clientToPlan(event.clientX, event.clientY)
+    const room = rooms.find((candidate) => candidate.id === state.roomId)
+    if (!point || !room) return
+    const x = Math.max(-0.48, Math.min(0.48, (point.x - room.rect.x - room.rect.w / 2) / room.rect.w))
+    const z = Math.max(-0.48, Math.min(0.48, (point.y - room.rect.y - room.rect.h / 2) / room.rect.h))
+    onMoveItem?.(state.roomId, state.item.id, Math.round(x * 1000) / 1000, Math.round(z * 1000) / 1000)
+  }
+  const endItemDrag = (event: ReactPointerEvent<SVGGElement>) => {
+    if (!itemDrag.current) return
+    itemDrag.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     onEditEnd?.()
   }
@@ -372,6 +408,7 @@ export function FloorPlanDiagram({
                   }
                 : undefined
             }
+            onDoubleClick={onDoubleClickRoom ? (event) => { event.stopPropagation(); onDoubleClickRoom(room) } : undefined}
             onPointerDown={dragEnabled ? (event) => startDrag(event, room, 'move') : undefined}
             onPointerMove={dragEnabled ? moveDrag : undefined}
             onPointerUp={dragEnabled ? endDrag : undefined}
@@ -437,7 +474,7 @@ export function FloorPlanDiagram({
                 {fmt(room.rect.w)} × {fmt(room.rect.h)} {units}
               </text>
             ) : null}
-            {rw >= 70 && rh >= 48 ? <RoomFurniture room={room} u={u} color={palette.text} /> : null}
+            {(rw >= 42 && rh >= 32) || selectedItemId && (placed[room.id] ?? room.items ?? []).some((item) => item.id === selectedItemId) ? <RoomFurniture room={{ ...room, items: placed[room.id] ?? room.items }} u={u} color={palette.text} selectedItemId={selectedItemId} dragEnabled={dragEnabled} onSelectItem={onSelectItem} onItemPointerDown={startItemDrag} onItemPointerMove={moveItemDrag} onItemPointerUp={endItemDrag} /> : null}
             {isSelected && dragEnabled ? (
               <circle
                 cx={room.rect.x + room.rect.w}
@@ -540,33 +577,42 @@ export function FloorPlanDiagram({
       {/* Site objects have independent selection, movement and resize handles. */}
       {trees.map((tree) => {
         const selected = tree.id === selectedTreeId
-        const radius = 1.7 * tree.scale
+        const width = (tree.width ?? (tree.kind === 'car' ? 7 : 3)) * tree.scale
+        const length = (tree.length ?? (tree.kind === 'car' ? 14 : 3)) * tree.scale
+        const radius = Math.max(width, length) / 2
+        const angle = tree.rotation * 180 / Math.PI
         return (
-          <g
-            key={tree.id}
-            opacity={0.95}
-            style={{ cursor: selected ? 'move' : 'pointer' }}
-            onClick={(event) => { event.stopPropagation(); onSelectTree?.(tree.id) }}
-            onPointerDown={(event) => startTreeDrag(event, tree, 'move')}
-            onPointerMove={moveTreeDrag}
-            onPointerUp={endTreeDrag}
-            onPointerCancel={endTreeDrag}
-            aria-label={`Select ${tree.kind ?? 'landscape object'}`}
-          >
-            {tree.kind === 'car' ? (
-              <g transform={`translate(${tree.x} ${tree.y}) rotate(${tree.rotation * 180 / Math.PI})`}>
-                <rect x={-radius * 1.7} y={-radius} width={radius * 3.4} height={radius * 2} rx={u(1.4)} fill={tree.color} fillOpacity=".75" stroke="#536273" strokeWidth={u(0.8)} />
-                <rect x={-radius * 0.8} y={-radius * 0.7} width={radius * 1.6} height={radius * 1.4} rx={u(0.6)} fill="#d9edf6" stroke="#627786" strokeWidth={u(0.5)} />
-              </g>
-            ) : (
-              <>
-                <circle cx={tree.x} cy={tree.y} r={radius + 0.35} fill={selected ? '#dbeafe' : '#dbeccd'} stroke={selected ? '#1a56f5' : '#7fa668'} strokeWidth={selected ? u(1.4) : u(0.8)} />
-                <circle cx={tree.x} cy={tree.y} r={radius} fill={tree.color} stroke="#47643c" strokeWidth={u(0.5)} />
-              </>
-            )}
-            {selected ? (
-              <circle cx={tree.x + radius} cy={tree.y + radius} r={u(3.2)} fill="#1a56f5" stroke="white" strokeWidth={u(1)} style={{ cursor: 'nwse-resize' }} onPointerDown={(event) => startTreeDrag(event, tree, 'resize')} onPointerMove={moveTreeDrag} onPointerUp={endTreeDrag} onPointerCancel={endTreeDrag} />
-            ) : null}
+          <g key={tree.id} style={{ cursor: selected ? 'move' : 'pointer' }} onClick={(event) => { event.stopPropagation(); onSelectTree?.(tree.id) }} onPointerDown={(event) => startTreeDrag(event, tree, 'move')} onPointerMove={moveTreeDrag} onPointerUp={endTreeDrag} onPointerCancel={endTreeDrag} aria-label={`Select ${tree.kind ?? 'landscape object'}`}>
+            <g transform={`translate(${tree.x} ${tree.y}) rotate(${angle})`} opacity={0.96}>
+              {tree.kind === 'road' || tree.kind === 'path' ? <>
+                <rect x={-width / 2} y={-length / 2} width={width} height={length} rx={tree.kind === 'path' ? u(0.4) : 0} fill={tree.kind === 'road' ? '#51565d' : '#c9c4b9'} stroke={selected ? '#1a56f5' : tree.kind === 'road' ? '#33383f' : '#938e83'} strokeWidth={selected ? u(1.5) : u(0.45)} />
+                {tree.kind === 'road' ? <line x1={0} y1={-length / 2} x2={0} y2={length / 2} stroke="#e5d8a2" strokeWidth={u(0.45)} strokeDasharray={`${u(2.3)} ${u(2)}`} /> : null}
+                {selected ? <rect x={-width / 2 - u(1)} y={-length / 2 - u(1)} width={width + u(2)} height={length + u(2)} fill="none" stroke="#1a56f5" strokeDasharray={`${u(1.5)} ${u(1)}`} /> : null}
+              </> : tree.kind === 'fence' || tree.kind === 'gate' ? <>
+                <rect x={-width / 2} y={-length / 2} width={width} height={length} fill={tree.color} stroke={selected ? '#1a56f5' : '#51483d'} strokeWidth={selected ? u(1.3) : u(0.5)} />
+                {tree.kind === 'fence' ? <>
+                  <line x1={-width / 2} y1={-length * 0.28} x2={width / 2} y2={-length * 0.28} stroke="#e7dfd3" strokeWidth={u(0.35)} />
+                  <line x1={-width / 2} y1={length * 0.28} x2={width / 2} y2={length * 0.28} stroke="#e7dfd3" strokeWidth={u(0.35)} />
+                  {Array.from({ length: Math.max(2, Math.floor(length / 1.5)) }, (_, index) => <line key={index} x1={-width / 2} y1={-length / 2 + (index + 0.5) * length / Math.max(2, Math.floor(length / 1.5))} x2={width / 2} y2={-length / 2 + (index + 0.5) * length / Math.max(2, Math.floor(length / 1.5))} stroke="#f5f1e9" strokeWidth={u(0.18)} />)}
+                </> : <line x1={0} y1={-length / 2} x2={0} y2={length / 2} stroke="#d7c7a4" strokeWidth={u(0.25)} />}
+              </> : tree.kind === 'street-light' ? <>
+                <circle cx={0} cy={0} r={width * 0.65} fill={selected ? '#dbeafe' : '#fff3be'} stroke={selected ? '#1a56f5' : '#8b7447'} strokeWidth={u(0.7)} />
+                <path d={`M 0 ${length / 2} L 0 ${-length * 0.25} Q 0 ${-length / 2} ${width} ${-length / 2}`} fill="none" stroke="#4b5563" strokeWidth={u(0.5)} />
+                <circle cx={width} cy={-length / 2} r={width * 0.65} fill="#fff2a8" stroke="#aa8a48" strokeWidth={u(0.35)} />
+              </> : tree.kind === 'car' ? <>
+                <rect x={-width / 2} y={-length / 2} width={width} height={length} rx={width * 0.22} fill={tree.color} fillOpacity=".85" stroke={selected ? '#1a56f5' : '#536273'} strokeWidth={selected ? u(1.2) : u(0.65)} />
+                <rect x={-width * 0.32} y={-length * 0.24} width={width * 0.64} height={length * 0.44} rx={width * 0.12} fill="#d9edf6" stroke="#627786" strokeWidth={u(0.4)} />
+                <line x1={-width / 2} y1={0} x2={width / 2} y2={0} stroke="#465362" strokeWidth={u(0.35)} />
+              </> : tree.kind === 'person' ? <>
+                <circle cx={0} cy={0} r={width * 0.45} fill={tree.color} stroke={selected ? '#1a56f5' : '#455f87'} strokeWidth={u(0.7)} />
+                <text x={0} y={u(0.9)} textAnchor="middle" fontSize={u(1.7)} fill="#fff">P</text>
+              </> : <>
+                <circle cx={0} cy={0} r={radius + 0.35} fill={selected ? '#dbeafe' : '#dbeccd'} stroke={selected ? '#1a56f5' : '#7fa668'} strokeWidth={selected ? u(1.4) : u(0.8)} />
+                <circle cx={0} cy={0} r={radius} fill={tree.color} stroke="#47643c" strokeWidth={u(0.5)} />
+              </>}
+              {selected ? <rect x={-width / 2 - u(1)} y={-length / 2 - u(1)} width={width + u(2)} height={length + u(2)} fill="none" stroke="#1a56f5" strokeDasharray={`${u(1.5)} ${u(1)}`} /> : null}
+            </g>
+            {selected ? <circle cx={tree.x + width / 2} cy={tree.y + length / 2} r={u(3.2)} fill="#1a56f5" stroke="white" strokeWidth={u(1)} style={{ cursor: 'nwse-resize' }} onPointerDown={(event) => startTreeDrag(event, tree, 'resize')} onPointerMove={moveTreeDrag} onPointerUp={endTreeDrag} onPointerCancel={endTreeDrag} /> : null}
           </g>
         )
       })}
@@ -731,11 +777,11 @@ function pickScaleBar(s: number, units: Units): { units: number } | null {
  * Schematic furniture glyphs, drawn in plan units (real-world size) with
  * screen-constant stroke weight — the way drafted plans show FF&E.
  */
-function RoomFurniture({ room, u, color }: { room: Room; u: (px: number) => number; color: string }) {
+function RoomFurniture({ room, u, color, selectedItemId, dragEnabled, onSelectItem, onItemPointerDown, onItemPointerMove, onItemPointerUp }: { room: Room; u: (px: number) => number; color: string; selectedItemId: string | null; dragEnabled: boolean; onSelectItem?: (id: string | null) => void; onItemPointerDown: (event: ReactPointerEvent<SVGGElement>, room: Room, item: PlacedItem) => void; onItemPointerMove: (event: ReactPointerEvent<SVGGElement>) => void; onItemPointerUp: (event: ReactPointerEvent<SVGGElement>) => void }) {
   const { x, y, w, h } = room.rect
   if (!room.items?.length) return null
   return (
-    <g pointerEvents="none" strokeWidth={u(0.85)}>
+    <g pointerEvents="all" strokeWidth={u(0.85)}>
       {room.items.map((item) => {
         const key = canonicalFurnitureKey(item.item)
         const defaults = getFurnitureDimensions(item.item, room.units)
@@ -746,8 +792,9 @@ function RoomFurniture({ room, u, color }: { room: Room; u: (px: number) => numb
         const stroke = item.color || color
         const base = <rect x={-iw / 2} y={-ih / 2} width={iw} height={ih} rx={u(0.3)} fill={stroke} fillOpacity={0.13} stroke={stroke} />
         return (
-          <g key={item.id} transform={`translate(${cx} ${cy}) rotate(${item.rotation * 180 / Math.PI})`} stroke={stroke} fill="none">
+          <g key={item.id} transform={`translate(${cx} ${cy}) rotate(${item.rotation * 180 / Math.PI})`} stroke={selectedItemId === item.id ? '#1a56f5' : stroke} fill="none" style={{ cursor: dragEnabled ? 'move' : 'pointer' }} onClick={(event) => { event.stopPropagation(); onSelectItem?.(item.id) }} onPointerDown={dragEnabled ? (event) => onItemPointerDown(event, room, item) : undefined} onPointerMove={dragEnabled ? onItemPointerMove : undefined} onPointerUp={dragEnabled ? onItemPointerUp : undefined} onPointerCancel={dragEnabled ? onItemPointerUp : undefined}>
             {base}
+            {selectedItemId === item.id ? <rect x={-iw / 2 - u(0.2)} y={-ih / 2 - u(0.2)} width={iw + u(0.4)} height={ih + u(0.4)} fill="none" stroke="#1a56f5" strokeDasharray={`${u(1)} ${u(0.7)}`} /> : null}
             {key === 'bed' || key === 'king-bed' ? <>
               <path d={`M ${-iw * 0.42} ${-ih * 0.18} h ${iw * 0.84} v ${ih * 0.58} h ${-iw * 0.84} Z`} fill="#fff" fillOpacity=".7" />
               <line x1={-iw / 2} y1={-ih * 0.28} x2={iw / 2} y2={-ih * 0.28} />

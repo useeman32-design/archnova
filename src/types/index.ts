@@ -84,6 +84,19 @@ export type OutdoorFeature =
 
 export type FinishOption = 'render' | 'paint' | 'brick' | 'stone' | 'wood' | 'glass' | 'tile' | 'marble' | 'concrete' | 'carpet' | 'terrazzo' | 'metal'
 
+export type SiteElementKind = 'palm' | 'conifer' | 'shrub' | 'flower' | 'hedge' | 'car' | 'person' | 'fence' | 'gate' | 'street-light' | 'path' | 'road'
+
+export interface LandscapeItem extends Vec2 {
+  id: string
+  kind?: SiteElementKind | string
+  rotation: number
+  scale: number
+  color: string
+  /** Footprint dimensions for linear/site elements, in plot units. */
+  width?: number
+  length?: number
+}
+
 export interface PlacedItem {
   id: string
   item: string
@@ -219,7 +232,7 @@ export interface Project {
   updatedAt: string
   floors: Floor[]
   /** User-placed landscaping, vehicles and site entourage. */
-  landscape?: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string }[]
+  landscape?: LandscapeItem[]
   preferences: DesignPreferences
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronsRight, X, Sofa, Ruler, Check, Trash2, Move3D, Copy } from 'lucide-react'
 import type { ArchitecturalWall, Element, FinishOption, PlacedItem, Room, RoomShape, Units, Vec2, WallOpening } from '@/types'
 import { roomArea } from '@/lib/floorPlan'
@@ -11,7 +11,7 @@ import { INTERIOR_FINISHES } from '@/data/catalog'
 import { Button } from '@/components/ui/Button'
 import { Box } from 'lucide-react'
 
-export type PropertyTab = 'room' | 'wall' | 'door' | 'window'
+export type PropertyTab = 'room' | 'elements' | 'wall' | 'door' | 'window'
 
 const WALLS = ['North wall', 'East wall', 'South wall', 'West wall']
 
@@ -38,8 +38,8 @@ export interface PropertiesPanelProps {
   placed?: Record<string, PlacedItem[]>
   selectedItem?: PlacedItem | null
   selectedItemRoomId?: string | null
-  selectedSite?: { id: string; kind?: string; x: number; y: number; scale: number; rotation: number; color: string } | null
-  onUpdateSite?: (id: string, patch: Partial<{ x: number; y: number; scale: number; rotation: number; color: string }>) => void
+  selectedSite?: { id: string; kind?: string; x: number; y: number; scale: number; rotation: number; color: string; width?: number; length?: number } | null
+  onUpdateSite?: (id: string, patch: Partial<{ x: number; y: number; scale: number; rotation: number; color: string; width: number; length: number }>) => void
   onRemoveSite?: (id: string) => void
   onSelectItem?: (id: string | null) => void
   onUpdatePlacedItem?: (roomId: string, itemId: string, patch: Partial<PlacedItem>) => void
@@ -82,11 +82,12 @@ export function PropertiesPanel({
   onViewIn3D,
   onCollapse,
 }: PropertiesPanelProps) {
-  const [tab, setTab] = useState<PropertyTab>('room')
+  const [tab, setTab] = useState<PropertyTab>('elements')
+  useEffect(() => setTab('elements'), [room?.id])
   const placedHere = room ? (placed[room.id] ?? []) : []
 
   return (
-    <div className="flex h-full flex-col bg-surface">
+    <div className="flex h-full min-h-0 flex-col bg-surface">
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <h2 className="text-[14px] font-semibold text-ink-text">Properties</h2>
         <div className="flex items-center gap-1">
@@ -117,10 +118,11 @@ export function PropertiesPanel({
           fullWidth
           size="sm"
           options={[
-            { value: 'room', label: 'Room' },
-            { value: 'wall', label: 'Wall' },
-            { value: 'door', label: 'Door' },
-            { value: 'window', label: 'Window' },
+            { value: 'room', label: 'Details' },
+            { value: 'elements', label: 'Elements' },
+            { value: 'wall', label: 'Walls' },
+            { value: 'door', label: 'Doors' },
+            { value: 'window', label: 'Windows' },
           ]}
           value={tab}
           onChange={setTab}
@@ -148,6 +150,8 @@ export function PropertiesPanel({
             title="Nothing selected"
             description="Select a room on the floor plan to see and edit its properties."
           />
+        ) : tab === 'elements' ? (
+          <RoomElementsList room={room} placed={placedHere} onOpenTab={setTab} onSelectItem={onSelectItem} onRemoveOpening={onRemoveRoomElement} onRemoveItem={onRemovePlacedItem} />
         ) : tab === 'room' ? (
           <div className="space-y-5">
             <div className="flex items-center justify-between gap-2">
@@ -330,9 +334,37 @@ export function PropertiesPanel({
   )
 }
 
+function RoomElementsList({ room, placed, onOpenTab, onSelectItem, onRemoveOpening, onRemoveItem }: {
+  room: Room
+  placed: PlacedItem[]
+  onOpenTab: (tab: PropertyTab) => void
+  onSelectItem?: (id: string | null) => void
+  onRemoveOpening?: (roomId: string, elementId: string) => void
+  onRemoveItem?: (roomId: string, itemId: string) => void
+}) {
+  const openings = room.elements.filter((element) => element.type === 'door' || element.type === 'window')
+  return <div className="space-y-4">
+    <div>
+      <div className="mb-2 flex items-center justify-between"><h3 className="text-[12px] font-semibold text-ink-text">Doors & windows</h3><span className="text-[10px] text-muted">{openings.length}</span></div>
+      {openings.length ? <div className="space-y-2">{openings.map((element, index) => <div key={element.id} className="flex items-center gap-2 rounded-lg border border-line p-2">
+        <ObjectPreview item={element.label ?? element.type} color={element.color ?? (element.type === 'door' ? '#8a6a48' : '#9fd4ee')} />
+        <button type="button" onClick={() => onOpenTab(element.type as 'door' | 'window')} className="min-w-0 flex-1 text-left"><span className="block truncate text-[11.5px] font-medium text-ink-text">{element.label || `${element.type} ${index + 1}`}</span><span className="text-[10px] capitalize text-muted">{element.type} · {element.width ?? 'default'} × {element.height ?? 'default'} {room.units} · Edit</span></button>
+        <button type="button" onClick={() => onRemoveOpening?.(room.id, element.id)} aria-label={`Remove ${element.label ?? element.type}`} className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+      </div>)}</div> : <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[11px] text-muted">No doors or windows in this room yet. Choose a window or door in the left library.</p>}
+    </div>
+    <div>
+      <div className="mb-2 flex items-center justify-between"><h3 className="text-[12px] font-semibold text-ink-text">Furniture & appliances</h3><span className="text-[10px] text-muted">{placed.length}</span></div>
+      {placed.length ? <div className="space-y-2">{placed.map((item) => <div key={item.id} className="flex items-center gap-2 rounded-lg border border-line p-2">
+        <button type="button" onClick={() => onSelectItem?.(item.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left"><ObjectPreview item={item.item} color={item.color} /><span className="min-w-0"><span className="block truncate text-[11.5px] font-medium capitalize text-ink-text">{item.item.replace(/[-_]/g, ' ')}</span><span className="text-[10px] text-muted">Select to adjust position, size or color</span></span></button>
+        <button type="button" onClick={() => onRemoveItem?.(room.id, item.id)} aria-label={`Remove ${item.item}`} className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+      </div>)}</div> : <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[11px] text-muted">No placed items yet. Add furniture from the Interior library.</p>}
+    </div>
+  </div>
+}
+
 function SiteInspector({ site, onUpdate, onRemove, onClose, units }: {
-  site: { id: string; kind?: string; x: number; y: number; scale: number; rotation: number; color: string }
-  onUpdate?: (id: string, patch: Partial<{ x: number; y: number; scale: number; rotation: number; color: string }>) => void
+  site: { id: string; kind?: string; x: number; y: number; scale: number; rotation: number; color: string; width?: number; length?: number }
+  onUpdate?: (id: string, patch: Partial<{ x: number; y: number; scale: number; rotation: number; color: string; width: number; length: number }>) => void
   onRemove?: (id: string) => void
   onClose?: () => void
   units: Units
@@ -347,6 +379,10 @@ function SiteInspector({ site, onUpdate, onRemove, onClose, units }: {
         <NumberField label="Plot Y" min={0} max={1000} step={0.5} suffix={units} value={Number(site.y.toFixed(2))} onChange={(event) => onUpdate?.(site.id, { y: Number(event.target.value) })} />
         <NumberField label="Rotation" min={0} max={359} step={5} suffix="°" value={Math.round(site.rotation * 180 / Math.PI)} onChange={(event) => onUpdate?.(site.id, { rotation: Number(event.target.value) * Math.PI / 180 })} />
         <NumberField label="Scale" min={0.35} max={3} step={0.05} value={site.scale} onChange={(event) => onUpdate?.(site.id, { scale: Number(event.target.value) })} />
+        {['road', 'path', 'fence', 'gate'].includes(site.kind ?? '') ? <>
+          <NumberField label="Width" min={0.1} max={1000} step={units === 'ft' ? 0.5 : 0.1} suffix={units} value={site.width ?? (units === 'ft' ? 4 : 1.2)} onChange={(event) => onUpdate?.(site.id, { width: Number(event.target.value) })} />
+          <NumberField label="Length" min={0.1} max={1000} step={units === 'ft' ? 1 : 0.25} suffix={units} value={site.length ?? (units === 'ft' ? 24 : 7.2)} onChange={(event) => onUpdate?.(site.id, { length: Number(event.target.value) })} />
+        </> : null}
       </div>
       <label className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[12px] font-medium text-muted">Object color<input type="color" value={site.color} onChange={(event) => onUpdate?.(site.id, { color: event.target.value })} className="h-8 w-12 cursor-pointer rounded border-0 bg-transparent p-0" /></label>
       <p className="text-[11px] text-muted">Drag the object in the floor plan or use numeric controls to reposition it.</p>

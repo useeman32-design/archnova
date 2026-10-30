@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Compass, Crosshair, Frame, Info, Printer, Tag } from 'lucide-react'
+import { AlertTriangle, Compass, Crosshair, Frame, Info, Printer, Tag, X } from 'lucide-react'
 import type { Room, Vec2 } from '@/types'
 import { useWorkspace } from '@/pages/workspace/WorkspaceLayout'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
@@ -67,6 +67,7 @@ export function PlanEditor() {
   const planErrorCount = planIssues.filter((issue) => issue.severity === 'error').length
   const [plotWidth, setPlotWidth] = useState(String(project.plot.width))
   const [plotLength, setPlotLength] = useState(String(project.plot.length))
+  const [plotModalOpen, setPlotModalOpen] = useState(false)
   useEffect(() => {
     setPlotWidth(String(project.plot.width))
     setPlotLength(String(project.plot.length))
@@ -102,7 +103,7 @@ export function PlanEditor() {
       return
     }
     if (tool === 'trees') {
-      ctx.addTreeAt(point, variant.kind)
+      ctx.addTreeAt(point, variant.kind, { width: variant.w, length: variant.h })
       return
     }
     const room = roomAt(point)
@@ -151,15 +152,9 @@ export function PlanEditor() {
           value={units}
           onChange={setUnits}
         />
-        <div className="flex items-end gap-1.5 border-l border-line pl-2">
-          <div className="w-[76px]">
-            <NumberField label="Plot W" min={5} max={1000} step={1} suffix={units} value={plotWidth} onChange={(event) => setPlotWidth(event.target.value)} onBlur={applyPlotSize} onKeyDown={(event) => event.key === 'Enter' && applyPlotSize()} />
-          </div>
-          <span className="pb-2 text-xs text-faint">×</span>
-          <div className="w-[76px]">
-            <NumberField label="Plot L" min={5} max={1000} step={1} suffix={units} value={plotLength} onChange={(event) => setPlotLength(event.target.value)} onBlur={applyPlotSize} onKeyDown={(event) => event.key === 'Enter' && applyPlotSize()} />
-          </div>
-        </div>
+        <button type="button" onClick={() => setPlotModalOpen(true)} className="flex h-8 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-[11.5px] font-medium text-muted hover:bg-canvas-soft" title="Set plot dimensions">
+          <Frame className="h-3.5 w-3.5" /> Plot Size
+        </button>
         <ZoomControls zoom={zoom} setZoom={setZoom} />
         <IconToggle
           active={measure}
@@ -205,7 +200,7 @@ export function PlanEditor() {
         }}
         onDrop={handleDrop}
       >
-        <PlanCanvas zoom={zoom} pan={ctx.tool === 'pan'} className="h-full">
+        <PlanCanvas zoom={zoom} setZoom={setZoom} pan={ctx.tool === 'pan'} className="h-full">
           <FloorPlanDiagram
             rooms={rooms}
             units={units}
@@ -225,6 +220,14 @@ export function PlanEditor() {
             onCanvasClick={handleCanvasClick}
             selectedId={selectedRoomId}
             onSelectRoom={handleRoomClick}
+            onDoubleClickRoom={(room) => ctx.openRoomDetails(room.id)}
+            placed={ctx.placed}
+            selectedItemId={ctx.selectedItemId}
+            onSelectItem={ctx.selectItem}
+            onMoveItem={(roomId, itemId, x, z) => ctx.liveEdit((state) => {
+              const items = (state.placed[roomId] ?? []).map((item) => item.id === itemId ? { ...item, x, z } : item)
+              return { ...state, placed: { ...state.placed, [roomId]: items }, rooms: state.rooms.map((room) => room.id === roomId ? { ...room, items } : room) }
+            })}
             dragEnabled={ctx.tool === 'select'}
             onEditBegin={ctx.beginEdit}
             onEditEnd={ctx.endEdit}
@@ -275,10 +278,42 @@ export function PlanEditor() {
         </p>
         <p className="text-[11.5px] font-medium text-ink-text">
           {selectedRoom
-            ? `${selectedRoom.name} · ${selectedRoom.width} × ${selectedRoom.length} ${units}`
+            ? `${selectedRoom.name} · ${selectedRoom.width} × ${selectedRoom.length} ${units} · double-click for details`
             : `${rooms.length} spaces · ${project.name}`}
         </p>
       </div>
+      {plotModalOpen ? (() => {
+        const liveWidth = Math.max(5, Number(plotWidth) || project.plot.width)
+        const liveLength = Math.max(5, Number(plotLength) || project.plot.length)
+        const scale = Math.min(180 / liveWidth, 125 / liveLength)
+        const previewWidth = liveWidth * scale
+        const previewLength = liveLength * scale
+        return <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink-950/45 p-4 backdrop-blur-sm" onClick={() => setPlotModalOpen(false)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="plot-size-title" className="w-full max-w-lg overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-line px-5 py-4">
+              <div><h2 id="plot-size-title" className="text-[15px] font-semibold text-ink-text">Plot Size</h2><p className="mt-0.5 text-[11px] text-muted">Set the overall plot width and length.</p></div>
+              <button type="button" onClick={() => setPlotModalOpen(false)} className="rounded-lg p-2 text-muted hover:bg-canvas-soft" aria-label="Close plot size dialog"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="grid gap-4 p-5 sm:grid-cols-[1fr_1.1fr]">
+              <div className="space-y-3">
+                <NumberField label="Plot width" min={5} max={1000} step={0.5} suffix={units} value={plotWidth} onChange={(event) => setPlotWidth(event.target.value)} />
+                <NumberField label="Plot length" min={5} max={1000} step={0.5} suffix={units} value={plotLength} onChange={(event) => setPlotLength(event.target.value)} />
+                <p className="text-[10.5px] leading-relaxed text-muted">The animated preview updates as you type. Existing rooms and site objects stay in their plot positions where they fit.</p>
+              </div>
+              <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed border-line bg-canvas-soft/60 p-3">
+                <svg viewBox="0 0 220 170" className="max-h-44 w-full animate-pulse" role="img" aria-label={`Plot skeleton preview, ${liveWidth} by ${liveLength} ${units}`}>
+                  <rect x={110 - previewWidth / 2} y={85 - previewLength / 2} width={previewWidth} height={previewLength} rx="3" fill="#e5f0ff" stroke="#3973e8" strokeWidth="2" />
+                  {rooms.slice(0, 18).map((room) => <rect key={room.id} x={110 - previewWidth / 2 + room.rect.x * scale} y={85 - previewLength / 2 + room.rect.y * scale} width={Math.max(3, room.rect.w * scale)} height={Math.max(3, room.rect.h * scale)} rx="1.5" fill="#d5dce7" stroke="#9aa6b6" strokeWidth="1" />)}
+                </svg>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-line bg-canvas-soft/40 px-5 py-3">
+              <button type="button" onClick={() => { setPlotWidth(String(project.plot.width)); setPlotLength(String(project.plot.length)); setPlotModalOpen(false) }} className="rounded-lg border border-line bg-white px-3 py-2 text-[12px] font-medium text-muted">Cancel</button>
+              <button type="button" onClick={() => { applyPlotSize(); setPlotModalOpen(false) }} className="rounded-lg bg-brand-600 px-4 py-2 text-[12px] font-semibold text-white hover:bg-brand-700">Apply plot size</button>
+            </div>
+          </section>
+        </div>
+      })() : null}
     </div>
   )
 }

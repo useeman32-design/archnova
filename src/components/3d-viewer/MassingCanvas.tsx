@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas, type ThreeEvent } from '@react-three/fiber'
+import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { OrbitControls, TransformControls, Edges } from '@react-three/drei'
 import { CanvasTexture, RepeatWrapping, SRGBColorSpace, Shape, type Mesh, type Object3D } from 'three'
 import type { ArchitecturalWall, FinishOption, PlacedItem, Project, Room, WallOpening } from '@/types'
@@ -54,6 +54,8 @@ const FLAT_CATEGORIES = new Set(['garden', 'pool', 'circulation'])
 export interface MassingCanvasProps {
   project: Project
   mode: 'exterior' | 'interior'
+  roofVisible?: boolean
+  topDown?: boolean
   selectedId?: string | null
   onSelectRoom?: (id: string | null) => void
   transformMode?: 'translate' | 'scale'
@@ -61,7 +63,7 @@ export interface MassingCanvasProps {
   onResizeLive?: (id: string, w: number, h: number) => void
   onEditBegin?: () => void
   onEditEnd?: () => void
-  ornaments?: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string }[]
+  ornaments?: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string; width?: number; length?: number }[]
   placed?: Record<string, PlacedItem[]>
   selectedItemId?: string | null
   onSelectItem?: (id: string | null) => void
@@ -83,12 +85,21 @@ export default function MassingCanvas(props: MassingCanvasProps) {
   const [selectedItemObj, setSelectedItemObj] = useState<Object3D | null>(null)
   const baseSize = useRef<{ w: number; h: number } | null>(null)
   const { project, mode, selectedId, onSelectRoom, transformMode = 'translate' } = props
+  const roofVisible = props.roofVisible ?? true
+  const topDown = props.topDown ?? false
 
   useEffect(() => {
     setSelectedObj(selectedId ? (meshRefs.current.get(selectedId) ?? null) : null)
   }, [selectedId])
 
-  const rooms = project.floors.flatMap((floor) => floor.rooms)
+  const rooms = useMemo(() => project.floors.flatMap((floor) => floor.rooms), [project.floors])
+  const sceneTarget = useMemo<[number, number, number]>(() => {
+    const bounds = rooms.length ? {
+      minX: Math.min(...rooms.map((room) => room.rect.x)), minY: Math.min(...rooms.map((room) => room.rect.y)),
+      maxX: Math.max(...rooms.map((room) => room.rect.x + room.rect.w)), maxY: Math.max(...rooms.map((room) => room.rect.y + room.rect.h)),
+    } : { minX: 0, minY: 0, maxX: project.plot.width, maxY: project.plot.length }
+    return [((bounds.minX + bounds.maxX) / 2 - project.plot.width / 2) * S, 0.6, ((bounds.minY + bounds.maxY) / 2 - project.plot.length / 2) * S]
+  }, [rooms, project.plot.width, project.plot.length])
   const selectedRoom = rooms.find((r) => r.id === selectedId) ?? null
 
   useEffect(() => {
@@ -140,13 +151,10 @@ export default function MassingCanvas(props: MassingCanvasProps) {
     <Canvas
       shadows
       dpr={[1, 1.75]}
-      camera={
-        mode === 'interior'
-          ? { position: [0, 0.5, 0.01], fov: 70 }
-          : { position: [5.4, 4.2, 6.4], fov: 42 }
-      }
+      camera={mode === 'interior' ? { position: [0, 0.5, 0.01], fov: 70 } : { position: [sceneTarget[0] + 5.4, 4.2, sceneTarget[2] + 6.4], fov: 42 }}
       onPointerMissed={() => { onSelectRoom?.(null); props.onSelectSite?.(null); props.onSelectItem?.(null) }}
     >
+      <CameraController mode={mode} topDown={topDown} target={sceneTarget} plotWidth={project.plot.width} plotLength={project.plot.length} orbitRef={orbitRef} />
       {mode === 'interior' ? (
         <InteriorScene
           rooms={rooms}
@@ -173,6 +181,7 @@ export default function MassingCanvas(props: MassingCanvasProps) {
           selectedSiteId={props.selectedSiteId ?? null}
           onSelectSite={props.onSelectSite}
           ornaments={props.ornaments ?? []}
+          roofVisible={roofVisible}
         />
       )}
 
@@ -233,15 +242,45 @@ export default function MassingCanvas(props: MassingCanvasProps) {
         enableDamping
         dampingFactor={0.08}
         minDistance={mode === 'interior' ? 0.01 : 2.5}
-        maxDistance={mode === 'interior' ? 6 : 16}
+        maxDistance={mode === 'interior' ? 6 : Math.max(16, Math.max(project.plot.width, project.plot.length) * S * 2)}
         maxPolarAngle={mode === 'interior' ? Math.PI : Math.PI / 2.05}
-        target={mode === 'interior' ? [0, 0.5, 0] : [0, 0.6, 0]}
+        target={mode === 'interior' ? [0, 0.5, 0] : sceneTarget}
       />
     </Canvas>
   )
 }
 
 /* ------------------------------------------------------------------ */
+
+function CameraController({ mode, topDown, target, plotWidth, plotLength, orbitRef }: { mode: 'exterior' | 'interior'; topDown: boolean; target: [number, number, number]; plotWidth: number; plotLength: number; orbitRef: React.MutableRefObject<any> }) {
+  const { camera } = useThree()
+  const cameraPose = useRef('')
+  useEffect(() => {
+    const poseKey = `${mode}:${mode === 'exterior' && topDown ? 'top' : 'normal'}:${plotWidth}:${plotLength}`
+    if (cameraPose.current === poseKey) return
+    cameraPose.current = poseKey
+    if (mode === 'interior') {
+      camera.up.set(0, 1, 0)
+      camera.position.set(0, 0.5, 0.01)
+      camera.lookAt(0, 0.5, 0)
+    } else if (topDown) {
+      const distance = Math.max(8, Math.min(48, Math.max(plotWidth, plotLength) * S * 1.35))
+      camera.up.set(0, 0, -1)
+      camera.position.set(target[0], distance, target[2] + 0.01)
+      camera.lookAt(target[0], 0, target[2])
+    } else {
+      camera.up.set(0, 1, 0)
+      camera.position.set(target[0] + 5.4, 4.2, target[2] + 6.4)
+      camera.lookAt(target[0], 0.6, target[2])
+    }
+    camera.updateProjectionMatrix()
+    if (orbitRef.current) {
+      orbitRef.current.target.set(...(mode === 'interior' ? [0, 0.5, 0] : target))
+      orbitRef.current.update()
+    }
+  }, [camera, mode, topDown, target, plotWidth, plotLength, orbitRef])
+  return null
+}
 
 function ExteriorScene({
   project,
@@ -252,6 +291,7 @@ function ExteriorScene({
   selectedSiteId,
   onSelectSite,
   ornaments,
+  roofVisible,
 }: {
   project: Project
   selectedId: string | null
@@ -260,7 +300,8 @@ function ExteriorScene({
   siteRefs: React.MutableRefObject<Map<string, Object3D>>
   selectedSiteId: string | null
   onSelectSite?: (id: string | null) => void
-  ornaments: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string }[]
+  ornaments: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string; width?: number; length?: number }[]
+  roofVisible: boolean
 }) {
   const { width: plotW, length: plotL } = project.plot
   const wallThicknesses = {
@@ -342,30 +383,17 @@ function ExteriorScene({
         ))
       })}
 
-      {ornaments.map((tree) => {
-        const [tx, tz] = toWorld(tree.x, tree.y)
-        return <group
-          key={tree.id}
-          ref={(obj) => { if (obj) siteRefs.current.set(tree.id, obj); else siteRefs.current.delete(tree.id) }}
-          position={[tx, 0, tz]}
-          rotation={[0, tree.rotation, 0]}
-          scale={tree.scale}
-          onClick={(event) => { event.stopPropagation(); onSelectSite?.(tree.id) }}
-        >
-          {tree.id === selectedSiteId ? <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}><ringGeometry args={[0.31, 0.36, 28]} /><meshBasicMaterial color="#1a56f5" /></mesh> : null}
-          <Tree position={[0, 0, 0]} kind={tree.kind} color={tree.color} />
+      {ornaments.map((site) => {
+        const [sx, sz] = toWorld(site.x, site.y)
+        return <group key={site.id} ref={(obj) => { if (obj) siteRefs.current.set(site.id, obj); else siteRefs.current.delete(site.id) }} position={[sx, 0, sz]} rotation={[0, site.rotation, 0]} scale={site.scale} onClick={(event) => { event.stopPropagation(); onSelectSite?.(site.id) }}>
+          {site.id === selectedSiteId ? <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}><ringGeometry args={[0.28, 0.34, 28]} /><meshBasicMaterial color="#1a56f5" /></mesh> : null}
+          <SiteObject kind={site.kind} color={site.color} width={(site.width ?? 3) * S} length={(site.length ?? 3) * S} />
         </group>
       })}
 
-      {buildingBounds ? (
+      {buildingBounds && roofVisible ? (
         <group position={[(buildingBounds.minX + buildingBounds.maxX - plotW) * S / 2, 0, (buildingBounds.minY + buildingBounds.maxY - plotL) * S / 2]}>
-          <Roof
-            form={project.roof}
-            y={topLevel * (WALL_H + SLAB)}
-            width={(buildingBounds.maxX - buildingBounds.minX) * S * 1.06}
-            length={(buildingBounds.maxY - buildingBounds.minY) * S * 1.06}
-            color={project.preferences.roofColor}
-          />
+          <Roof form={project.roof} y={topLevel * (WALL_H + SLAB) + 0.08} width={(buildingBounds.maxX - buildingBounds.minX) * S * 1.08} length={(buildingBounds.maxY - buildingBounds.minY) * S * 1.08} color={project.preferences.roofColor} />
         </group>
       ) : null}
     </>
@@ -516,6 +544,36 @@ function makeRoomShape(room: Room, scale: number): Shape {
   return shape
 }
 
+function SiteObject({ kind = 'palm', color, width, length }: { kind?: string; color: string; width: number; length: number }) {
+  if (kind === 'road' || kind === 'path') return <group>
+    <mesh position={[0, 0.012, 0]} receiveShadow><boxGeometry args={[width, 0.022, length]} /><meshStandardMaterial color={kind === 'road' ? '#555a61' : '#c9c3b7'} roughness={0.95} /></mesh>
+    {kind === 'road' ? <mesh position={[0, 0.025, 0]}><boxGeometry args={[0.025, 0.004, length * 0.78]} /><meshStandardMaterial color="#e6d89e" /></mesh> : null}
+  </group>
+  if (kind === 'fence') {
+    const height = 0.85
+    const count = Math.max(2, Math.floor(length / 0.45))
+    return <group>
+      {Array.from({ length: count + 1 }, (_, index) => <mesh key={`post-${index}`} position={[0, height / 2, -length / 2 + length * index / count]} castShadow><boxGeometry args={[Math.max(width, 0.035), height, Math.max(width, 0.035)]} /><meshStandardMaterial color={color} roughness={0.8} /></mesh>)}
+      {[height * 0.32, height * 0.78].map((y) => <mesh key={y} position={[0, y, 0]} castShadow><boxGeometry args={[Math.max(width, 0.04) * 1.3, 0.07, length]} /><meshStandardMaterial color={color} roughness={0.8} /></mesh>)}
+    </group>
+  }
+  if (kind === 'gate') return <group>
+    {[-1, 1].map((side) => <mesh key={side} position={[side * width * 0.25, 0.48, 0]} castShadow><boxGeometry args={[width * 0.49, 0.9, Math.max(length, 0.06)]} /><meshStandardMaterial color={color} metalness={0.15} roughness={0.55} /></mesh>)}
+    {Array.from({ length: 8 }, (_, index) => <mesh key={`bar-${index}`} position={[-width * 0.48 + width * index / 7, 0.48, 0.01]}><boxGeometry args={[0.025, 0.82, Math.max(length, 0.065)]} /><meshStandardMaterial color="#d8d0c2" metalness={0.45} /></mesh>)}
+  </group>
+  if (kind === 'street-light') return <group>
+    <mesh position={[0, 0.48, 0]} castShadow><cylinderGeometry args={[0.018, 0.035, 0.96, 8]} /><meshStandardMaterial color="#4c5561" metalness={0.65} roughness={0.35} /></mesh>
+    <mesh position={[width * 0.6, 0.96, 0]} rotation={[0, 0, -0.5]}><boxGeometry args={[width * 1.5, 0.035, 0.04]} /><meshStandardMaterial color="#59636f" metalness={0.55} /></mesh>
+    <mesh position={[width * 1.25, 0.91, 0]}><sphereGeometry args={[0.055, 10, 8]} /><meshStandardMaterial color="#fff0a3" emissive="#ffcf56" emissiveIntensity={0.7} /></mesh>
+  </group>
+  if (kind === 'car') return <group>
+    <mesh position={[0, 0.14, 0]} castShadow><boxGeometry args={[width, 0.26, length]} /><meshStandardMaterial color={color} metalness={0.18} roughness={0.45} /></mesh>
+    <mesh position={[0, 0.29, -length * 0.03]} castShadow><boxGeometry args={[width * 0.72, 0.19, length * 0.43]} /><meshStandardMaterial color="#8eb4c8" roughness={0.25} /></mesh>
+    {[-1, 1].flatMap((x) => [-1, 1].map((z) => <mesh key={`${x}-${z}`} position={[x * width * 0.48, 0.08, z * length * 0.32]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.055, 0.055, 0.04, 12]} /><meshStandardMaterial color="#20252b" /></mesh>))}
+  </group>
+  return <Tree position={[0, 0, 0]} kind={kind} color={color} />
+}
+
 function Tree({ position, kind = 'palm', color = '#4f8a3f' }: { position: [number, number, number]; kind?: string; color?: string }) {
   if (kind === 'car') {
     return (
@@ -588,7 +646,7 @@ function Roof({ form, y, width, length, color = '#33415c' }: { form: string; y: 
   }
   if (form === 'hip' || form === 'mansard') {
     return (
-      <mesh position={[0, y, 0]} rotation={[0, Math.PI / 4, 0]} scale={[width * 0.72, 1, length * 0.72]} castShadow>
+      <mesh position={[0, y + rise / 2 + 0.08, 0]} rotation={[0, Math.PI / 4, 0]} scale={[width * 0.72, 1, length * 0.72]} castShadow>
         <coneGeometry args={[1, rise, 4]} />
         <meshStandardMaterial color={color} roughness={0.7} />
       </mesh>
@@ -596,7 +654,7 @@ function Roof({ form, y, width, length, color = '#33415c' }: { form: string; y: 
   }
   if (form === 'shed') {
     return (
-      <mesh position={[0, y + rise * 0.28, 0]} rotation={[0.28, 0, 0]} castShadow>
+      <mesh position={[0, y + Math.sin(0.28) * length / 2 + 0.08, 0]} rotation={[0.28, 0, 0]} castShadow>
         <boxGeometry args={[width + 0.24, 0.06, length + 0.3]} />
         <meshStandardMaterial color={color} roughness={0.7} />
       </mesh>

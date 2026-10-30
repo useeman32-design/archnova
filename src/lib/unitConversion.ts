@@ -40,7 +40,7 @@ export function convertPlacedItem(item: PlacedItem, from: Units, to: Units): Pla
 export function convertOrnaments(items: Ornament[], from: Units, to: Units): Ornament[] {
   if (from === to) return items
   const factor = conversionFactor(from, to)
-  return items.map((item) => ({ ...item, x: round(item.x * factor), y: round(item.y * factor) }))
+  return items.map((item) => ({ ...item, x: round(item.x * factor), y: round(item.y * factor), ...(item.width !== undefined ? { width: round(item.width * factor) } : {}), ...(item.length !== undefined ? { length: round(item.length * factor) } : {}) }))
 }
 
 export function convertWallThicknesses(value: { exterior: number; interior: number }, from: Units, to: Units) {

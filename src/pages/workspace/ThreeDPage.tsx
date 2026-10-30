@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Box, Brush, Layers, Mountain, Move, Plane, Scale, Sofa, Square } from 'lucide-react'
+import { ArrowLeft, Box, Brush, Eye, EyeOff, Layers, Mountain, Move, Plane, Scale, Sofa, Square } from 'lucide-react'
 import type { FinishOption } from '@/types'
 import { useWorkspace } from './WorkspaceLayout'
 import { MassingViewerSafe } from '@/components/3d-viewer/MassingViewer'
@@ -61,6 +61,8 @@ export function ThreeDPage() {
   } = ctx
   const [mode, setMode] = useState<'exterior' | 'interior'>('exterior')
   const [transformMode, setTransformMode] = useState<'translate' | 'scale'>('translate')
+  const [roofVisible, setRoofVisible] = useState(true)
+  const [topDown, setTopDown] = useState(false)
 
   useEffect(() => {
     if (roomParam && ctx.rooms.some((room) => room.id === roomParam)) {
@@ -86,7 +88,7 @@ export function ThreeDPage() {
         const bounds = event.currentTarget.getBoundingClientRect()
         const x = ((event.clientX - bounds.left) / Math.max(bounds.width, 1)) * ctx.project.plot.width
         const y = ((event.clientY - bounds.top) / Math.max(bounds.height, 1)) * ctx.project.plot.length
-        ctx.addTreeAt({ x: Math.max(0, Math.min(ctx.project.plot.width, x)), y: Math.max(0, Math.min(ctx.project.plot.length, y)) }, placement.variant.kind)
+        ctx.addTreeAt({ x: Math.max(0, Math.min(ctx.project.plot.width, x)), y: Math.max(0, Math.min(ctx.project.plot.length, y)) }, placement.variant.kind, { width: placement.variant.w, length: placement.variant.h })
       }
     } catch { /* ignore invalid library payload */ }
   }
@@ -97,6 +99,8 @@ export function ThreeDPage() {
         <MassingViewerSafe
           project={previewProject}
           mode={mode}
+          roofVisible={roofVisible}
+          topDown={topDown && mode === 'exterior'}
           className="h-full w-full"
           selectedId={ctx.selectedRoomId}
           onSelectRoom={ctx.selectRoom}
@@ -148,6 +152,12 @@ export function ThreeDPage() {
             value={mode}
             onChange={setMode}
           />
+          {mode === 'exterior' ? <>
+            <button type="button" onClick={() => { const visible = !roofVisible; setRoofVisible(visible); if (!visible) setTopDown(true) }} className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11.5px] font-medium ${roofVisible ? 'border-line bg-surface text-muted hover:bg-canvas-soft' : 'border-brand-500 bg-brand-50 text-brand-700'}`} title="Hide the roof to inspect the house from above">
+              {roofVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}{roofVisible ? 'Hide roof' : 'Show roof'}
+            </button>
+            <button type="button" onClick={() => setTopDown((value) => !value)} className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11.5px] font-medium ${topDown ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-line bg-surface text-muted hover:bg-canvas-soft'}`} title="View the home from directly above">Top view</button>
+          </> : null}
           {selectedRoom ? (
             <SegmentedControl<'translate' | 'scale'>
               size="sm"
