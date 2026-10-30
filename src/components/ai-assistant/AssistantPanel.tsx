@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { AppWindow, ArrowUp, BedDouble, Box, Car, Check, DoorOpen, Eye, EyeOff, Fence, Flower2, Home, Lamp, Loader2, Settings2, ShieldCheck, Sofa, Sparkles, Sprout, TreePalm, Trash2, Trees, X } from 'lucide-react'
+import { AppWindow, ArrowUp, BedDouble, Box, Bug, Car, Check, Copy, DoorOpen, Eye, EyeOff, Fence, Flower2, Home, Lamp, Loader2, Settings2, ShieldCheck, Sofa, Sparkles, Sprout, TreePalm, Trash2, Trees, X } from 'lucide-react'
 import type { ArchitecturalWall, ChatMessage, PlacedItem, Project, Room, RoomCategory, Units } from '@/types'
-import { DEFAULT_GROQ_MODEL, localSmallTalkReply, requestAssistantPlan, testGroqConnection, type AssistantAction, type AssistantPlan, type AssistantSiteItem } from '@/services/groqAssistant'
+import { DEFAULT_GROQ_MODEL, localSmallTalkReply, requestAssistantPlan, testGroqConnection, type AssistantAction, type AssistantDebugEvent, type AssistantPlan, type AssistantSiteItem } from '@/services/groqAssistant'
 import type { ApplyAssistantPlanResult } from '@/lib/applyAssistantPlan'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { storageKeys } from '@/lib/storage'
@@ -10,6 +10,8 @@ import { TOOL_GROUPS, type ToolVariant } from '@/data/toolLibrary'
 
 const GROQ_KEY_STORAGE = 'archnova:groq-api-key'
 const GROQ_MODEL_STORAGE = 'archnova:groq-model'
+type DebugStatus = AssistantDebugEvent['status']
+type DebugEntry = { id: string; at: string; stage: string; status: DebugStatus; details?: unknown }
 
 export function AssistantPanel({
   open,
@@ -49,10 +51,32 @@ export function AssistantPanel({
   const [applyProgress, setApplyProgress] = useState<{ current: number; total: number; label: string } | null>(null)
   const [pendingPlan, setPendingPlan] = useState<AssistantPlan | null>(null)
   const [applyStatus, setApplyStatus] = useState<{ ok: boolean; message: string; warnings: string[] } | null>(null)
+  const [debugOpen, setDebugOpen] = useState(false)
+  const [debugEntries, setDebugEntries] = useState<DebugEntry[]>([])
+  const [debugCopyStatus, setDebugCopyStatus] = useState('')
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const applyPlanRef = useRef<() => Promise<void>>(async () => undefined)
   const migratedChat = useRef(false)
+
+  const recordDebug = (stage: string, status: DebugStatus = 'info', details?: unknown) => {
+    setDebugEntries((previous) => [...previous, {
+      id: uid('debug'),
+      at: new Date().toISOString(),
+      stage,
+      status,
+      details: sanitizeDebugDetails(details, apiKey),
+    }].slice(-160))
+  }
+
+  const copyDebugLog = async () => {
+    try {
+      await navigator.clipboard.writeText(formatDebugLog(debugEntries))
+      setDebugCopyStatus('Copied diagnostic log.')
+    } catch {
+      setDebugCopyStatus('Clipboard unavailable; select and copy the log entries below.')
+    }
+  }
 
   useEffect(() => {
     if (!migratedChat.current) {
@@ -87,13 +111,16 @@ export function AssistantPanel({
 
   const testKey = async () => {
     if (!apiKey.trim()) {
+      recordDebug('connection-check.failed', 'error', { reason: 'No API key entered.' })
       setConnectionStatus('Paste a Groq API key first.')
       return
     }
     setTestingKey(true)
     setConnectionStatus('Checking key and model…')
+    recordDebug('connection-check.started', 'info', { model, apiKeyPresent: true })
     try {
       const result = await testGroqConnection(apiKey, model)
+      recordDebug('connection-check.succeeded', 'success', { selectedModel: result.selectedModel, availableModels: result.models })
       setAvailableModels(result.models)
       const previousModel = model.trim() || DEFAULT_GROQ_MODEL
       if (result.selectedModel !== previousModel) updateModel(result.selectedModel)
@@ -101,7 +128,9 @@ export function AssistantPanel({
         ? `Key verified — ${result.selectedModel} is available.`
         : `Key verified. Switched to an available model: ${result.selectedModel}.`)
     } catch (error) {
-      setConnectionStatus(error instanceof Error ? error.message : 'Could not verify the Groq key.')
+      const message = error instanceof Error ? error.message : 'Could not verify the Groq key.'
+      recordDebug('connection-check.failed', 'error', { error: message })
+      setConnectionStatus(message)
     } finally {
       setTestingKey(false)
     }
@@ -110,7 +139,9 @@ export function AssistantPanel({
   const send = async (raw: string) => {
     const text = raw.trim()
     if (!text || busy) return
+    recordDebug('user.prompt-received', 'info', { prompt: text, model, projectId: project.id, roomCount: rooms.length })
     if (pendingPlan && isApplyConfirmation(text)) {
+      recordDebug('proposal.approved-by-chat', 'info', { confirmation: text, actionTypes: pendingPlan.actions.map((action) => action.type) })
       setInput('')
       setRequestError('')
       setMessages((previous) => [...previous, { id: uid('msg'), role: 'user', text, createdAt: Date.now() }])
@@ -119,6 +150,7 @@ export function AssistantPanel({
     }
     const smallTalk = localSmallTalkReply(text)
     if (smallTalk) {
+      recordDebug('assistant.local-response', 'success', { prompt: text, reply: smallTalk, outcome: 'handled-without-Groq' })
       setInput('')
       setRequestError('')
       setMessages((previous) => [...previous,
@@ -128,6 +160,7 @@ export function AssistantPanel({
       return
     }
     if (!apiKey.trim()) {
+      recordDebug('assistant.request-blocked', 'error', { reason: 'No Groq API key configured.' })
       setSettingsOpen(true)
       setRequestError('Paste your Groq API key in Groq settings before sending a prompt.')
       return
@@ -156,10 +189,15 @@ export function AssistantPanel({
         history,
         prompt: text,
         onProgress: (report) => {
+          recordDebug('assistant.progress', 'info', { message: report })
           setMessages((previous) => previous.map((message) => message.id === pendingId ? { ...message, text: report } : message))
         },
+        onDebug: (event) => recordDebug(event.stage, event.status, event.details),
       })
       const hasApplicableChanges = plan.actions.length > 0 || Boolean(plan.project) || Boolean(plan.plot) || Boolean(plan.wallThicknesses)
+      recordDebug(hasApplicableChanges ? 'assistant.proposal-ready' : 'assistant.no-proposal', hasApplicableChanges ? 'success' : 'warning', {
+        actionTypes: plan.actions.map((action) => action.type), reply: plan.reply, unsupported: plan.unsupported ?? [], proposalReady: hasApplicableChanges,
+      })
       setPendingPlan(hasApplicableChanges ? plan : null)
       const visibleReply = !hasApplicableChanges && plan.unsupported?.length ? `${plan.reply}\n\n${plan.unsupported.join(' ')}` : plan.reply
       setMessages((previous) => previous.map((message) => message.id === pendingId
@@ -167,6 +205,7 @@ export function AssistantPanel({
         : message))
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The Groq request failed. Try again.'
+      recordDebug('assistant.request-failed', 'error', { error: message })
       setRequestError('')
       setMessages((previous) => previous.map((item) => item.id === pendingId
         ? { ...item, text: message, pending: false }
@@ -177,6 +216,7 @@ export function AssistantPanel({
   }
 
   const chooseCatalogVariant = (actionIndex: number, variant: ToolVariant) => {
+    recordDebug('proposal.catalog-variant-selected', 'info', { actionIndex, variantId: variant.id, variantName: variant.name })
     setPendingPlan((previous) => {
       if (!previous) return previous
       const actions = previous.actions.map((action, index): AssistantAction => {
@@ -201,22 +241,30 @@ export function AssistantPanel({
 
   const applyPlan = async () => {
     if (!pendingPlan || busy) return
+    recordDebug('proposal.apply-started', 'info', { actionTypes: pendingPlan.actions.map((action) => action.type) })
     setBusy(true)
     setApplyStatus(null)
     setRequestError('')
     setApplyProgress({ current: 0, total: 1, label: 'Checking geometry before applying…' })
     try {
-      const result = await onApplyPlan(pendingPlan, (current, total, label) => setApplyProgress({ current, total, label }))
+      const result = await onApplyPlan(pendingPlan, (current, total, label) => {
+        recordDebug('proposal.apply-progress', 'info', { current, total, label })
+        setApplyProgress({ current, total, label })
+      })
       if (!result.ok) {
+        recordDebug('proposal.apply-failed', 'error', { errors: result.errors })
         setApplyStatus({ ok: false, message: result.errors.join(' '), warnings: [] })
         return
       }
       const message = `Applied ${result.appliedCount} design change${result.appliedCount === 1 ? '' : 's'} and saved the project.`
+      recordDebug('proposal.apply-succeeded', result.warnings.length ? 'warning' : 'success', { appliedCount: result.appliedCount, warnings: result.warnings })
       setApplyStatus(result.warnings.length ? { ok: true, message: 'Applied with geometry notes:', warnings: result.warnings } : null)
       setMessages((previous) => [...previous, { id: uid('msg'), role: 'assistant', text: message, createdAt: Date.now() }])
       setPendingPlan(null)
     } catch (error) {
-      setApplyStatus({ ok: false, message: error instanceof Error ? error.message : 'The design update could not be applied.', warnings: [] })
+      const message = error instanceof Error ? error.message : 'The design update could not be applied.'
+      recordDebug('proposal.apply-failed', 'error', { error: message })
+      setApplyStatus({ ok: false, message, warnings: [] })
     } finally {
       setBusy(false)
       setApplyProgress(null)
@@ -250,6 +298,7 @@ export function AssistantPanel({
         </div>
         <div className="flex items-center gap-1">
           <button type="button" onClick={() => setSettingsOpen((open) => !open)} aria-expanded={settingsOpen} className={`flex h-8 w-8 items-center justify-center rounded-lg ${settingsOpen ? 'bg-brand-50 text-brand-700' : 'text-muted hover:bg-canvas-soft hover:text-ink-text'}`} aria-label={settingsOpen ? 'Hide Groq settings' : 'Groq settings'} title="Groq settings"><Settings2 className="h-4 w-4" /></button>
+          <button type="button" onClick={() => { setDebugOpen((previous) => !previous); setDebugCopyStatus('') }} aria-expanded={debugOpen} className={`relative flex h-8 w-8 items-center justify-center rounded-lg ${debugOpen ? 'bg-amber-50 text-amber-700' : 'text-muted hover:bg-canvas-soft hover:text-ink-text'}`} aria-label={debugOpen ? 'Hide assistant diagnostics' : `Show assistant diagnostics (${debugEntries.length} events)`} title={`Assistant diagnostics · ${debugEntries.length} events`}><Bug className="h-4 w-4" />{debugEntries.length ? <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-amber-500 px-1 text-[8px] font-bold leading-4 text-white">{debugEntries.length > 99 ? '99+' : debugEntries.length}</span> : null}</button>
           <button type="button" onClick={clearConversation} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text" aria-label="Clear conversation" title="Clear conversation"><Trash2 className="h-4 w-4" /></button>
           <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text" aria-label="Close assistant"><X className="h-4 w-4" /></button>
         </div>
@@ -293,7 +342,33 @@ export function AssistantPanel({
           </div>
         ))}
 
-        {pendingPlan ? <PlanPreview plan={pendingPlan} onApply={() => void applyPlan()} onDiscard={() => { setPendingPlan(null); setApplyStatus(null); setApplyProgress(null) }} onChooseVariant={chooseCatalogVariant} busy={busy} progress={applyProgress} units={units} /> : null}
+        {debugOpen ? (
+          <section aria-label="Assistant diagnostics" className="rounded-xl border border-amber-300 bg-amber-50/70 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-[11.5px] font-semibold text-amber-950">Assistant diagnostics · {debugEntries.length} events</h3>
+              <div className="flex gap-1.5">
+                <button type="button" onClick={() => void copyDebugLog()} disabled={!debugEntries.length} className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-[10px] font-medium text-amber-900 disabled:opacity-50"><Copy className="h-3 w-3" />Copy log</button>
+                <button type="button" onClick={() => { setDebugEntries([]); setDebugCopyStatus('Log cleared.') }} disabled={!debugEntries.length} className="rounded-md border border-amber-300 bg-white px-2 py-1 text-[10px] font-medium text-amber-900 disabled:opacity-50">Clear</button>
+              </div>
+            </div>
+            <p className="mt-1 text-[9.5px] leading-relaxed text-amber-900">Tab memory only; not saved. Includes prompts and model replies, but redacts API keys. Copy before refreshing if you want to share it.</p>
+            {debugCopyStatus ? <p role="status" className="mt-1 text-[10px] font-medium text-amber-900">{debugCopyStatus}</p> : null}
+            <div className="mt-2 max-h-64 space-y-1.5 overflow-y-auto">
+              {debugEntries.length ? [...debugEntries].reverse().map((entry) => (
+                <details key={entry.id} className="rounded-md border border-amber-200 bg-white/90 px-2 py-1.5">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 text-[9.5px]">
+                    <time dateTime={entry.at} className="shrink-0 text-amber-800">{new Date(entry.at).toLocaleTimeString()}</time>
+                    <strong className="min-w-0 flex-1 break-all text-ink-text">{entry.stage}</strong>
+                    <span className={`shrink-0 rounded px-1.5 py-0.5 font-semibold uppercase ${entry.status === 'error' ? 'bg-red-100 text-red-800' : entry.status === 'warning' ? 'bg-yellow-100 text-yellow-900' : entry.status === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{entry.status}</span>
+                  </summary>
+                  {entry.details !== undefined ? <pre className="mt-1.5 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950 p-2 text-[9px] leading-relaxed text-slate-100">{JSON.stringify(entry.details, null, 2)}</pre> : null}
+                </details>
+              )) : <p className="rounded-md bg-white/70 p-2 text-[10px] text-amber-900">Send a prompt or check the model to start collecting diagnostics.</p>}
+            </div>
+          </section>
+        ) : null}
+
+        {pendingPlan ? <PlanPreview plan={pendingPlan} onApply={() => void applyPlan()} onDiscard={() => { recordDebug('proposal.discarded', 'warning', { actionTypes: pendingPlan.actions.map((action) => action.type) }); setPendingPlan(null); setApplyStatus(null); setApplyProgress(null) }} onChooseVariant={chooseCatalogVariant} busy={busy} progress={applyProgress} units={units} /> : null}
         {applyStatus ? <div role={applyStatus.ok ? 'status' : 'alert'} className={`rounded-xl border p-3 text-[12px] leading-relaxed ${applyStatus.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
           <p className="font-medium">{applyStatus.message}</p>
           {applyStatus.warnings.map((warning, index) => <p key={index} className="mt-1 text-[11px]">Check: {warning}</p>)}
@@ -313,6 +388,31 @@ export function AssistantPanel({
       </form>
     </aside>
   )
+}
+
+function sanitizeDebugDetails(value: unknown, apiKey: string): unknown {
+  if (typeof value === 'string') {
+    let safe = value
+    const key = apiKey.trim()
+    if (key.length >= 8) safe = safe.split(key).join('[REDACTED API KEY]')
+    return safe.replace(/\b(?:gsk_[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9]{20,})\b/g, '[REDACTED TOKEN]')
+      .replace(/\bBearer\s+[^\s,}"']+/gi, 'Bearer [REDACTED]')
+  }
+  if (Array.isArray(value)) return value.map((item) => sanitizeDebugDetails(item, apiKey))
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+      key,
+      /^(?:api[-_]?key|authorization|access[-_]?token|secret)$/i.test(key) ? '[REDACTED]' : sanitizeDebugDetails(item, apiKey),
+    ]))
+  }
+  return value
+}
+
+function formatDebugLog(entries: DebugEntry[]): string {
+  return entries.map((entry) => [
+    `[${entry.at}] ${entry.status.toUpperCase()} ${entry.stage}`,
+    entry.details === undefined ? '' : JSON.stringify(entry.details, null, 2),
+  ].filter(Boolean).join('\n')).join('\n\n')
 }
 
 function PlanPreview({ plan, onApply, onDiscard, onChooseVariant, busy, progress, units }: { plan: AssistantPlan; onApply: () => void; onDiscard: () => void; onChooseVariant: (actionIndex: number, variant: ToolVariant) => void; busy: boolean; progress: { current: number; total: number; label: string } | null; units: Units }) {

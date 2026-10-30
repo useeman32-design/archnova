@@ -2,7 +2,7 @@
 
 **Product:** ArchNova by Pixel Studios  
 **Tagline:** Design Your Vision. Build Your Future.  
-**Status:** Phase 2 in progress — plot-boundary geometry/editor slice; Groq action-recovery fix verified locally
+**Status:** Phase 2 in progress — plot-boundary geometry/editor slice; assistant diagnostics added for live troubleshooting
 **Last updated:** 2026-10-30
 
 This is the durable project log. Read it before starting each follow-up task, update the milestone status after meaningful work, and keep the application buildable. This plan is based on the user's expansion brief and the existing repository audit; it is not a claim of professional or regulatory approval.
@@ -107,8 +107,9 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [x] Add the 2D plot-boundary editor: tap/click to add points, drag vertices, show area and edge lengths, validate before save, or explicitly choose a dimension-derived rectangle.
 - [x] Render the same saved site polygon in the existing 2D plan and Three.js scene; keep unknown boundaries labeled as envelopes.
 - [x] Diagnose mobile project lookup: local browser storage is device-local. Replace generic workspace not-found with an explanatory local-storage message; add regressions for opening a saved dashboard card and missing cross-device IDs.
-- [x] Run full tests, typecheck and both builds after Groq recovery and edge-label work. Result: 51 tests pass across 8 files; typecheck and `git diff --check` pass; production and Pages builds pass. Builds retain the >500 kB chunk warning.
+- [x] Run full tests, typecheck and both builds after Groq recovery, edge-label, and assistant diagnostics work. Result: 51 tests pass across 8 files; typecheck and `git diff --check` pass; production and Pages builds pass. Builds retain the >500 kB chunk warning.
 - [x] Groq regression recovery: direct design requests with no supported operation now get one strict, compact retry; valid responses still flow into the existing user-approved “Apply and save” proposal. Regression test verifies the retry and recovered action. This verifies the local request/normalization flow, not live Groq provider behavior.
+- [x] Add an in-memory assistant diagnostics panel: records prompts, model/progress/request status, raw model responses, parsing/normalized plan, retry decisions, and proposal/apply outcomes; lets the user copy or clear the log. API-key patterns and the entered key are redacted. Logs are not persisted across refresh/project changes; tests cover service trace events and the UI panel.
 - [x] Extend Phase 2 boundary editing with optional per-edge standard labels (Front/Rear/Left/Right/Road-facing), custom names, explicit Unknown, and perimeter lengths derived from vertices. Labels persist on vertex-pair metadata and appear with lengths in the 2D site view; no directions are inferred.
 - [x] Save the Groq action-recovery fix, regression coverage, and roadmap correction in local commit `7d87b99` (`fix: recover Groq design actions`).
 - [x] Save standard/custom site-edge labels and vertex-derived edge lengths in local commit `d93dc4f` (`feat: add site edge labels`).

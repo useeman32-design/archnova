@@ -54,10 +54,11 @@ describe('Groq assistant client', () => {
       .mockResolvedValueOnce(jsonResponse({ reply: 'I prepared the study.', actions: [{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 10 } }] }))
     vi.stubGlobal('fetch', fetchMock)
     const progress = vi.fn()
+    const debug = vi.fn()
     const plan = await requestAssistantPlan({
-      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      apiKey: 'secret-test-key', model: DEFAULT_GROQ_MODEL,
       context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
-      history: [], prompt: 'Add a study room.', onProgress: progress,
+      history: [], prompt: 'Add a study room.', onProgress: progress, onDebug: debug,
     })
     expect(fetchMock).toHaveBeenCalledTimes(2)
     const recoveryBody = JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))
@@ -65,6 +66,10 @@ describe('Groq assistant client', () => {
     expect(recoveryBody.messages.some((message: { content: string }) => message.content.includes('ACTION RECOVERY'))).toBe(true)
     expect(plan.actions).toEqual([{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 10 } }])
     expect(progress).toHaveBeenCalledWith(expect.stringContaining('Retrying once'))
+    expect(debug).toHaveBeenCalledWith(expect.objectContaining({ stage: 'initial.model-response', status: 'success', details: expect.objectContaining({ content: expect.stringContaining('Sure, I can help add that.') }) }))
+    expect(debug).toHaveBeenCalledWith(expect.objectContaining({ stage: 'action-recovery.normalized-plan', status: 'success', details: expect.objectContaining({ outcome: 'proposal-ready' }) }))
+    expect(debug).toHaveBeenCalledWith(expect.objectContaining({ stage: 'assistant.result', status: 'success', details: expect.objectContaining({ outcome: 'proposal-ready-after-retry' }) }))
+    expect(JSON.stringify(debug.mock.calls)).not.toContain('secret-test-key')
   })
 
   it('normalizes a room-by-room create_house response and uses room defaults for omitted dimensions', async () => {

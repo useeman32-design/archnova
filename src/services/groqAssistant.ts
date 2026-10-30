@@ -85,6 +85,12 @@ export function localSmallTalkReply(prompt: string): string | null {
   return null
 }
 
+export interface AssistantDebugEvent {
+  stage: string
+  status: 'info' | 'success' | 'warning' | 'error'
+  details?: Record<string, unknown>
+}
+
 export async function requestAssistantPlan(options: {
   apiKey: string
   model: string
@@ -92,36 +98,83 @@ export async function requestAssistantPlan(options: {
   history: { role: 'user' | 'assistant'; content: string }[]
   prompt: string
   onProgress?: (message: string) => void
+  onDebug?: (event: AssistantDebugEvent) => void
 }): Promise<AssistantPlan> {
   const { apiKey, model, context, history, prompt } = options
+  const debug = (stage: string, status: AssistantDebugEvent['status'], details?: Record<string, unknown>) => options.onDebug?.({ stage, status, details })
   options.onProgress?.('Sending a compact project summary to Groq…')
   const endpoint = `${ENDPOINT}/chat/completions`
   const selectedModel = model.trim() || DEFAULT_GROQ_MODEL
   const messages = buildRequestMessages(context, history, prompt, false)
-  let response = await groqFetchWithRetry(endpoint, makeChatRequest(apiKey, selectedModel, messages, 1400), options.onProgress)
-  let errorPayload = response.ok ? null : await response.clone().json().catch(() => null) as GroqResponse | null
+  const fetchWithDebug = async (stage: string, requestMessages: { role: string; content: string }[], maxTokens: number) => {
+    debug(`${stage}.request`, 'info', { model: selectedModel, prompt, messageCount: requestMessages.length, maxCompletionTokens: maxTokens, roomsInContext: context.rooms.length, historyCount: history.length })
+    try {
+      const result = await groqFetchWithRetry(endpoint, makeChatRequest(apiKey, selectedModel, requestMessages, maxTokens), (report) => {
+        options.onProgress?.(report)
+        if (/retrying automatically|rate-limiting/i.test(report)) debug(`${stage}.retry-progress`, 'warning', { message: report })
+      })
+      const error = result.ok ? null : await result.clone().json().catch(() => null) as GroqResponse | null
+      debug(`${stage}.http-response`, result.ok ? 'success' : 'error', { status: result.status, ok: result.ok, providerError: error?.error?.message })
+      return { response: result, error }
+    } catch (error) {
+      debug(`${stage}.request-failed`, 'error', { error: error instanceof Error ? error.message : String(error) })
+      throw error
+    }
+  }
+  debug('assistant.request-started', 'info', { model: selectedModel, prompt, projectId: context.project.id, roomsInContext: context.rooms.length })
+  let { response, error: errorPayload } = await fetchWithDebug('initial', messages, 1400)
   if (!response.ok && isTokenLimitError(errorPayload?.error?.message)) {
     options.onProgress?.('The model limit is tight; retrying with a smaller project summary…')
-    response = await groqFetchWithRetry(endpoint, makeChatRequest(apiKey, selectedModel, buildRequestMessages(context, [], prompt, true), 650), options.onProgress)
-    errorPayload = response.ok ? null : await response.clone().json().catch(() => null) as GroqResponse | null
+    const compact = await fetchWithDebug('compact-retry', buildRequestMessages(context, [], prompt, true), 650)
+    response = compact.response
+    errorPayload = compact.error
   }
   if (!response.ok) throw new Error(groqErrorMessage(response.status, errorPayload?.error?.message))
   const content = await readGroqContent(response, options.onProgress)
+  debug('initial.model-response', 'success', { content: content.slice(0, 12000), truncated: content.length > 12000 })
   options.onProgress?.('Checking the returned design operations…')
-  const firstRaw = parsePlanJson(content)
+  let firstRaw: unknown
+  try {
+    firstRaw = parsePlanJson(content)
+  } catch (error) {
+    debug('initial.parse-failed', 'error', { error: error instanceof Error ? error.message : String(error), content: content.slice(0, 12000), truncated: content.length > 12000 })
+    throw error
+  }
+  debug('initial.parsed-json', 'success', { keys: firstRaw && typeof firstRaw === 'object' && !Array.isArray(firstRaw) ? Object.keys(firstRaw) : [], valueType: Array.isArray(firstRaw) ? 'array' : typeof firstRaw })
   const firstPlan = normalizePlan(firstRaw, context.units, prompt)
-  if (!needsActionRecovery(firstRaw, firstPlan, prompt)) return firstPlan
+  const recoveryNeeded = needsActionRecovery(firstRaw, firstPlan, prompt)
+  debug('initial.normalized-plan', recoveryNeeded ? 'warning' : 'success', { plan: firstPlan, directDesignRequest: isDirectDesignRequest(prompt), actionRecoveryNeeded: recoveryNeeded })
+  if (!recoveryNeeded) {
+    debug('assistant.result', hasPlanChanges(firstPlan) ? 'success' : 'warning', { outcome: hasPlanChanges(firstPlan) ? 'proposal-ready' : isClarificationReply(firstPlan.reply) ? 'clarification-or-chat' : 'no-edit-proposal', actionTypes: firstPlan.actions.map((action) => action.type), reply: firstPlan.reply })
+    return firstPlan
+  }
 
   options.onProgress?.('The model replied without an editable operation. Retrying once with strict action instructions…')
+  debug('action-recovery.started', 'warning', { reason: 'Direct design request produced no valid operation; retrying once with strict action instructions.' })
   try {
     const recoveryMessages = buildActionRecoveryMessages(context, prompt)
-    const recoveryResponse = await groqFetchWithRetry(endpoint, makeChatRequest(apiKey, selectedModel, recoveryMessages, 900), options.onProgress)
-    if (!recoveryResponse.ok) return firstPlan
-    const recoveryContent = await readGroqContent(recoveryResponse, options.onProgress)
+    const recoveryResult = await fetchWithDebug('action-recovery', recoveryMessages, 900)
+    if (!recoveryResult.response.ok) {
+      debug('action-recovery.failed', 'error', { retainedFirstReply: true })
+      return firstPlan
+    }
+    const recoveryContent = await readGroqContent(recoveryResult.response, options.onProgress)
+    debug('action-recovery.model-response', 'success', { content: recoveryContent.slice(0, 12000), truncated: recoveryContent.length > 12000 })
     options.onProgress?.('Validating the recovered design operation…')
-    const recoveryPlan = normalizePlan(parsePlanJson(recoveryContent), context.units, prompt)
+    let recoveryRaw: unknown
+    try {
+      recoveryRaw = parsePlanJson(recoveryContent)
+    } catch (error) {
+      debug('action-recovery.parse-failed', 'error', { error: error instanceof Error ? error.message : String(error), content: recoveryContent.slice(0, 12000), truncated: recoveryContent.length > 12000 })
+      return firstPlan
+    }
+    const recoveryPlan = normalizePlan(recoveryRaw, context.units, prompt)
+    const proposalReady = hasPlanChanges(recoveryPlan)
+    debug('action-recovery.normalized-plan', proposalReady ? 'success' : 'warning', { plan: recoveryPlan, outcome: proposalReady ? 'proposal-ready' : isClarificationReply(recoveryPlan.reply) ? 'clarification-or-chat' : 'no-edit-proposal' })
+    debug('assistant.result', proposalReady ? 'success' : 'warning', { outcome: proposalReady ? 'proposal-ready-after-retry' : 'no-edit-proposal-after-retry', actionTypes: recoveryPlan.actions.map((action) => action.type), reply: recoveryPlan.reply })
     return recoveryPlan
-  } catch {
+  } catch (error) {
+    debug('action-recovery.failed', 'error', { error: error instanceof Error ? error.message : String(error), retainedFirstReply: true })
     // Keep the first model response available; the UI reports that no edits are ready.
     return firstPlan
   }
