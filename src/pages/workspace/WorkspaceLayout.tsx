@@ -16,6 +16,9 @@ import { uid } from '@/lib/id'
 import { ROOM_FURNITURE } from '@/data/catalog'
 import { canonicalFurnitureKey, findFurniturePosition, getFurnitureDimensions, validateFurniture } from '@/lib/furniture'
 import { findAvailableOpeningPosition, getFloorArchitecturalModel, validateOpenings } from '@/lib/architecturalModel'
+import { applyAssistantPlan as applyAssistantPlanChanges, type ApplyAssistantPlanResult } from '@/lib/applyAssistantPlan'
+import { conversionFactor, convertOrnaments, convertPlacedItem, convertRoomUnits, convertWallThicknesses } from '@/lib/unitConversion'
+import type { AssistantPlan } from '@/services/groqAssistant'
 import type { PendingPlacement, ToolVariant } from '@/data/toolLibrary'
 import { variantFromAsset, ASSET_LOOKUP } from '@/data/toolLibrary'
 import { Logo } from '@/components/layout/Logo'
@@ -95,6 +98,7 @@ export interface WorkspaceContext {
   propsOpen: boolean
   setPropsOpen: (open: boolean) => void
   save: () => void
+  applyAssistantPlan: (plan: AssistantPlan) => Promise<ApplyAssistantPlanResult>
   saved: boolean
   showProperties: boolean
   /* Tools */
@@ -166,13 +170,6 @@ export function WorkspaceLayout() {
   const [previewExtColor, setPreviewExtColor] = useState('#e9e4d8')
   const [previewRoofColor, setPreviewRoofColor] = useState('#33415c')
   const [previewInt, setPreviewInt] = useState<FinishOption>('wood')
-  const setUnits = useCallback((next: Units) => {
-    setUnitsState(next)
-    if (project && project.plot.units !== next) {
-      void updateProject(project.id, { plot: { ...project.plot, units: next } })
-    }
-  }, [project, updateProject])
-
   /* ---- undo / redo history ---- */
   const past = useRef<EditorState[]>([])
   const future = useRef<EditorState[]>([])
@@ -188,6 +185,45 @@ export function WorkspaceLayout() {
     })
     bumpHistory()
   }, [])
+
+  const setUnits = useCallback((next: Units) => {
+    if (!project || next === units) return
+    const convertedRooms = editor.rooms.map((room) => convertRoomUnits(room, next))
+    const roomUnits = new Map(editor.rooms.map((room) => [room.id, room.units]))
+    const convertedPlaced = Object.fromEntries(Object.entries(editor.placed).map(([roomId, items]) => [
+      roomId,
+      items.map((item) => convertPlacedItem(item, roomUnits.get(roomId) ?? units, next)),
+    ]))
+    const convertedOrnaments = convertOrnaments(editor.ornaments, units, next)
+    const convertedThicknesses = convertWallThicknesses(editor.wallThicknesses, units, next)
+    const convertedFloors = project.floors.map((floor) => ({
+      ...floor,
+      rooms: floor.level === 1 ? convertedRooms : floor.rooms.map((room) => convertRoomUnits(room, next)),
+    }))
+    const plotFactor = conversionFactor(project.plot.units, next)
+    const landscape = convertOrnaments(project.landscape ?? [], project.plot.units, next)
+    const preferences = {
+      ...project.preferences,
+      exteriorWallThickness: (project.preferences.exteriorWallThickness ?? editor.wallThicknesses.exterior) * plotFactor,
+      interiorWallThickness: (project.preferences.interiorWallThickness ?? editor.wallThicknesses.interior) * plotFactor,
+    }
+    setUnitsState(next)
+    commit((state) => ({
+      ...state,
+      rooms: convertedRooms,
+      placed: convertedPlaced,
+      ornaments: convertedOrnaments,
+      wallThicknesses: convertedThicknesses,
+    }))
+    void updateProject(project.id, {
+      plot: { ...project.plot, width: round4(project.plot.width * plotFactor), length: round4(project.plot.length * plotFactor), units: next },
+      floors: convertedFloors,
+      landscape,
+      preferences,
+    })
+    setSaved(true)
+    window.setTimeout(() => setSaved(false), 1800)
+  }, [project, units, editor.rooms, editor.placed, editor.ornaments, editor.wallThicknesses, commit, updateProject])
 
   const beginEdit = useCallback(() => {
     editSnapshot.current = null
@@ -267,7 +303,7 @@ export function WorkspaceLayout() {
         interior: project.preferences.interiorWallThickness ?? (project.plot.units === 'ft' ? 0.375 : 0.12),
       },
     })
-    setUnits(project.plot.units)
+    setUnitsState(project.plot.units)
     setSelectedRoomId(null)
     setSelectedItemId(null)
     setSelectedSiteId(null)
@@ -642,6 +678,43 @@ export function WorkspaceLayout() {
     window.setTimeout(() => setSaved(false), 1800)
   }, [project, editor.rooms, editor.ornaments, editor.wallThicknesses, previewExtColor, previewRoofColor, updateProject])
 
+  const applyAssistantPlan = useCallback(async (plan: AssistantPlan): Promise<ApplyAssistantPlanResult> => {
+    if (!project) return { ok: false, rooms: editor.rooms, placed: editor.placed, projectPatch: {}, appliedCount: 0, errors: ['The project is not loaded yet.'], warnings: [] }
+    const result = applyAssistantPlanChanges({ plan, project, rooms: editor.rooms, placed: editor.placed, wallThicknesses: editor.wallThicknesses })
+    if (!result.ok) return result
+    const roomsWithItems = result.rooms.map((room) => ({ ...room, items: result.placed[room.id] ?? room.items ?? [] }))
+    let floors = project.floors.map((floor) => floor.level === 1 ? { ...floor, rooms: roomsWithItems } : floor)
+    if (!floors.some((floor) => floor.level === 1)) floors = [{ id: uid('floor'), name: 'Ground Floor', level: 1, rooms: roomsWithItems }, ...floors]
+    const createdHouse = plan.actions.some((action) => action.type === 'create_house')
+    const nextProjectPatch: Partial<Project> = {
+      ...result.projectPatch,
+      floors,
+      preferences: {
+        ...project.preferences,
+        ...(result.projectPatch.style ? { style: result.projectPatch.style } : {}),
+        ...(result.projectPatch.roof ? { roof: result.projectPatch.roof } : {}),
+      },
+    }
+    if (createdHouse) {
+      if (nextProjectPatch.bedrooms === undefined) nextProjectPatch.bedrooms = roomsWithItems.filter((room) => room.category === 'bedroom').length
+      if (nextProjectPatch.bathrooms === undefined) nextProjectPatch.bathrooms = roomsWithItems.filter((room) => room.category === 'bathroom').length
+    }
+    try {
+      const updated = await updateProject(project.id, nextProjectPatch)
+      if (!updated) return { ...result, ok: false, errors: ['The plan was prepared, but the project could not be saved. Try again.'] }
+      commit((state) => ({ ...state, rooms: roomsWithItems, placed: result.placed }))
+      setSelectedRoomId((selected) => roomsWithItems.some((room) => room.id === selected) ? selected : null)
+      if (nextProjectPatch.roof) setPreviewRoof(nextProjectPatch.roof)
+      setSelectedItemId(null)
+      setPlacementWarning(null)
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 2200)
+      return { ...result, rooms: roomsWithItems }
+    } catch {
+      return { ...result, ok: false, errors: ['The project could not be saved. Check local storage and try again.'] }
+    }
+  }, [project, editor.rooms, editor.placed, editor.wallThicknesses, updateProject, commit])
+
   const selectedRoom = useMemo(
     () => editor.rooms.find((room) => room.id === selectedRoomId) ?? null,
     [editor.rooms, selectedRoomId],
@@ -747,6 +820,7 @@ export function WorkspaceLayout() {
     propsOpen,
     setPropsOpen,
     save,
+    applyAssistantPlan,
     saved,
     showProperties,
     tool,
@@ -910,6 +984,10 @@ export function WorkspaceLayout() {
           open={assistantOpen}
           onClose={() => setAssistantOpen(false)}
           project={project}
+          rooms={editor.rooms}
+          placed={editor.placed}
+          units={units}
+          onApplyPlan={applyAssistantPlan}
         />
       </div>
 
@@ -975,6 +1053,10 @@ function defaultItemColor(item: string): string {
 
 function round1(value: number): number {
   return Math.round(value * 10) / 10
+}
+
+function round4(value: number): number {
+  return Math.round(value * 10000) / 10000
 }
 
 function normaliseCategory(value: string): Room['category'] {

@@ -4,9 +4,10 @@ Frontend-first prototype of **ArchNova**, the AI house design & visualisation st
 Built with **React 19 + TypeScript + Vite + Tailwind CSS v4 + React Router + React Three Fiber**,
 following the supplied reference mockup.
 
-> This phase is **UI only**. There is no backend, no database, no real AI, no payments and no
-> production export. Everything labelled *simulated*, *preview* or *coming soon* in the interface
-> is intentionally inert and clearly marked.
+> This is a browser-first prototype with local project storage. The assistant can call the Groq
+> Chat Completions API when the user supplies their own API key; there is no server-side key vault,
+> backend database, or production export pipeline. AI-produced geometry is conceptual and is not
+> building-code, structural, permit, or construction validation.
 
 ---
 
@@ -25,8 +26,9 @@ npm run build     # type-check + production build into dist/
 npm run preview   # serve the production build
 ```
 
-No environment variables, no services, no Docker. The app runs entirely in the browser;
-demo data is seeded into `localStorage` on first load.
+No build-time secrets or Docker are required. Project data is stored in browser `localStorage`.
+The optional Groq key is entered in the assistant and held in that tab's `sessionStorage`; requests
+are sent directly from the browser to Groq, so do not use this on a shared/untrusted browser.
 
 ## Routes
 
@@ -43,10 +45,12 @@ demo data is seeded into `localStorage` on first load.
 | `/workspace/:id/3d`     | F — 3D preview (orbit/zoom, exterior/interior, roof & finish switches)   |
 | `/workspace/:id/drawings` | G — Drawing set for one project                            |
 
-The workspace also hosts the **D — AI Assistant** slide-over panel (toolbar button or
-`?assistant=1`), clearly labelled as a simulated demonstration. Both side panels (workspace
-rail and properties) collapse with arrow buttons; the 2D canvas switches to 3D with a tab so
-only one preview is on screen at a time.
+The workspace also hosts the **AI Assistant** slide-over panel. Paste a Groq key and model ID,
+test the connection, describe a complete floor plan or request room-shape, room-size, door/window, furniture, or finish
+edits, then review and apply the proposed operations. Supported edits update the shared 2D/3D project
+model and save to the current project. The assistant key is never saved in project/chat data.
+Geometry checks are guardrails, not code compliance. Both side panels (workspace rail and
+properties) collapse with arrow buttons; the 2D canvas switches to 3D with a tab.
 
 ## Folder structure
 
@@ -67,24 +71,34 @@ src/
   pages/workspace/ WorkspaceLayout + Overview / FloorPlanEditor / ThreeD / Drawings
   data/            catalog (options), projects (samples), documents (drawing set)
   types/           Domain models: Project, Plot, Room, Element, Budget, preferences, exports
-  lib/             format, storage, id, floorPlan (demo layout builder), projectFactory, defaultForm
-  services/        Contracts only: projectService (localStorage impl), aiService (simulated),
-                   geometryService, threeModelService, costService, exportService (placeholders)
+  lib/             format, storage, id, floorPlan, furniture/architecture geometry, plan validation
+  services/        projectService (localStorage), groqAssistant (direct client), export/model stubs
   hooks/           useProjects, useLocalStorage, useMediaQuery
 ```
 
-## Swapping in real systems later
+## Groq assistant
 
-* **Project API** — implement `ProjectService` (`src/services/projectService.ts`) against your
-  PHP/MySQL REST endpoints; components only use the interface via `useProjects`.
-* **AI** — replace `createSimulatedAIService()` with a client for the interpretation API; the
-  assistant panel already renders `InterpretationResult` (summary, suggestions, warnings).
-* **Geometry engine** — `src/lib/floorPlan.ts` is a demo-only layout builder; replace with the
-  real engine producing `Floor[]/Room[]` in the same shapes.
-* **3D** — `MassingCanvas.tsx` (React Three Fiber) is the placeholder scene; swap in a GLTF-loaded
-  model through `threeModelService` without touching the pages.
-* **Exports** — `exportService.exportDocument` currently returns labelled "preview" results.
-* **Storage** — all persistence funnels through `src/lib/storage.ts` (single prefix, JSON).
+1. Open a project workspace and select **Assistant**.
+2. Paste a Groq API key in the **Groq API key** field. It is held only in the current browser
+   tab's `sessionStorage`; it is not written to project data or chat history.
+3. Keep the default model ID (`llama-3.3-70b-versatile`) or replace it with a model available to
+   your Groq account. Use **Test key** to check the key/model before sending a prompt.
+4. Describe a new floor plan or changes to existing rooms. The assistant returns a constrained JSON
+   plan, which the app validates and shows for review. **Apply and save** writes accepted edits to
+   the current project and updates the live 2D/3D editor. **Discard** makes no design changes.
+
+The browser sends prompts and project context directly to Groq; this prototype has no server proxy.
+Review your provider settings and do not paste secrets into the chat prompt. AI-generated layouts
+are schematic and are not professional, structural, permit, or building-code advice.
+
+## Remaining prototype boundaries
+
+* **Geometry engine** — the editor has editable rooms, shared walls, openings, and furniture, but
+  arbitrary partial-wall intersections/custom room splitting are not fully robust.
+* **3D** — `MassingCanvas.tsx` is a stylized massing/fixture preview, not a construction model.
+* **Exports** — `exportService.exportDocument` still reports labelled preview/coming-soon results;
+  floor-plan printing can use the browser's Print / Save as PDF dialog.
+* **Storage** — project persistence is local browser storage; no synchronized backend exists.
 
 ## Sample data
 
@@ -126,7 +140,10 @@ instead of squeezing the desktop grid. The 3D viewer and plan canvas remain touc
 
 ## Honest-labelling rules honoured in this prototype
 
-* The assistant never claims to generate a design; every reply is marked *Simulated response*.
-* The 3D view is an interactive **massing** preview, labelled as such — not a finished render.
-* Export buttons report preview/coming-soon states instead of producing files.
-* Dimension/area figures come from the demo layout builder and are marked as demonstration values.
+* The assistant uses the user's Groq key to propose conceptual room-plan edits; the user reviews each
+  action before application. Generated plans are not code-compliance or structural validation.
+* The 3D view is an interactive **massing** preview, not a finished render or construction model.
+* Document-export controls still identify preview/coming-soon results; floor-plan printing is
+  available through the browser print dialog.
+* Geometry warnings flag common room, opening, furniture and plot conflicts only; they do not
+  establish building-code compliance.

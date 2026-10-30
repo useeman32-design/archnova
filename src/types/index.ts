@@ -250,9 +250,9 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   text: string
   createdAt: number
-  /** True while a simulated response is being produced. */
+  /** True while a model response is being produced. */
   pending?: boolean
-  /** Present on assistant turns that are frontend simulations. */
+  /** Legacy marker retained so earlier stored demo chats remain identifiable. */
   simulated?: boolean
 }
 

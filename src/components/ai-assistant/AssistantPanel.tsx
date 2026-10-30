@@ -1,376 +1,298 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowUp, Info, Sparkles, Trash2, Wand2, X } from 'lucide-react'
-import type { ChatMessage, InterpretationResult, Project } from '@/types'
-import { aiService, getExamplePrompts } from '@/services/aiService'
+import { ArrowUp, Check, Eye, EyeOff, Loader2, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react'
+import type { ChatMessage, PlacedItem, Project, Room, Units } from '@/types'
+import { getExamplePrompts } from '@/services/aiService'
+import { DEFAULT_GROQ_MODEL, requestAssistantPlan, testGroqConnection, type AssistantAction, type AssistantPlan } from '@/services/groqAssistant'
+import type { ApplyAssistantPlanResult } from '@/lib/applyAssistantPlan'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
-import { useProjects } from '@/hooks/useProjects'
 import { storageKeys } from '@/lib/storage'
 import { uid } from '@/lib/id'
-import { parseBrief, type ParsedBrief } from '@/lib/briefParser'
 import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
-import { LogoMark } from '@/components/layout/Logo'
-import { formatDimensions } from '@/lib/format'
 
-const TONE_STYLES: Record<string, string> = {
-  improve: 'bg-brand-50 text-brand-700',
-  add: 'bg-emerald-50 text-emerald-700',
-  reduce: 'bg-amber-50 text-amber-700',
-  style: 'bg-violet-50 text-violet-700',
-}
-
-const CREATE_VERBS = /(build|create|make|design|draft|plan|generate)/
+const GROQ_KEY_STORAGE = 'archnova:groq-api-key'
+const GROQ_MODEL_STORAGE = 'archnova:groq-model'
 
 export function AssistantPanel({
   open,
   onClose,
   project,
+  rooms,
+  placed,
+  units,
+  onApplyPlan,
 }: {
   open: boolean
   onClose: () => void
   project: Project
+  rooms: Room[]
+  placed: Record<string, PlacedItem[]>
+  units: Units
+  onApplyPlan: (plan: AssistantPlan) => Promise<ApplyAssistantPlanResult>
 }) {
-  const navigate = useNavigate()
-  const { createProject } = useProjects()
   const chatKey = `${storageKeys.aiChat}:${project.id}`
   const [messages, setMessages, resetChat] = useLocalStorage<ChatMessage[]>(chatKey, [])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<InterpretationResult | null>(null)
-  const [brief, setBrief] = useState<ParsedBrief | null>(null)
-  const [bootStage, setBootStage] = useState(0)
+  const [testingKey, setTestingKey] = useState(false)
+  const [apiKey, setApiKey] = useState(readSessionValue(GROQ_KEY_STORAGE))
+  const [model, setModel] = useState(readSessionValue(GROQ_MODEL_STORAGE) || DEFAULT_GROQ_MODEL)
+  const [showKey, setShowKey] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState('')
+  const [requestError, setRequestError] = useState('')
+  const [pendingPlan, setPendingPlan] = useState<AssistantPlan | null>(null)
+  const [applyStatus, setApplyStatus] = useState<{ ok: boolean; message: string; warnings: string[] } | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  const started = project.floors.some((floor) => floor.rooms.length > 0)
-
-  /* Boot sequence: plays each time the panel opens on an empty conversation. */
   useEffect(() => {
-    if (!open) {
-      setBootStage(0)
+    if (open) endRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'end' })
+  }, [messages, open, busy, pendingPlan, applyStatus])
+
+  const updateApiKey = (value: string) => {
+    setApiKey(value)
+    setConnectionStatus('')
+    setRequestError('')
+    try {
+      if (value.trim()) sessionStorage.setItem(GROQ_KEY_STORAGE, value.trim())
+      else sessionStorage.removeItem(GROQ_KEY_STORAGE)
+    } catch { /* Browser storage may be disabled; the in-memory key still works. */ }
+  }
+
+  const updateModel = (value: string) => {
+    setModel(value)
+    setConnectionStatus('')
+    try {
+      if (value.trim()) sessionStorage.setItem(GROQ_MODEL_STORAGE, value.trim())
+      else sessionStorage.removeItem(GROQ_MODEL_STORAGE)
+    } catch { /* Model remains available for this component session. */ }
+  }
+
+  const testKey = async () => {
+    if (!apiKey.trim()) {
+      setConnectionStatus('Paste a Groq API key first.')
       return
     }
-    if (messages.length > 0) {
-      setBootStage(3)
-      return
+    setTestingKey(true)
+    setConnectionStatus('Checking key and model…')
+    try {
+      await testGroqConnection(apiKey, model)
+      setConnectionStatus(`Connected — ${model.trim() || DEFAULT_GROQ_MODEL} is available.`)
+    } catch (error) {
+      setConnectionStatus(error instanceof Error ? error.message : 'Could not verify the Groq key.')
+    } finally {
+      setTestingKey(false)
     }
-    setBootStage(1)
-    const t1 = window.setTimeout(() => setBootStage(2), 700)
-    const t2 = window.setTimeout(() => setBootStage(3), 1500)
-    return () => {
-      window.clearTimeout(t1)
-      window.clearTimeout(t2)
-    }
-  }, [open, messages.length])
-
-  useEffect(() => {
-    /* Only auto-scroll while the panel is actually open — scrolling a closed
-       (off-screen) panel into view would drag the workspace sideways. */
-    if (!open) return
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages, open, bootStage])
+  }
 
   const send = async (raw: string) => {
     const text = raw.trim()
     if (!text || busy) return
+    if (!apiKey.trim()) {
+      setRequestError('Paste your Groq API key above before sending a prompt.')
+      return
+    }
     setInput('')
     setBusy(true)
-    const parsed = parseBrief(text, project.location)
-    const wantsCreate = CREATE_VERBS.test(text.toLowerCase())
-    setBrief(wantsCreate && parsed.confident ? parsed : null)
+    setRequestError('')
+    setPendingPlan(null)
+    setApplyStatus(null)
     const pendingId = uid('msg')
-    setMessages((prev) => [
-      ...prev,
+    const history = messages
+      .filter((message) => !message.pending && !message.simulated)
+      .slice(-10)
+      .map((message) => ({ role: message.role, content: message.text }))
+    setMessages((previous) => [
+      ...previous,
       { id: uid('msg'), role: 'user', text, createdAt: Date.now() },
       { id: pendingId, role: 'assistant', text: '', createdAt: Date.now(), pending: true },
     ])
-    const interpretation = await aiService.interpret(text, { plot: project.plot })
-    setMessages((prev) =>
-      prev.map((message) =>
-        message.id === pendingId
-          ? { ...message, text: interpretation.summary, pending: false, simulated: true }
-          : message,
-      ),
-    )
-    setResult(interpretation)
-    setBusy(false)
+    try {
+      const plan = await requestAssistantPlan({
+        apiKey,
+        model,
+        context: { project, rooms, placed, units },
+        history,
+        prompt: text,
+      })
+      setPendingPlan(plan.actions.length || plan.project || plan.plot ? plan : null)
+      setMessages((previous) => previous.map((message) => message.id === pendingId
+        ? { ...message, text: plan.reply || 'I have prepared a response.', pending: false }
+        : message))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The Groq request failed. Try again.'
+      setRequestError(message)
+      setMessages((previous) => previous.map((item) => item.id === pendingId
+        ? { ...item, text: `I couldn't reach Groq: ${message}`, pending: false }
+        : item))
+    } finally {
+      setBusy(false)
+    }
   }
 
-  const createFromBrief = async () => {
-    if (!brief) return
-    const created = await createProject(brief.form)
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: uid('msg'),
-        role: 'assistant',
-        text: `Project "${created.name}" created from your brief and opened in the workspace. Dimensions and layout are demonstration values until the generation engine is connected.`,
-        createdAt: Date.now(),
-        simulated: true,
-      },
-    ])
-    setBrief(null)
-    onClose()
-    navigate(`/workspace/${created.id}`)
+  const applyPlan = async () => {
+    if (!pendingPlan || busy) return
+    setBusy(true)
+    setApplyStatus(null)
+    setRequestError('')
+    try {
+      const result = await onApplyPlan(pendingPlan)
+      if (!result.ok) {
+        setApplyStatus({ ok: false, message: result.errors.join(' '), warnings: [] })
+        return
+      }
+      const message = `Applied ${result.appliedCount} design change${result.appliedCount === 1 ? '' : 's'} and saved the project.`
+      setApplyStatus({ ok: true, message, warnings: result.warnings })
+      setMessages((previous) => [...previous, { id: uid('msg'), role: 'assistant', text: message, createdAt: Date.now() }])
+      setPendingPlan(null)
+    } catch (error) {
+      setApplyStatus({ ok: false, message: error instanceof Error ? error.message : 'The design update could not be applied.', warnings: [] })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const clearConversation = () => {
+    resetChat()
+    setPendingPlan(null)
+    setApplyStatus(null)
+    setRequestError('')
+    setInput('')
   }
 
   return (
     <aside
-      className={`absolute inset-y-0 right-0 z-40 flex w-full max-w-[26rem] flex-col border-l border-line bg-surface shadow-2xl transition-transform duration-300 ${
-        open ? 'translate-x-0 visible' : 'translate-x-full invisible'
-      }`}
+      className={`absolute inset-y-0 right-0 z-40 flex w-full max-w-[27rem] flex-col border-l border-line bg-surface shadow-2xl transition-transform duration-300 ${open ? 'translate-x-0 visible' : 'translate-x-full invisible'}`}
       aria-hidden={!open}
       aria-label="AI assistant"
     >
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
-            <Sparkles className="h-4 w-4" />
-          </span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white"><Sparkles className="h-4 w-4" /></span>
           <div>
             <p className="text-[14px] font-semibold leading-tight text-ink-text">AI Assistant</p>
-            <p className="text-[11px] text-muted">Design copilot for {project.name}</p>
+            <p className="text-[11px] text-muted">Groq design copilot · {project.name}</p>
           </div>
           <Badge tone="violet">Beta</Badge>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => {
-              resetChat()
-              setResult(null)
-              setBrief(null)
-              setBootStage(1)
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text"
-            aria-label="Clear conversation"
-            title="Clear conversation"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text"
-            aria-label="Close assistant"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <button type="button" onClick={clearConversation} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text" aria-label="Clear conversation" title="Clear conversation"><Trash2 className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas-soft hover:text-ink-text" aria-label="Close assistant"><X className="h-4 w-4" /></button>
         </div>
       </div>
 
-      <div className="border-b border-line-soft bg-brand-50/60 px-4 py-2.5">
-        <p className="text-[11.5px] leading-relaxed text-brand-800">
-          <span className="font-semibold">Simulated assistant.</span> Replies are canned frontend
-          demonstrations; brief parsing runs on-device. No design is generated and no AI service is
-          called in this prototype.
-        </p>
-      </div>
+      <section className="space-y-2.5 border-b border-line bg-brand-50/60 px-3.5 py-3" aria-label="Groq API settings">
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor="groq-api-key" className="text-[11px] font-semibold uppercase tracking-wide text-brand-900">Groq API key</label>
+          <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="ml-auto text-[10px] font-medium text-brand-700 underline underline-offset-2">Get a key</a>
+          <button type="button" onClick={() => void testKey()} disabled={testingKey || !apiKey.trim()} className="rounded-md border border-brand-200 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-800 disabled:opacity-50">
+            {testingKey ? 'Testing…' : 'Test key'}
+          </button>
+        </div>
+        <div className="flex gap-1.5">
+          <input
+            id="groq-api-key"
+            type={showKey ? 'text' : 'password'}
+            value={apiKey}
+            onChange={(event) => updateApiKey(event.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="Paste gsk_… API key"
+            className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-3 py-2 text-[12px] text-ink-text placeholder:text-faint focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          />
+          <button type="button" onClick={() => setShowKey((visible) => !visible)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand-200 bg-white text-muted" aria-label={showKey ? 'Hide API key' : 'Show API key'}>
+            {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+          {apiKey ? <button type="button" onClick={() => updateApiKey('')} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand-200 bg-white text-muted" aria-label="Clear API key" title="Clear API key"><X className="h-4 w-4" /></button> : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor="groq-model" className="shrink-0 text-[11px] font-medium text-brand-900">Model ID</label>
+          <input id="groq-model" value={model} onChange={(event) => updateModel(event.target.value)} placeholder={DEFAULT_GROQ_MODEL} className="min-w-0 flex-1 rounded-md border border-brand-200 bg-white px-2 py-1.5 text-[11px] text-ink-text focus:border-brand-500 focus:outline-none" />
+        </div>
+        <p className="text-[10px] leading-relaxed text-brand-900/75">Key stays in this browser tab’s session storage, not in your project or chat. Your prompt and room summary go directly from this browser to Groq.</p>
+        {connectionStatus ? <p role="status" className={`text-[10.5px] leading-relaxed ${/connected/i.test(connectionStatus) ? 'text-emerald-700' : 'text-brand-900'}`}>{/connected/i.test(connectionStatus) ? <Check className="mr-1 inline h-3 w-3" /> : null}{connectionStatus}</p> : null}
+      </section>
 
       <div className="flex-1 space-y-4 overflow-y-auto scroll-thin p-4">
-        {bootStage < 3 ? (
-          <div className="flex flex-col items-center gap-4 pt-10 text-center animate-fade-in">
-            <span className={bootStage >= 1 ? 'animate-pulse' : ''}>
-              <LogoMark size={52} />
-            </span>
-            <p className="text-[13px] font-medium text-ink-text">Starting assistant…</p>
-            <div className="flex gap-1.5">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="h-2 w-2 animate-bounce rounded-full bg-brand-500"
-                  style={{ animationDelay: `${i * 120}ms` }}
-                />
-              ))}
-            </div>
-          </div>
-        ) : messages.length === 0 ? (
+        {messages.length === 0 ? (
           <div className="space-y-4 animate-fade-in">
             <div className="rounded-2xl rounded-tl-sm border border-line bg-canvas-soft/70 p-4">
-              <p className="text-[14px] font-semibold text-ink-text">
-                What would you like to build?
-              </p>
-              <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
-                {started
-                  ? `I see you've started: a ${project.bedrooms}-bedroom ${project.buildingType} on a ${formatDimensions(
-                      project.plot.width,
-                      project.plot.length,
-                      project.plot.units,
-                    )} plot${project.location ? ` in ${project.location}` : ''}. I can help refine it — or describe something completely new and I'll draft the brief.`
-                  : 'Describe your house in plain language and I’ll draft a project brief you can create in one click — or open the questionnaire and build it manually step by step.'}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  onClick={() => inputRef.current?.focus()}
-                  className="rounded-full bg-brand-600 px-3 py-1.5 text-[12px] font-medium text-white shadow-sm shadow-brand-600/25 hover:bg-brand-700"
-                >
-                  Describe a new build
-                </button>
-                {started ? (
-                  <button
-                    onClick={() => void send('Suggest improvements for my current design')}
-                    className="rounded-full bg-surface px-3 py-1.5 text-[12px] font-medium text-brand-700 ring-1 ring-line hover:bg-brand-50"
-                  >
-                    Help with my current design
-                  </button>
-                ) : null}
-              </div>
+              <p className="text-[14px] font-semibold text-ink-text">Describe the house or change you want.</p>
+              <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">With a key connected, I can propose a room layout, add doors/windows and furniture, resize or rename rooms, and set finishes. Review proposed edits before applying; accepted changes update the 2D/3D model and save into this project.</p>
             </div>
             <div>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                Example prompts
-              </p>
-              {getExamplePrompts().map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => void send(prompt)}
-                  className="mb-2 block w-full rounded-xl border border-line bg-surface p-3 text-left text-[12.5px] leading-relaxed text-ink-text transition-colors hover:border-brand-300 hover:bg-brand-50/50"
-                >
-                  {prompt}
-                </button>
-              ))}
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">Try a prompt</p>
+              {getExamplePrompts().map((prompt) => <button key={prompt} type="button" onClick={() => { setInput(prompt); inputRef.current?.focus() }} className="mb-2 block w-full rounded-xl border border-line bg-surface p-3 text-left text-[12px] leading-relaxed text-ink-text transition-colors hover:border-brand-300 hover:bg-brand-50/50">{prompt}</button>)}
             </div>
           </div>
-        ) : (
-          messages.map((message) => (
-            <div key={message.id} className={message.role === 'user' ? 'flex justify-end' : ''}>
-              <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
-                  message.role === 'user'
-                    ? 'bg-brand-600 text-white'
-                    : 'border border-line bg-canvas-soft/70 text-ink-text'
-                }`}
-              >
-                {message.pending ? (
-                  <span className="inline-flex items-center gap-1.5 text-muted">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-500" />
-                    Thinking…
-                  </span>
-                ) : (
-                  message.text
-                )}
-                {message.simulated ? (
-                  <span className="mt-1.5 block text-[10.5px] font-medium uppercase tracking-wide text-faint">
-                    Simulated response
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          ))
-        )}
-
-        {brief ? (
-          <div className="rounded-xl border border-brand-200 bg-brand-50/70 p-4 animate-fade-in">
-            <div className="flex items-center gap-2">
-              <Wand2 className="h-4 w-4 text-brand-700" />
-              <p className="text-[13px] font-semibold text-brand-800">Brief understood</p>
-            </div>
-            <p className="mt-1.5 text-[12px] leading-relaxed text-brand-800/90">{brief.summary}</p>
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              <span className="rounded-md bg-surface px-2 py-1 text-[11px] font-medium text-ink-text ring-1 ring-brand-200">
-                {brief.form.bedrooms} bed · {brief.form.bathrooms} bath
-              </span>
-              <span className="rounded-md bg-surface px-2 py-1 text-[11px] font-medium text-ink-text ring-1 ring-brand-200">
-                {formatDimensions(brief.form.plotWidth, brief.form.plotLength, brief.form.units)}
-              </span>
-              <span className="rounded-md bg-surface px-2 py-1 text-[11px] font-medium capitalize text-ink-text ring-1 ring-brand-200">
-                {brief.form.buildingType}
-              </span>
-            </div>
-            <Button variant="primary" size="sm" className="mt-3" onClick={() => void createFromBrief()}>
-              Create project from this brief
-            </Button>
-            <p className="mt-2 text-[10.5px] leading-relaxed text-brand-800/70">
-              Parsed on-device from your sentence — a demo of the future AI brief interpreter. You
-              can also build manually via New Project → questionnaire.
-            </p>
-          </div>
-        ) : null}
-
-        {result ? (
-          <div className="space-y-3">
-            {result.warnings.length > 0 ? (
-              <div className="space-y-2">
-                {result.warnings.map((warning) => (
-                  <div
-                    key={warning.id}
-                    className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5"
-                  >
-                    {warning.level === 'info' ? (
-                      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-                    ) : (
-                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-                    )}
-                    <p className="text-[12px] leading-relaxed text-amber-800">{warning.text}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-line px-3 py-2.5">
-                <p className="text-[11.5px] text-faint">
-                  Feasibility warnings will appear here once the geometry engine is connected.
-                </p>
-              </div>
-            )}
-
-            <div>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                Suggestions
-              </p>
-              <div className="space-y-2">
-                {result.suggestions.map((suggestion) => (
-                  <div key={suggestion.id} className="rounded-xl border border-line p-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`rounded-md px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide ${TONE_STYLES[suggestion.tone] ?? 'bg-canvas-soft text-muted'}`}
-                      >
-                        {suggestion.tone}
-                      </span>
-                      <span className="text-[13px] font-medium text-ink-text">{suggestion.title}</span>
-                    </div>
-                    <p className="mt-1.5 text-[12px] leading-relaxed text-muted">{suggestion.detail}</p>
-                  </div>
-                ))}
-              </div>
+        ) : messages.map((message) => (
+          <div key={message.id} className={message.role === 'user' ? 'flex justify-end' : ''}>
+            <div className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${message.role === 'user' ? 'bg-brand-600 text-white' : 'border border-line bg-canvas-soft/70 text-ink-text'}`}>
+              {message.pending ? <span className="inline-flex items-center gap-1.5 text-muted"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-500" />Thinking with Groq…</span> : message.text}
+              {message.simulated ? <span className="mt-1.5 block text-[10px] font-medium uppercase tracking-wide text-faint">Earlier demo response</span> : null}
             </div>
           </div>
-        ) : null}
+        ))}
+
+        {pendingPlan ? <PlanPreview plan={pendingPlan} onApply={() => void applyPlan()} onDiscard={() => { setPendingPlan(null); setApplyStatus(null) }} busy={busy} /> : null}
+        {applyStatus ? <div role={applyStatus.ok ? 'status' : 'alert'} className={`rounded-xl border p-3 text-[12px] leading-relaxed ${applyStatus.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+          <p className="font-medium">{applyStatus.message}</p>
+          {applyStatus.warnings.map((warning, index) => <p key={index} className="mt-1 text-[11px]">Check: {warning}</p>)}
+        </div> : null}
+        {requestError ? <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11.5px] leading-relaxed text-red-800">{requestError}</div> : null}
         <div ref={endRef} />
       </div>
 
-      <form
-        className="border-t border-line p-3"
-        onSubmit={(event) => {
-          event.preventDefault()
-          void send(input)
-        }}
-      >
+      <form className="border-t border-line p-3" onSubmit={(event) => { event.preventDefault(); void send(input) }}>
         <div className="flex items-end gap-2">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault()
-                void send(input)
-              }
-            }}
-            rows={2}
-            placeholder="e.g. Build a 4-bedroom duplex on a 60 × 80 ft plot with a pool…"
-            className="max-h-32 min-h-[44px] w-full resize-y rounded-xl border border-line bg-canvas-soft/60 px-3 py-2.5 text-[13px] text-ink-text placeholder:text-faint focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          />
-          <button
-            type="submit"
-            disabled={busy || !input.trim()}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm shadow-brand-600/25 transition-colors hover:bg-brand-700 disabled:opacity-50"
-            aria-label="Send message"
-          >
-            <ArrowUp className="h-4 w-4" />
+          <textarea ref={inputRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(input) } }} rows={2} placeholder="e.g. Create a 3-bedroom bungalow on my 50 × 50 ft plot…" className="max-h-32 min-h-[44px] w-full resize-y rounded-xl border border-line bg-canvas-soft/60 px-3 py-2.5 text-[13px] text-ink-text placeholder:text-faint focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
+          <button type="submit" disabled={busy || !input.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm shadow-brand-600/25 transition-colors hover:bg-brand-700 disabled:opacity-50" aria-label="Send message">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
           </button>
         </div>
-        <p className="mt-2 text-[11px] text-faint">Enter to send · Shift+Enter for a new line</p>
+        <p className="mt-2 text-[10.5px] text-faint">Enter to send · Shift+Enter for a new line · design edits require your approval</p>
       </form>
     </aside>
   )
+}
+
+function PlanPreview({ plan, onApply, onDiscard, busy }: { plan: AssistantPlan; onApply: () => void; onDiscard: () => void; busy: boolean }) {
+  const hasChanges = plan.actions.length > 0 || Boolean(plan.project) || Boolean(plan.plot)
+  if (!hasChanges) return null
+  return (
+    <section className="rounded-xl border border-brand-200 bg-brand-50/70 p-3" aria-label="Proposed design edits">
+      <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-brand-700" /><h3 className="text-[12.5px] font-semibold text-brand-900">Review proposed edits</h3></div>
+      <ul className="mt-2 space-y-1.5">
+        {plan.actions.map((action, index) => <li key={`${action.type}-${index}`} className="rounded-md bg-white/80 px-2.5 py-1.5 text-[11px] text-ink-text">{describeAction(action)}</li>)}
+        {plan.plot ? <li className="rounded-md bg-white/80 px-2.5 py-1.5 text-[11px] text-ink-text">Adjust plot dimensions{plan.plot.width ? ` to ${plan.plot.width}` : ''}{plan.plot.length ? ` × ${plan.plot.length}` : ''}{plan.plot.units ? ` ${plan.plot.units}` : ''}</li> : null}
+        {plan.project ? <li className="rounded-md bg-white/80 px-2.5 py-1.5 text-[11px] text-ink-text">Update project details: {Object.keys(plan.project).join(', ')}</li> : null}
+      </ul>
+      <p className="mt-2 text-[10px] leading-relaxed text-brand-900/75">The editor checks geometry before applying. This is a conceptual design aid, not building-code or permit validation.</p>
+      <div className="mt-2.5 flex gap-2">
+        <button type="button" onClick={onApply} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-[11.5px] font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}Apply and save</button>
+        <button type="button" onClick={onDiscard} disabled={busy} className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-[11.5px] font-medium text-brand-800 disabled:opacity-50">Discard</button>
+      </div>
+    </section>
+  )
+}
+
+function describeAction(action: AssistantAction): string {
+  switch (action.type) {
+    case 'create_house': return `${action.replaceExisting === false ? 'Add' : 'Create'} floor plan with ${action.rooms.length} room${action.rooms.length === 1 ? '' : 's'}: ${action.rooms.slice(0, 5).map((room) => room.name).join(', ')}${action.rooms.length > 5 ? ', …' : ''}`
+    case 'add_room': return `Add ${action.room.name} (${action.room.width} × ${action.room.length})`
+    case 'resize_room': return `Resize ${action.room}${action.width ? ` to ${action.width}` : ''}${action.length ? ` × ${action.length}` : ''}`
+    case 'move_room': return `Move ${action.room} to (${action.x}, ${action.y})`
+    case 'rename_room': return `Rename ${action.room} to ${action.name}`
+    case 'remove_room': return `Remove ${action.room}`
+    case 'set_room_shape': return `Change ${action.room} to ${action.shape}-shaped`
+    case 'add_opening': return `Add ${action.kind} in ${action.room}${action.width ? ` (${action.width} wide)` : ''}`
+    case 'edit_opening': return `Edit ${action.opening} in ${action.room}`
+    case 'remove_opening': return `Remove ${action.opening ?? action.kind ?? 'opening'} from ${action.room}`
+    case 'add_furniture': return `Place ${action.item} in ${action.room}`
+    case 'remove_furniture': return `Remove ${action.item} from ${action.room}`
+    case 'set_room_finish': return `Set ${action.room} finish to ${action.finish}`
+  }
+}
+
+function readSessionValue(key: string): string {
+  try { return sessionStorage.getItem(key) ?? '' } catch { return '' }
 }

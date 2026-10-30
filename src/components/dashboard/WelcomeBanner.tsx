@@ -66,7 +66,7 @@ export function WelcomeBanner({
               label="Last activity"
               value={lastUpdated ?? 'No projects yet'}
             />
-            <Stat icon={<Sparkles className="h-4 w-4" />} label="AI assistant" value="Ready to preview" />
+            <Stat icon={<Sparkles className="h-4 w-4" />} label="AI assistant" value="Groq key supported" />
           </div>
         </div>
 

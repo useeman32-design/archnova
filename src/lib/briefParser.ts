@@ -7,8 +7,8 @@ import { defaultNewProjectForm } from './defaultForm'
  * Extracts the obvious facts from a natural-language sentence — bedroom count,
  * plot size, building type, outdoor features — so the assistant can offer to
  * create a project straight from a prompt. This is a *frontend stand-in* for
- * the real AI interpretation service (`@/services/aiService`); it is labelled
- * as such in the UI and never claims design generation.
+ * the Groq-powered workspace assistant now handles these prompts directly;
+ * this small parser remains as a standalone offline utility for forms only.
  */
 
 export interface ParsedBrief {

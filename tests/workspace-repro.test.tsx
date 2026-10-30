@@ -6,7 +6,7 @@
  * errors are thrown with full stacks.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { render, waitFor, cleanup } from '@testing-library/react'
+import { render, waitFor, cleanup, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import App from '@/App'
 import { ASSETS } from '@/data/assets'
@@ -176,4 +176,21 @@ describe('workspace opens', () => {
       cleanup()
     }
   }, 60000)
+
+  it('opens the Groq assistant with an API-key field and actionable error without a key', async () => {
+    localStorage.clear()
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    await waitFor(() => expect(projectIdsFromStorage().length).toBeGreaterThan(0), { timeout: 5000 })
+    const id = projectIdsFromStorage()[0]
+    cleanup()
+    render(<MemoryRouter initialEntries={[`/workspace/${id}`]}><App /></MemoryRouter>)
+    await waitFor(() => expect(document.body.textContent).toMatch(/Floor Plan|Save/), { timeout: 8000 })
+    fireEvent.click(screen.getByRole('button', { name: 'Assistant' }))
+    expect(await screen.findByLabelText('Groq API key')).toBeTruthy()
+    expect(screen.getByLabelText('Model ID')).toBeTruthy()
+    fireEvent.change(screen.getByPlaceholderText(/Create a 3-bedroom bungalow/), { target: { value: 'Add a study room' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('Paste your Groq API key')
+    cleanup()
+  }, 30000)
 })

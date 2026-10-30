@@ -12,7 +12,7 @@ const PRO_FEATURES = [
 const FREE_FEATURES = [
   'Up to 3 saved projects',
   '2D plan preview and 3D walkthrough',
-  'AI assistant (preview)',
+  'Groq assistant (bring your API key)',
   'Community support',
 ]
 
