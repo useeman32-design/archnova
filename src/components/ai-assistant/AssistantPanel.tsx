@@ -51,6 +51,7 @@ export function AssistantPanel({
   const [applyStatus, setApplyStatus] = useState<{ ok: boolean; message: string; warnings: string[] } | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const applyPlanRef = useRef<() => Promise<void>>(async () => undefined)
   const migratedChat = useRef(false)
 
   useEffect(() => {
@@ -109,6 +110,13 @@ export function AssistantPanel({
   const send = async (raw: string) => {
     const text = raw.trim()
     if (!text || busy) return
+    if (pendingPlan && isApplyConfirmation(text)) {
+      setInput('')
+      setRequestError('')
+      setMessages((previous) => [...previous, { id: uid('msg'), role: 'user', text, createdAt: Date.now() }])
+      void applyPlanRef.current()
+      return
+    }
     const smallTalk = localSmallTalkReply(text)
     if (smallTalk) {
       setInput('')
@@ -214,6 +222,8 @@ export function AssistantPanel({
       setApplyProgress(null)
     }
   }
+
+  applyPlanRef.current = applyPlan
 
   const clearConversation = () => {
     resetChat()
@@ -332,6 +342,10 @@ function PlanPreview({ plan, onApply, onDiscard, onChooseVariant, busy, progress
       </div>
     </section>
   )
+}
+
+function isApplyConfirmation(value: string): boolean {
+  return /^(?:yes|yes please|go ahead|do it|make it|create it|build it|apply|apply it|apply and save|approve|approve it|approved|save it|proceed|looks good|use this|create the house|create the plan|generate it)[.! ]*$/i.test(value.trim())
 }
 
 function choiceVariants(action: AssistantAction): ToolVariant[] {
