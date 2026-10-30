@@ -81,8 +81,9 @@ src/
 1. Open a project workspace and select **Assistant**.
 2. Paste a Groq API key in the **Groq API key** field. It is held only in the current browser
    tab's `sessionStorage`; it is not written to project data or chat history.
-3. Keep the default model ID (`llama-3.3-70b-versatile`) or replace it with a model available to
-   your Groq account. Use **Test key** to check the key/model before sending a prompt.
+3. Keep the default model ID (`openai/gpt-oss-20b`) or enter one available to your account. Use
+   **Check models** to verify the key and load the models your account can use; ArchNova will
+   switch away from an unavailable model automatically.
 4. Describe a new floor plan or changes to existing rooms. The assistant returns a constrained JSON
    plan, which the app validates and shows for review. **Apply and save** writes accepted edits to
    the current project and updates the live 2D/3D editor. **Discard** makes no design changes.

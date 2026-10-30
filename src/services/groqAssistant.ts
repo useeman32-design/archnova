@@ -39,7 +39,7 @@ export interface GroqContext {
 }
 
 const ENDPOINT = 'https://api.groq.com/openai/v1'
-export const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
+export const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-20b'
 
 const SYSTEM_INSTRUCTIONS = `You are ArchNova's architectural design copilot. Help the user design or edit a conceptual residential floor plan. You do NOT make code-compliance, structural, safety, cost, or permit claims. The app is a schematic editor; dimensions and layouts are preliminary.
 
@@ -95,16 +95,22 @@ export async function requestAssistantPlan(options: {
   return normalizePlan(parsed)
 }
 
-export async function testGroqConnection(apiKey: string, model: string): Promise<void> {
+export async function testGroqConnection(apiKey: string, model: string): Promise<{ models: string[]; selectedModel: string }> {
   const response = await groqFetch(`${ENDPOINT}/models`, {
     headers: { Authorization: `Bearer ${apiKey.trim()}` },
   })
   const payload = await response.json().catch(() => null) as { data?: { id: string }[]; error?: { message?: string } } | null
   if (!response.ok) throw new Error(groqErrorMessage(response.status, payload?.error?.message))
-  const wanted = model.trim() || DEFAULT_GROQ_MODEL
-  if (payload?.data && !payload.data.some((entry) => entry.id === wanted)) {
-    throw new Error(`The key is valid, but model “${wanted}” was not listed for this account. Check the model ID.`)
-  }
+  const models = [...new Set((payload?.data ?? []).map((entry) => entry.id).filter((id) => typeof id === 'string' && id.length > 0))]
+  if (!models.length) throw new Error('Groq accepted the key but returned no available models for this account.')
+  const requested = model.trim() || DEFAULT_GROQ_MODEL
+  return { models, selectedModel: models.includes(requested) ? requested : chooseChatModel(models) }
+}
+
+function chooseChatModel(models: string[]): string {
+  const preferred = [DEFAULT_GROQ_MODEL, 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant']
+  const chatModels = models.filter((id) => !/(whisper|embed|speech|guard)/i.test(id))
+  return preferred.find((id) => chatModels.includes(id)) ?? chatModels[0] ?? models[0]
 }
 
 function summarizeContext(context: GroqContext) {
@@ -143,6 +149,7 @@ function groqErrorMessage(status: number, detail?: string): string {
   const message = detail?.trim()
   if (status === 401 || status === 403) return 'Groq rejected this API key. Check that it is complete and active, then try again.'
   if (status === 429) return 'Groq rate limit or quota reached. Wait a little, check your Groq account limits, then retry.'
+  if (status === 400 && message && /(model|access).*(not found|not available|does not exist|do not have access)/i.test(message)) return 'That model is not available to this Groq key. Click Test key to load and select a model your account can use.'
   if (status === 400 && message) return `Groq could not accept this request: ${message}`
   return message ? `Groq request failed: ${message}` : `Groq request failed (HTTP ${status}). Try again.`
 }

@@ -36,6 +36,7 @@ export function AssistantPanel({
   const [testingKey, setTestingKey] = useState(false)
   const [apiKey, setApiKey] = useState(readSessionValue(GROQ_KEY_STORAGE))
   const [model, setModel] = useState(readSessionValue(GROQ_MODEL_STORAGE) || DEFAULT_GROQ_MODEL)
+  const [availableModels, setAvailableModels] = useState<string[]>([])
   const [showKey, setShowKey] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState('')
   const [requestError, setRequestError] = useState('')
@@ -43,6 +44,14 @@ export function AssistantPanel({
   const [applyStatus, setApplyStatus] = useState<{ ok: boolean; message: string; warnings: string[] } | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const migratedChat = useRef(false)
+
+  useEffect(() => {
+    if (!migratedChat.current) {
+      migratedChat.current = true
+      if (messages.some((message) => message.simulated || message.pending)) resetChat()
+    }
+  }, [messages, resetChat])
 
   useEffect(() => {
     if (open) endRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'end' })
@@ -75,8 +84,13 @@ export function AssistantPanel({
     setTestingKey(true)
     setConnectionStatus('Checking key and model…')
     try {
-      await testGroqConnection(apiKey, model)
-      setConnectionStatus(`Connected — ${model.trim() || DEFAULT_GROQ_MODEL} is available.`)
+      const result = await testGroqConnection(apiKey, model)
+      setAvailableModels(result.models)
+      const previousModel = model.trim() || DEFAULT_GROQ_MODEL
+      if (result.selectedModel !== previousModel) updateModel(result.selectedModel)
+      setConnectionStatus(result.selectedModel === previousModel
+        ? `Key verified — ${result.selectedModel} is available.`
+        : `Key verified. Switched to an available model: ${result.selectedModel}.`)
     } catch (error) {
       setConnectionStatus(error instanceof Error ? error.message : 'Could not verify the Groq key.')
     } finally {
@@ -141,7 +155,7 @@ export function AssistantPanel({
         return
       }
       const message = `Applied ${result.appliedCount} design change${result.appliedCount === 1 ? '' : 's'} and saved the project.`
-      setApplyStatus({ ok: true, message, warnings: result.warnings })
+      setApplyStatus(result.warnings.length ? { ok: true, message: 'Applied with geometry notes:', warnings: result.warnings } : null)
       setMessages((previous) => [...previous, { id: uid('msg'), role: 'assistant', text: message, createdAt: Date.now() }])
       setPendingPlan(null)
     } catch (error) {
@@ -185,7 +199,7 @@ export function AssistantPanel({
           <label htmlFor="groq-api-key" className="text-[11px] font-semibold uppercase tracking-wide text-brand-900">Groq API key</label>
           <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="ml-auto text-[10px] font-medium text-brand-700 underline underline-offset-2">Get a key</a>
           <button type="button" onClick={() => void testKey()} disabled={testingKey || !apiKey.trim()} className="rounded-md border border-brand-200 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-800 disabled:opacity-50">
-            {testingKey ? 'Testing…' : 'Test key'}
+            {testingKey ? 'Checking…' : 'Check models'}
           </button>
         </div>
         <div className="flex gap-1.5">
@@ -206,10 +220,11 @@ export function AssistantPanel({
         </div>
         <div className="flex items-center gap-2">
           <label htmlFor="groq-model" className="shrink-0 text-[11px] font-medium text-brand-900">Model ID</label>
-          <input id="groq-model" value={model} onChange={(event) => updateModel(event.target.value)} placeholder={DEFAULT_GROQ_MODEL} className="min-w-0 flex-1 rounded-md border border-brand-200 bg-white px-2 py-1.5 text-[11px] text-ink-text focus:border-brand-500 focus:outline-none" />
+          <input id="groq-model" list="groq-model-options" value={model} onChange={(event) => updateModel(event.target.value)} placeholder={DEFAULT_GROQ_MODEL} className="min-w-0 flex-1 rounded-md border border-brand-200 bg-white px-2 py-1.5 text-[11px] text-ink-text focus:border-brand-500 focus:outline-none" />
+          <datalist id="groq-model-options">{availableModels.map((id) => <option key={id} value={id} />)}</datalist>
         </div>
         <p className="text-[10px] leading-relaxed text-brand-900/75">Key stays in this browser tab’s session storage, not in your project or chat. Your prompt and room summary go directly from this browser to Groq.</p>
-        {connectionStatus ? <p role="status" className={`text-[10.5px] leading-relaxed ${/connected/i.test(connectionStatus) ? 'text-emerald-700' : 'text-brand-900'}`}>{/connected/i.test(connectionStatus) ? <Check className="mr-1 inline h-3 w-3" /> : null}{connectionStatus}</p> : null}
+        {connectionStatus ? <p role="status" className={`text-[10.5px] leading-relaxed ${/verified/i.test(connectionStatus) ? 'text-emerald-700' : 'text-brand-900'}`}>{/verified/i.test(connectionStatus) ? <Check className="mr-1 inline h-3 w-3" /> : null}{connectionStatus}</p> : null}
       </section>
 
       <div className="flex-1 space-y-4 overflow-y-auto scroll-thin p-4">
@@ -228,7 +243,6 @@ export function AssistantPanel({
           <div key={message.id} className={message.role === 'user' ? 'flex justify-end' : ''}>
             <div className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${message.role === 'user' ? 'bg-brand-600 text-white' : 'border border-line bg-canvas-soft/70 text-ink-text'}`}>
               {message.pending ? <span className="inline-flex items-center gap-1.5 text-muted"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-500" />Thinking with Groq…</span> : message.text}
-              {message.simulated ? <span className="mt-1.5 block text-[10px] font-medium uppercase tracking-wide text-faint">Earlier demo response</span> : null}
             </div>
           </div>
         ))}

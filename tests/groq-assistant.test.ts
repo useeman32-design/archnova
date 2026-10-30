@@ -40,10 +40,12 @@ describe('Groq assistant client', () => {
     })).rejects.toThrow(/Groq rejected this API key/)
   })
 
-  it('checks a key and requested model with the provider models endpoint', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{ id: DEFAULT_GROQ_MODEL }] }), { status: 200 }))
+  it('checks the key and selects a model available to the account', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{ id: 'openai/gpt-oss-20b' }, { id: 'whisper-large-v3' }] }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
-    await expect(testGroqConnection('key', DEFAULT_GROQ_MODEL)).resolves.toBeUndefined()
+    await expect(testGroqConnection('key', 'llama-3.3-70b-versatile')).resolves.toEqual({
+      models: ['openai/gpt-oss-20b', 'whisper-large-v3'], selectedModel: 'openai/gpt-oss-20b',
+    })
     expect(fetchMock.mock.calls[0][0]).toContain('/models')
   })
 })
