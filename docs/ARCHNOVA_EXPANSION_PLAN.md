@@ -13,7 +13,7 @@ This is the durable project log. Read it before starting each follow-up task, up
 **Milestone 1 — Generalized, backward-compatible project/site model: core foundation complete locally (commit `4e34770`).**
 **Milestone 2 — Phase 2 site-boundary geometry/editor: interactive polygon editing and explicit edge labels/derived lengths complete locally; orientation, roads, setbacks and multi-building placement remain.**
 
-The codebase has assistant commits (`9035e2b`, `df13735`), the Phase 1 foundation (`4e34770`), Phase 2 site/mobile work (`be8071e`, `f7b3de4`), Groq recovery (`7d87b99`, `b538a11`), and site-edge labels (`d93dc4f`) on `main`. Pushes completed through `d51ab60` on `main` and `7a95cac` on `gh-pages`. The published branch contains assets `index-9ZZDJSFd.js` and `index-BeUFGlsg.css`, but checks of the hosted URL still returned the prior `index-Dijc-OCA.js` and `index-2cXtmBnb.css`. Page delivery is not confirmed; no `.github/workflows` deployment workflow exists in this checkout. Do not put credentials in this file or in chat.
+The codebase has assistant commits (`9035e2b`, `df13735`), the Phase 1 foundation (`4e34770`), Phase 2 site/mobile work (`be8071e`, `f7b3de4`), Groq recovery (`7d87b99`, `b538a11`), and site-edge labels (`d93dc4f`) on `main`. Pushes completed on `main` and `gh-pages` (deployment commit `7a95cac`). After the Pages cache refreshed, the hosted URL served `assets/index-9ZZDJSFd.js` and `assets/index-BeUFGlsg.css`, matching the latest Pages build. No `.github/workflows` deployment workflow exists in this checkout; deployment is via the `gh-pages` branch. Do not put credentials in this file or in chat.
 
 **Mobile project-opening finding:** saved projects remain in each browser's `localStorage`; no cross-device API/authentication was introduced. The valid mobile dashboard-to-workspace flow is covered by tests, and the user confirmed mobile project opening now works. The missing-project explanation remains as a fallback. Per the user's scope decision, leave storage device-local and do not pursue cross-device sync unless requested.
 
@@ -115,9 +115,9 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [ ] Add user-set north orientation, access points, setbacks, and site/building overlap checks.
 - [x] Per user decision, leave project storage browser-local and do not pursue a shared cross-device sync API unless requested.
 - [x] Save the Phase 2 site editor and mobile-message work in local milestone commit `be8071e` (`feat: add interactive plot boundary editing`).
-- [x] Push `main` through commit `d51ab60`; GitHub accepted the update.
+- [x] Push `main` with the Groq recovery, Phase 2 edge-label work, and publication-status checkpoints; GitHub accepted the updates.
 - [x] Push the built static bundle to `gh-pages` in commit `7a95cac` (`deploy: publish ArchNova updates`).
-- [ ] Verify live Pages delivery. The hosted URL still served `assets/index-Dijc-OCA.js` after the `gh-pages` push, while the pushed bundle uses `assets/index-9ZZDJSFd.js`; no `.github/workflows` deployment workflow exists in this checkout. Recheck Pages source/cache and do not claim the updated assistant is live until the new asset is served.
+- [x] Verify live Pages delivery after the cache refreshed: the hosted URL serves `assets/index-9ZZDJSFd.js` and `assets/index-BeUFGlsg.css`, matching the latest local Pages build.
 
 ## Working rules
 
