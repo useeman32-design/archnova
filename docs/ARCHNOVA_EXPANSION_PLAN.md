@@ -13,7 +13,7 @@ This is the durable project log. Read it before starting each follow-up task, up
 **Milestone 1 — Generalized, backward-compatible project/site model: core foundation complete locally (commit `4e34770`).**
 **Milestone 2 — Phase 2 site-boundary geometry/editor: first interactive slice complete locally; edge frontage, setbacks, roads and multi-building placement remain.**
 
-The codebase has the assistant fix commits (`9035e2b`, `df13735`) and the Phase 1 foundation commit (`4e34770`) locally on `main`, based on `origin/main` at `1f40293`. The latest push attempt failed with `could not read Username for 'https://github.com': No such device or address`; this is a missing credential-provider/runtime issue, not a rejected-token response. The remote and Pages site are not updated. Do not put credentials in this file or in chat.
+The codebase has assistant commits (`9035e2b`, `df13735`), the Phase 1 foundation (`4e34770`), and the Phase 2 site/mobile slice (`be8071e`) locally on `main`, based on `origin/main` at `1f40293`. In this restored runtime, `.git/config` did not retain the remote; after restoring the public repository URL, the push failed with `could not read Username for 'https://github.com': No such device or address`. This indicates the credential provider/token is not available here, not that GitHub rejected the supplied token. The remote and Pages site are not updated. Do not put credentials in this file or in chat.
 
 **Mobile project-opening finding:** saved projects currently live in each browser's `localStorage`. A desktop-created project ID therefore has no corresponding data on a phone unless the project is also stored there; there is no cross-device API/authentication configured. A valid dashboard card opens the workspace in the mobile route test. The former generic “Page not found” for a missing ID now explains the device-local storage limitation and offers local navigation. This is an explanatory UX fix, not cloud sync. Actual cross-device access requires a shared PHP/MySQL project service and account/authorization contract; no endpoint or credentials were assumed.
 
@@ -110,8 +110,8 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [x] Run full tests, typecheck and both builds. Result: 49 tests pass; typecheck, production build and Pages build pass. Builds retain the >500 kB chunk warning.
 - [ ] Add edge/frontage labels and per-edge measurement editing, north orientation, access points, setbacks, and site/building overlap checks.
 - [ ] Implement a shared project API for actual desktop-to-phone sync only after the deployment endpoint and account/auth contract are specified; do not represent localStorage as cloud sync.
-- [ ] Save the Phase 2 site editor and mobile-message work in a local milestone commit.
-- [ ] Push `main` and publish Pages when GitHub authentication is available. Last push error: `could not read Username for 'https://github.com': No such device or address`; the token was not rejected, no credential provider was available. Do not claim remote or Pages is updated.
+- [x] Save the Phase 2 site editor and mobile-message work in local milestone commit `be8071e` (`feat: add interactive plot boundary editing`).
+- [ ] Push `main` and publish Pages when GitHub authentication is available. Latest attempt: after restoring the public origin URL, Git returned `could not read Username for 'https://github.com': No such device or address`; the token was not rejected, no credential provider was available. Do not claim remote or Pages is updated.
 
 ## Working rules
 
