@@ -1,15 +1,43 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { AssistantPanel } from '@/components/ai-assistant/AssistantPanel'
 import { createProjectFromForm } from '@/lib/projectFactory'
 import { defaultNewProjectForm } from '@/lib/defaultForm'
 
 afterEach(() => {
+  cleanup()
   vi.unstubAllGlobals()
   sessionStorage.clear()
 })
 
 describe('large project clarification flow', () => {
+  it('renders model clarification as selectable options with an Other text field', async () => {
+    sessionStorage.setItem('archnova:groq-api-key', 'test-key')
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const question = JSON.stringify({ reply: 'Which roof form should I use for the separate building?', actions: [] })
+    const proposal = JSON.stringify({ reply: 'I prepared a separate block.', actions: [{ type: 'add_building', name: 'Studio Block', purpose: { category: 'commercial', use: 'studio' }, role: 'secondary', width: 24, length: 18, floorCount: 1, roof: 'mansard' }] })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: question } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: proposal } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<AssistantPanel
+      open onClose={vi.fn()} project={project} rooms={[]} placed={{}} ornaments={[]}
+      wallThicknesses={{ exterior: 0.75, interior: 0.375 }} walls={[]} units="ft" onApplyPlan={vi.fn()}
+    />)
+
+    fireEvent.change(screen.getByPlaceholderText('Describe a design change…'), { target: { value: 'Add another block with a different roof.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+    expect(await screen.findByLabelText('Quick design clarification')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /^Other/ }))
+    fireEvent.change(screen.getByLabelText(/Custom answer for Which roof form/), { target: { value: 'mansard' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    const followUp = JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))
+    expect(followUp.messages.at(-1).content).toContain('Which roof form should I use for the separate building? mansard')
+    expect(await screen.findByText(/Add separate secondary building “Studio Block”/)).toBeTruthy()
+  })
+
   it('collects building, storey, site-element and plot choices before requesting a proposal', async () => {
     sessionStorage.setItem('archnova:groq-api-key', 'test-key')
     const project = createProjectFromForm(defaultNewProjectForm())

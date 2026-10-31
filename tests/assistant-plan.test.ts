@@ -44,13 +44,13 @@ describe('AI design-plan application', () => {
     const project = blankProject()
     const plan: AssistantPlan = {
       reply: 'A separate surgery block.',
-      actions: [{ type: 'add_building', name: 'Surgery Block', purpose: { category: 'institutional', use: 'hospital surgery' }, role: 'secondary', width: 24, length: 18, floorCount: 3 }],
+      actions: [{ type: 'add_building', name: 'Surgery Block', purpose: { category: 'institutional', use: 'hospital surgery' }, role: 'secondary', width: 24, length: 18, floorCount: 3, roof: 'hip' }],
     }
     const result = applyAssistantPlan({ plan, project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 } })
     expect(result.ok).toBe(true)
     const buildings = result.projectPatch.buildings ?? []
     const block = buildings.find((building) => building.name === 'Surgery Block')
-    expect(block).toMatchObject({ purpose: { category: 'institutional', use: 'hospital surgery' }, role: 'secondary' })
+    expect(block).toMatchObject({ purpose: { category: 'institutional', use: 'hospital surgery' }, role: 'secondary', roof: 'hip' })
     expect(block?.floors).toHaveLength(3)
     expect(block?.footprint).toMatchObject({ shape: 'polygon', source: 'ai-recommended', units: 'ft' })
     expect(block?.footprint?.vertices).toHaveLength(4)

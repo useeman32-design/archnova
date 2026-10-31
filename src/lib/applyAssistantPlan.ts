@@ -190,6 +190,7 @@ export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssista
         name: action.name,
         purpose: action.purpose,
         role: action.role,
+        roof: action.roof ?? project.roof,
         floors: Array.from({ length: action.floorCount }, (_, index) => ({
           id: `ai-floor-${crypto.randomUUID()}`,
           name: index === 0 ? 'Ground Floor' : `Level ${index + 1}`,

@@ -78,6 +78,95 @@ describe('Groq assistant client', () => {
     expect(JSON.stringify(debug.mock.calls)).not.toContain('secret-test-key')
   })
 
+  it('recovers a usable operation from a response with one surplus trailing brace', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const content = '{"reply":"I prepared a gate proposal.","actions":[{"type":"add_site_item","kind":"gate","x":25,"y":25}]}}'
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [], prompt: 'Add a gate.',
+    })
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(plan.actions).toEqual([{ type: 'add_site_item', kind: 'gate', x: 25, y: 25 }])
+  })
+
+  it('normalizes alternate siteItems output and aligns a requested gate with its fence', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const content = JSON.stringify({
+      reply: 'I added the fence, gate, path, and parked car.',
+      actions: [
+        { type: 'create_house', rooms: [{ name: 'Living Room', category: 'living', width: 16, length: 14 }] },
+        'add_site_item',
+      ],
+      siteItems: [
+        { kind: 'fence' }, { kind: 'gate', x: 25, y: 25 }, { kind: 'path' }, { kind: 'car' },
+      ],
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [], prompt: 'Create a random house, fence the house and add a gate to the fence, a walking path, and a parked car.',
+    })
+    const siteActions = plan.actions.filter((action) => action.type === 'add_site_item')
+    expect(plan.actions.some((action) => action.type === 'create_house')).toBe(true)
+    expect(siteActions.map((action) => action.type === 'add_site_item' && action.kind)).toEqual(['fence', 'gate', 'path', 'car'])
+    const fence = siteActions.find((action) => action.type === 'add_site_item' && action.kind === 'fence')
+    const gate = siteActions.find((action) => action.type === 'add_site_item' && action.kind === 'gate')
+    expect(gate).toMatchObject({ x: fence?.type === 'add_site_item' ? fence.x : -1, y: fence?.type === 'add_site_item' ? fence.y : -1 })
+    expect(plan.assumptions?.join(' ')).toMatch(/aligned with the proposed fence/i)
+    expect(plan.unsupported).toBeUndefined()
+    expect(plan.reply).toMatch(/proposal for review/i)
+  })
+
+  it('converts plain-language clarification replies into a structured choice without a recovery call', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const content = 'Which roof form should I use for the secondary block?'
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [], prompt: 'Add a separate building with a different roof.',
+    })
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(plan.actions).toEqual([])
+    expect(plan.clarification?.questions[0].options.some((option) => option.value === 'hip')).toBe(true)
+  })
+
+  it('does not claim a project was cleared when no removal operation was returned', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const emptyPlan = JSON.stringify({ reply: 'Project cleared.', project: {}, actions: [] })
+    const response = () => new Response(JSON.stringify({ choices: [{ message: { content: emptyPlan } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    const fetchMock = vi.fn().mockImplementation(response)
+    vi.stubGlobal('fetch', fetchMock)
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [], prompt: 'Clear this project.',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(plan.actions).toEqual([])
+    expect(plan.reply).toMatch(/have not cleared/i)
+    expect(plan.reply).not.toMatch(/project cleared/i)
+  })
+
+  it('turns an assistant roof question into selectable choices including Other', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const question = { reply: 'Which roof form should the separate block use?', actions: [] }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(question) } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [], prompt: 'Add another block with a different roof.',
+    })
+    expect(plan.clarification?.questions[0].options.some((option) => option.value === 'hip')).toBe(true)
+    expect(plan.clarification?.questions[0].options.some((option) => option.value === '__random__')).toBe(true)
+    expect(plan.clarification?.questions[0].allowOther).toBe(true)
+  })
+
   it('recovers once from malformed JSON on a direct design request', async () => {
     const project = createProjectFromForm(defaultNewProjectForm())
     const jsonResponse = (content: string) => new Response(JSON.stringify({ id: 'req-malformed', model: DEFAULT_GROQ_MODEL, choices: [{ message: { content }, finish_reason: 'stop' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -117,7 +206,7 @@ describe('Groq assistant client', () => {
     const project = createProjectFromForm(defaultNewProjectForm())
     const planText = JSON.stringify({
       reply: 'I will add the surgery block.',
-      actions: [{ type: 'add_building', name: 'Surgery Block', purpose: { category: 'institutional', use: 'hospital surgery' }, role: 'secondary', width: 42, length: 30, floorCount: 3 }],
+      actions: [{ type: 'add_building', name: 'Surgery Block', purpose: { category: 'institutional', use: 'hospital surgery' }, role: 'secondary', width: 42, length: 30, floorCount: 3, roof: 'hip' }],
     })
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: planText } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
     const plan = await requestAssistantPlan({
@@ -125,7 +214,7 @@ describe('Groq assistant client', () => {
       context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: 'ft' },
       history: [], prompt: 'Add a separate hospital surgery block.',
     })
-    expect(plan.actions).toEqual([{ type: 'add_building', name: 'Surgery Block', purpose: { category: 'institutional', use: 'hospital surgery' }, role: 'secondary', width: 42, length: 30, floorCount: 3 }])
+    expect(plan.actions).toEqual([{ type: 'add_building', name: 'Surgery Block', purpose: { category: 'institutional', use: 'hospital surgery' }, role: 'secondary', width: 42, length: 30, floorCount: 3, roof: 'hip' }])
     expect(plan.reply).toMatch(/distinct building footprint/i)
   })
 
@@ -223,6 +312,25 @@ describe('Groq assistant client', () => {
     for (const [, init] of fetchMock.mock.calls) {
       expect(JSON.parse(String((init as RequestInit).body)).max_completion_tokens).toBe(1400)
     }
+  })
+
+  it('waits for the provider-specified TPM reset time before retrying', async () => {
+    vi.useFakeTimers()
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const limited = new Response(JSON.stringify({ error: { message: 'Rate limit reached. Please try again in 11.4s.' } }), { status: 429 })
+    const success = new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ reply: 'Done.', actions: [] }) } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    const fetchMock = vi.fn().mockResolvedValueOnce(limited).mockResolvedValueOnce(success)
+    vi.stubGlobal('fetch', fetchMock)
+    const pending = requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [], prompt: 'Tell me one design tip.',
+    })
+    await vi.advanceTimersByTimeAsync(11399)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(2)
+    await expect(pending).resolves.toMatchObject({ reply: 'Done.' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('retries transient rate limits twice and reports retry progress', async () => {

@@ -381,7 +381,7 @@ function ExteriorScene({
           <Edges color="#0f766e" threshold={1} />
         </mesh>
       ) : null}
-      {(project.buildings ?? []).filter((building) => building.role !== 'primary' && (building.footprint?.vertices.length ?? 0) >= 3).map((building) => <SiteBuildingMass key={building.id} building={building} plotWidth={plotW} plotLength={plotL} siteBoundary={project.site?.boundary} />)}
+      {(project.buildings ?? []).filter((building) => building.role !== 'primary' && (building.footprint?.vertices.length ?? 0) >= 3).map((building) => <SiteBuildingMass key={building.id} building={building} plotWidth={plotW} plotLength={plotL} siteBoundary={project.site?.boundary} defaultRoof={project.roof} roofColor={project.preferences.roofColor} />)}
 
       {project.floors.flatMap((floor) =>
         floor.rooms.map((room) => {
@@ -481,7 +481,7 @@ function ExteriorScene({
   )
 }
 
-function SiteBuildingMass({ building, plotWidth, plotLength, siteBoundary }: { building: Building; plotWidth: number; plotLength: number; siteBoundary?: SiteBoundary }) {
+function SiteBuildingMass({ building, plotWidth, plotLength, siteBoundary, defaultRoof, roofColor }: { building: Building; plotWidth: number; plotLength: number; siteBoundary?: SiteBoundary; defaultRoof: string; roofColor?: string }) {
   const footprint = building.footprint
   const height = Math.max(1, building.floors.length) * (WALL_H + SLAB)
   const geometry = useMemo(() => {
@@ -505,10 +505,18 @@ function SiteBuildingMass({ building, plotWidth, plotLength, siteBoundary }: { b
     || (boundaryVertices.length >= 3 && vertices.some((point) => !pointInPolygon(point, boundaryVertices)))
   const color = overflow ? '#fecaca' : building.role === 'service' ? '#e6c59a' : building.role === 'other' ? '#cbd5e1' : '#b8c7e0'
   const edgeColor = overflow ? '#dc2626' : building.role === 'service' ? '#9a5b16' : '#425c82'
-  return <mesh geometry={geometry} position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
-    <meshStandardMaterial color={color} roughness={0.82} />
-    <Edges color={edgeColor} threshold={8} />
-  </mesh>
+  const minX = Math.min(...vertices.map((point) => point.x)), maxX = Math.max(...vertices.map((point) => point.x))
+  const minY = Math.min(...vertices.map((point) => point.y)), maxY = Math.max(...vertices.map((point) => point.y))
+  const centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2
+  return <>
+    <mesh geometry={geometry} position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
+      <meshStandardMaterial color={color} roughness={0.82} />
+      <Edges color={edgeColor} threshold={8} />
+    </mesh>
+    <group position={[(centerX - plotWidth / 2) * S, 0, (centerY - plotLength / 2) * S]}>
+      <Roof form={building.roof ?? defaultRoof} y={height + 0.08} width={(maxX - minX) * S * 1.08} length={(maxY - minY) * S * 1.08} color={roofColor} />
+    </group>
+  </>
 }
 
 function ExteriorWall({

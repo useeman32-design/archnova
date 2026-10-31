@@ -279,6 +279,8 @@ export interface Building {
   purpose: ProjectPurpose
   role: 'primary' | 'secondary' | 'service' | 'other'
   floors: Floor[]
+  /** Visual roof form for this building; falls back to the project roof when absent. */
+  roof?: string
   footprint?: SiteBoundary
   assumptions: string[]
 }
