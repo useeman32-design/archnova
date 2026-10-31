@@ -1,0 +1,1558 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-31T01:33:50Z",
+  "source": "Poly Haven API",
+  "sourceApi": "https://api.polyhaven.com/our-api",
+  "licenseNotice": "All listed assets are CC0 1.0. Attribution is not required; ArchNova includes Powered by Poly Haven credit as courtesy.",
+  "models": [
+    {
+      "id": "sofa_02",
+      "name": "Sofa 02",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/sofa_02",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Kirill Sannikov",
+      "polycount": 2728,
+      "dimensionsMm": [
+        1807.1673512458801,
+        817.7513778209686,
+        709.4888985157013
+      ],
+      "dimensionsM": [
+        1.807167,
+        0.817751,
+        0.709489
+      ],
+      "tags": [
+        "wood",
+        "furniture",
+        "chair",
+        "prop",
+        "couch",
+        "leather",
+        "fabric"
+      ],
+      "categories": [
+        "furniture",
+        "seating"
+      ],
+      "modelUrl": "/assets/polyhaven/models/sofa_02/sofa_02_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/sofa_02/sofa_02_1k.gltf",
+      "fileMd5": "ec2590dc8433a523d0fe9e507766c16f",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/sofa_02/sofa_02_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/sofa_02/sofa_02_1k.gltf",
+          "md5": "ec2590dc8433a523d0fe9e507766c16f",
+          "size": 4183,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/sofa_02/textures/sofa_02_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/sofa_02/sofa_02_diff_1k.jpg",
+          "md5": "0452c7d8dd3ef414d5ed3055085028a1",
+          "size": 86514,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/sofa_02/textures/sofa_02_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/sofa_02/sofa_02_arm_1k.jpg",
+          "md5": "78799d978a1117ba83dbffed9af0fa33",
+          "size": 121752,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/sofa_02/textures/sofa_02_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/sofa_02/sofa_02_nor_gl_1k.jpg",
+          "md5": "968528a369bced172d34275dba5aebf1",
+          "size": 139858,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/sofa_02/sofa_02.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/sofa_02/sofa_02.bin",
+          "md5": "024d6f57a7c2ee7915430cd6e1c2651e",
+          "size": 74864,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 427171,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "modern_arm_chair_01",
+      "name": "Modern Arm Chair 01",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/modern_arm_chair_01",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Vibrant Nordic",
+      "polycount": 8916,
+      "dimensionsMm": [
+        820.3444182872772,
+        986.5616858005524,
+        1022.8520567470696
+      ],
+      "dimensionsM": [
+        0.820344,
+        0.986562,
+        1.022852
+      ],
+      "tags": [
+        "wood",
+        "leather",
+        "fancy",
+        "modern",
+        "chair",
+        "contemporary",
+        "wooden",
+        "lounge"
+      ],
+      "categories": [
+        "furniture",
+        "seating",
+        "office"
+      ],
+      "modelUrl": "/assets/polyhaven/models/modern_arm_chair_01/modern_arm_chair_01_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/modern_arm_chair_01/modern_arm_chair_01_1k.gltf",
+      "fileMd5": "a5ce303bc2962fe98b733fcdfa5a842b",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/modern_arm_chair_01/modern_arm_chair_01_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modern_arm_chair_01/modern_arm_chair_01_1k.gltf",
+          "md5": "a5ce303bc2962fe98b733fcdfa5a842b",
+          "size": 5121,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_arm_chair_01/textures/modern_arm_chair_01_pillow_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_arm_chair_01/modern_arm_chair_01_pillow_nor_gl_1k.jpg",
+          "md5": "6804f34108fcc755f0c84dd3c638270c",
+          "size": 302377,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_arm_chair_01/textures/modern_arm_chair_01_legs_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_arm_chair_01/modern_arm_chair_01_legs_nor_gl_1k.jpg",
+          "md5": "7cece7eccf75588af5b5df9b095d2c97",
+          "size": 560864,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_arm_chair_01/textures/modern_arm_chair_01_pillow_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_arm_chair_01/modern_arm_chair_01_pillow_arm_1k.jpg",
+          "md5": "772495ddbf26ca3de4b31298f10113b9",
+          "size": 321223,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_arm_chair_01/textures/modern_arm_chair_01_legs_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_arm_chair_01/modern_arm_chair_01_legs_diff_1k.jpg",
+          "md5": "778f1897e07ff81b2bc338f3d463ad1f",
+          "size": 460937,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_arm_chair_01/textures/modern_arm_chair_01_legs_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_arm_chair_01/modern_arm_chair_01_legs_arm_1k.jpg",
+          "md5": "9c69cb001df175bddf6d1c2436567fb7",
+          "size": 577931,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_arm_chair_01/modern_arm_chair_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modern_arm_chair_01/modern_arm_chair_01.bin",
+          "md5": "5a8f2ea1c79ea484140e484b2a621670",
+          "size": 240728,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_arm_chair_01/textures/modern_arm_chair_01_pillow_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_arm_chair_01/modern_arm_chair_01_pillow_diff_1k.jpg",
+          "md5": "2e4f64c633c3cb1656ad3eabdb3f0607",
+          "size": 228851,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 2698032,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "mid_century_lounge_chair",
+      "name": "Mid Century Lounge Chair",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/mid_century_lounge_chair",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Kuutti Siitonen",
+      "polycount": 6148,
+      "dimensionsMm": [
+        1008.6143612861633,
+        1190.310776233673,
+        1169.0847246776136
+      ],
+      "dimensionsM": [
+        1.008614,
+        1.190311,
+        1.169085
+      ],
+      "tags": [
+        "wooden",
+        "leather",
+        "couch",
+        "lounge",
+        "architecture",
+        "modern",
+        "interior design",
+        "home decor",
+        "living room",
+        "comfort",
+        "stylish",
+        "recliner",
+        "retro",
+        "classy"
+      ],
+      "categories": [
+        "furniture",
+        "seating"
+      ],
+      "modelUrl": "/assets/polyhaven/models/mid_century_lounge_chair/mid_century_lounge_chair_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/mid_century_lounge_chair/mid_century_lounge_chair_1k.gltf",
+      "fileMd5": "474bed17d25e794f39e60d1748dafcc6",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/mid_century_lounge_chair/mid_century_lounge_chair_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/mid_century_lounge_chair/mid_century_lounge_chair_1k.gltf",
+          "md5": "474bed17d25e794f39e60d1748dafcc6",
+          "size": 2884,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/mid_century_lounge_chair/textures/mid_century_lounge_chair_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/mid_century_lounge_chair/mid_century_lounge_chair_nor_gl_1k.jpg",
+          "md5": "2caa258ba4e50a6be6533ac9ff96587e",
+          "size": 648960,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/mid_century_lounge_chair/textures/mid_century_lounge_chair_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/mid_century_lounge_chair/mid_century_lounge_chair_diff_1k.jpg",
+          "md5": "7ab2bc1b5ac85a7664a82eedf6c85dde",
+          "size": 627298,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/mid_century_lounge_chair/textures/mid_century_lounge_chair_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/mid_century_lounge_chair/mid_century_lounge_chair_arm_1k.jpg",
+          "md5": "a0a839c4ae18eb06a5ececc72c0e066f",
+          "size": 636493,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/mid_century_lounge_chair/mid_century_lounge_chair.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/mid_century_lounge_chair/mid_century_lounge_chair.bin",
+          "md5": "bded2f717792aefe222dca07633b94ce",
+          "size": 171384,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 2087019,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "modern_coffee_table_01",
+      "name": "Modern Coffee Table 01",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/modern_coffee_table_01",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Amin",
+      "polycount": 4504,
+      "dimensionsMm": [
+        1201.8300294876099,
+        600.0000834465027,
+        389.99998569488525
+      ],
+      "dimensionsM": [
+        1.20183,
+        0.6,
+        0.39
+      ],
+      "tags": [
+        "table",
+        "contemporary",
+        "modern",
+        "rectangular",
+        "stone",
+        "wood",
+        "deco",
+        "clean"
+      ],
+      "categories": [
+        "furniture",
+        "table"
+      ],
+      "modelUrl": "/assets/polyhaven/models/modern_coffee_table_01/modern_coffee_table_01_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/modern_coffee_table_01/modern_coffee_table_01_1k.gltf",
+      "fileMd5": "f1c079ab5bc307630258cf3b40910511",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_01/modern_coffee_table_01_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modern_coffee_table_01/modern_coffee_table_01_1k.gltf",
+          "md5": "f1c079ab5bc307630258cf3b40910511",
+          "size": 2771,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_01/modern_coffee_table_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modern_coffee_table_01/modern_coffee_table_01.bin",
+          "md5": "6e8f65bff935af308eab9eff062f6daa",
+          "size": 154864,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_01/textures/modern_coffee_table_01_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_coffee_table_01/modern_coffee_table_01_rough_1k.jpg",
+          "md5": "6ccbc448fa0e2bed32eac52511e84e2c",
+          "size": 403959,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_01/textures/modern_coffee_table_01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_coffee_table_01/modern_coffee_table_01_diff_1k.jpg",
+          "md5": "356014e027b59c21b3c99ac112e645f9",
+          "size": 410569,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_01/textures/modern_coffee_table_01_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_coffee_table_01/modern_coffee_table_01_nor_gl_1k.jpg",
+          "md5": "d263e6131abc518760d6771390bc5066",
+          "size": 359134,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 1331297,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "dining_chair_02",
+      "name": "Dining Chair 02",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/dining_chair_02",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "James Ray Cock",
+      "polycount": 22013,
+      "dimensionsMm": [
+        433.5707724094391,
+        576.4201134443283,
+        973.3776897192001
+      ],
+      "dimensionsM": [
+        0.433571,
+        0.57642,
+        0.973378
+      ],
+      "tags": [
+        "modern",
+        "chair",
+        "seat",
+        "dining",
+        "fancy",
+        "leather"
+      ],
+      "categories": [
+        "furniture",
+        "seating"
+      ],
+      "modelUrl": "/assets/polyhaven/models/dining_chair_02/dining_chair_02_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/dining_chair_02/dining_chair_02_1k.gltf",
+      "fileMd5": "5aff75016e0943e84161de89dcc3ceb8",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/dining_chair_02/dining_chair_02_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/dining_chair_02/dining_chair_02_1k.gltf",
+          "md5": "5aff75016e0943e84161de89dcc3ceb8",
+          "size": 2723,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/dining_chair_02/dining_chair_02.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/dining_chair_02/dining_chair_02.bin",
+          "md5": "b7f8a91c0a5249d02de7885f3b242c4e",
+          "size": 544592,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/dining_chair_02/textures/dining_chair_02_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dining_chair_02/dining_chair_02_nor_gl_1k.jpg",
+          "md5": "9c0e1003f9c8859a2e5c2c7f92a8f238",
+          "size": 119612,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/dining_chair_02/textures/dining_chair_02_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dining_chair_02/dining_chair_02_diff_1k.jpg",
+          "md5": "6b7b8e4ac0a3aad9ecdf314a97b0ef75",
+          "size": 91518,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/dining_chair_02/textures/dining_chair_02_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dining_chair_02/dining_chair_02_arm_1k.jpg",
+          "md5": "2b16c9ddb3ea83d200b02de54a4fdcb8",
+          "size": 162630,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 921075,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "modern_wooden_cabinet",
+      "name": "Modern Wooden Cabinet",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/modern_wooden_cabinet",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Patrik Pangerl",
+      "polycount": 24976,
+      "dimensionsMm": [
+        2440.0004148483276,
+        520.0000107288361,
+        680.1425069570541
+      ],
+      "dimensionsM": [
+        2.44,
+        0.52,
+        0.680143
+      ],
+      "tags": [
+        "cabinet",
+        "wood",
+        "modern",
+        "minimalist",
+        "interrior",
+        "living room",
+        "contemporary",
+        "design"
+      ],
+      "categories": [
+        "furniture",
+        "table"
+      ],
+      "modelUrl": "/assets/polyhaven/models/modern_wooden_cabinet/modern_wooden_cabinet_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/modern_wooden_cabinet/modern_wooden_cabinet_1k.gltf",
+      "fileMd5": "623406579e948eb75ff52ec1498085c8",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/modern_wooden_cabinet/modern_wooden_cabinet_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modern_wooden_cabinet/modern_wooden_cabinet_1k.gltf",
+          "md5": "623406579e948eb75ff52ec1498085c8",
+          "size": 10960,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_wooden_cabinet/modern_wooden_cabinet.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modern_wooden_cabinet/modern_wooden_cabinet.bin",
+          "md5": "0a619e6311e6b04b92e9f226f3d0978d",
+          "size": 1170136,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_wooden_cabinet/textures/modern_wooden_cabinet_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_wooden_cabinet/modern_wooden_cabinet_nor_gl_1k.jpg",
+          "md5": "62477103e44ac1b2746c9bb201f89e06",
+          "size": 430053,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_wooden_cabinet/textures/modern_wooden_cabinet_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_wooden_cabinet/modern_wooden_cabinet_arm_1k.jpg",
+          "md5": "bb821c89979d89ce2421df13af67fb07",
+          "size": 574020,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_wooden_cabinet/textures/modern_wooden_cabinet_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_wooden_cabinet/modern_wooden_cabinet_diff_1k.jpg",
+          "md5": "9c7e897741dd9aea6382f04e710d739b",
+          "size": 670353,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 2855522,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "metal_office_desk",
+      "name": "Metal Office Desk",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/metal_office_desk",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Ulan Cabanilla",
+      "polycount": 6898,
+      "dimensionsMm": [
+        2000.0003576278687,
+        947.2135305404663,
+        787.5000089406967
+      ],
+      "dimensionsM": [
+        2.0,
+        0.947214,
+        0.7875
+      ],
+      "tags": [
+        "old",
+        "vintage",
+        "metal",
+        "dirty",
+        "scratched",
+        "industrial",
+        "rectangular"
+      ],
+      "categories": [
+        "collection: project_lighthouse",
+        "furniture",
+        "table",
+        "office"
+      ],
+      "modelUrl": "/assets/polyhaven/models/metal_office_desk/metal_office_desk_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/metal_office_desk/metal_office_desk_1k.gltf",
+      "fileMd5": "723956efef6da35ad41494efa5c3b820",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/metal_office_desk/metal_office_desk_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/metal_office_desk/metal_office_desk_1k.gltf",
+          "md5": "723956efef6da35ad41494efa5c3b820",
+          "size": 13510,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/metal_office_desk/textures/metal_office_desk_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/metal_office_desk/metal_office_desk_nor_gl_1k.jpg",
+          "md5": "bcf6793df61d9b5f097f2b9518866c45",
+          "size": 170875,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/metal_office_desk/textures/metal_office_desk_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/metal_office_desk/metal_office_desk_diff_1k.jpg",
+          "md5": "6a27263c95811fa902ddea6476d610e9",
+          "size": 470831,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/metal_office_desk/textures/metal_office_desk_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/metal_office_desk/metal_office_desk_arm_1k.jpg",
+          "md5": "fb76b1e17f07592608d3f144fce4bfce",
+          "size": 721614,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/metal_office_desk/metal_office_desk.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/metal_office_desk/metal_office_desk.bin",
+          "md5": "96f258b9a64d36ca011f44de23da7c65",
+          "size": 229700,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 1606530,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "electric_stove",
+      "name": "Electric Stove",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/electric_stove",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Kuutti Siitonen",
+      "polycount": 13914,
+      "dimensionsMm": [
+        502.59482860565186,
+        647.6211845874786,
+        858.6971759796143
+      ],
+      "dimensionsM": [
+        0.502595,
+        0.647621,
+        0.858697
+      ],
+      "tags": [
+        "kitchen appliance",
+        "cooking equipment",
+        "stovetop",
+        "oven",
+        "cooktop",
+        "simple",
+        "white",
+        "cooking",
+        "kitchen"
+      ],
+      "categories": [
+        "electronics",
+        "appliances",
+        "rigged",
+        "props"
+      ],
+      "modelUrl": "/assets/polyhaven/models/electric_stove/electric_stove_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/electric_stove/electric_stove_1k.gltf",
+      "fileMd5": "1ec96abe416e022f792ace742d33947a",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/electric_stove/electric_stove_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/electric_stove/electric_stove_1k.gltf",
+          "md5": "1ec96abe416e022f792ace742d33947a",
+          "size": 31234,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/electric_stove/electric_stove.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/electric_stove/electric_stove.bin",
+          "md5": "9846b43c4af868f79a95635fb9bd354d",
+          "size": 462956,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/electric_stove/textures/electric_stove_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/electric_stove/electric_stove_nor_gl_1k.jpg",
+          "md5": "611bcfac2fc0eb84c8727bee1d2bfc15",
+          "size": 427043,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/electric_stove/textures/electric_stove_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/electric_stove/electric_stove_arm_1k.jpg",
+          "md5": "f6dd650e669f6cb8f767265a3cf80f95",
+          "size": 677547,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/electric_stove/textures/electric_stove_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/electric_stove/electric_stove_diff_1k.jpg",
+          "md5": "dd6ba5a62587e4172853321ec58388fe",
+          "size": 446916,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 2045696,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "modern_ceiling_lamp_01",
+      "name": "Modern Ceiling Lamp 01",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/modern_ceiling_lamp_01",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "James Ray Cock",
+      "polycount": 5602,
+      "dimensionsMm": [
+        431.6493272781372,
+        431.6607564687729,
+        951.5514969825745
+      ],
+      "dimensionsM": [
+        0.431649,
+        0.431661,
+        0.951551
+      ],
+      "tags": [
+        "lighting",
+        "light",
+        "modern",
+        "glass",
+        "round",
+        "hanging",
+        "hanging lamp",
+        "ceiling lamp",
+        "decorative lighting",
+        "modern decor",
+        "interior design"
+      ],
+      "categories": [
+        "lighting"
+      ],
+      "modelUrl": "/assets/polyhaven/models/modern_ceiling_lamp_01/modern_ceiling_lamp_01_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/modern_ceiling_lamp_01/modern_ceiling_lamp_01_1k.gltf",
+      "fileMd5": "b85c212ffcc2cb9c74b9e68f314fec3b",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/modern_ceiling_lamp_01/modern_ceiling_lamp_01_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_1k.gltf",
+          "md5": "b85c212ffcc2cb9c74b9e68f314fec3b",
+          "size": 6177,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_ceiling_lamp_01/textures/modern_ceiling_lamp_01_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_arm_1k.jpg",
+          "md5": "6667aa4091a273a041715dccd3b83bc8",
+          "size": 124022,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_ceiling_lamp_01/textures/modern_ceiling_lamp_01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_diff_1k.jpg",
+          "md5": "7197acc141761c4c417023b9fb58db95",
+          "size": 79705,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_ceiling_lamp_01/modern_ceiling_lamp_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modern_ceiling_lamp_01/modern_ceiling_lamp_01.bin",
+          "md5": "48b86e7e6db78e6d3dfd85b765c3ab68",
+          "size": 146828,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_ceiling_lamp_01/textures/modern_ceiling_lamp_01_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_nor_gl_1k.jpg",
+          "md5": "f3ebd90aa565968ce1faf25a03b1f912",
+          "size": 79333,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 436065,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "street_lamp_01",
+      "name": "Street Lamp 01",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/street_lamp_01",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Josh Dean",
+      "polycount": 30610,
+      "dimensionsMm": [
+        704.3362259864807,
+        386.49316132068634,
+        3870.5554008483887
+      ],
+      "dimensionsM": [
+        0.704336,
+        0.386493,
+        3.870555
+      ],
+      "tags": [
+        "street",
+        "road",
+        "light",
+        "lamppost",
+        "outdoor",
+        "pole",
+        "sidewalk",
+        "night",
+        " urban",
+        "city"
+      ],
+      "categories": [
+        "lighting",
+        "industrial",
+        "collection: hidden_alley"
+      ],
+      "modelUrl": "/assets/polyhaven/models/street_lamp_01/street_lamp_01_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/street_lamp_01/street_lamp_01_1k.gltf",
+      "fileMd5": "d29d1fc30bbdad99a58371754f144e65",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/street_lamp_01/street_lamp_01_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/street_lamp_01/street_lamp_01_1k.gltf",
+          "md5": "d29d1fc30bbdad99a58371754f144e65",
+          "size": 6419,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/street_lamp_01/textures/street_lamp_01_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/street_lamp_01/street_lamp_01_arm_1k.jpg",
+          "md5": "63d980174db10cf22a1b175743c465c9",
+          "size": 664324,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/street_lamp_01/textures/street_lamp_01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/street_lamp_01/street_lamp_01_diff_1k.jpg",
+          "md5": "82efb7531a25cda3ef8af2aff8ecccf7",
+          "size": 307889,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/street_lamp_01/textures/street_lamp_01_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/street_lamp_01/street_lamp_01_nor_gl_1k.jpg",
+          "md5": "c27d8102c7e851a8f0f654bb959b9d67",
+          "size": 438623,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/street_lamp_01/street_lamp_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/street_lamp_01/street_lamp_01.bin",
+          "md5": "324bc6295e3962322514ddcfc7037b23",
+          "size": 748908,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 2166163,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "modular_street_seating",
+      "name": "Modular Street Seating",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/modular_street_seating",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Stuart Attenborrow",
+      "polycount": 25156,
+      "dimensionsMm": [
+        4339.9999141693115,
+        770.3700959682465,
+        950.000050743509
+      ],
+      "dimensionsM": [
+        4.34,
+        0.77037,
+        0.95
+      ],
+      "tags": [
+        "chair",
+        "outdoor",
+        "urban",
+        "cityscape",
+        "contemporary",
+        "bench",
+        "city",
+        "infrastructure"
+      ],
+      "categories": [
+        "furniture",
+        "seating",
+        "collection: hidden_alley"
+      ],
+      "modelUrl": "/assets/polyhaven/models/modular_street_seating/modular_street_seating_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/modular_street_seating/modular_street_seating_1k.gltf",
+      "fileMd5": "350ccab60ac6ed46009c6bd578cf212f",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/modular_street_seating_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modular_street_seating/modular_street_seating_1k.gltf",
+          "md5": "350ccab60ac6ed46009c6bd578cf212f",
+          "size": 29629,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/textures/modular_street_seating_supports_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_street_seating/modular_street_seating_supports_diff_1k.jpg",
+          "md5": "f8f3ce0a8510267bb320523b147e8bc5",
+          "size": 721380,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/textures/modular_street_seating_armrests_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_street_seating/modular_street_seating_armrests_nor_gl_1k.jpg",
+          "md5": "3161b56f328b98f1cc3a3748bdcdd57a",
+          "size": 324073,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/textures/modular_street_seating_timber_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_street_seating/modular_street_seating_timber_arm_1k.jpg",
+          "md5": "ed6858f805affc2d5387043c7de0b9f3",
+          "size": 762344,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/textures/modular_street_seating_supports_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_street_seating/modular_street_seating_supports_nor_gl_1k.jpg",
+          "md5": "eb422efce89e6d40608ce8e9a8c7d42a",
+          "size": 477177,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/textures/modular_street_seating_timber_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_street_seating/modular_street_seating_timber_diff_1k.jpg",
+          "md5": "ef96054b965201bcf45a5fe1a137d853",
+          "size": 596026,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/textures/modular_street_seating_connectors_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_street_seating/modular_street_seating_connectors_nor_gl_1k.jpg",
+          "md5": "4489712b8404eb94a0ef2a8536f8571f",
+          "size": 398150,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/textures/modular_street_seating_armrests_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_street_seating/modular_street_seating_armrests_diff_1k.jpg",
+          "md5": "a1fa7086f8fadb9fc2861962505ee05d",
+          "size": 612860,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/textures/modular_street_seating_supports_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_street_seating/modular_street_seating_supports_arm_1k.jpg",
+          "md5": "2464500fdfcde0319bffc0a8d46647cf",
+          "size": 734095,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/textures/modular_street_seating_connectors_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_street_seating/modular_street_seating_connectors_diff_1k.jpg",
+          "md5": "f6718698d2c27333dd568db4a42798ff",
+          "size": 212785,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/textures/modular_street_seating_armrests_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_street_seating/modular_street_seating_armrests_arm_1k.jpg",
+          "md5": "df3dbc4ed5ef4fb98970e331a18805b5",
+          "size": 622643,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/textures/modular_street_seating_timber_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_street_seating/modular_street_seating_timber_nor_gl_1k.jpg",
+          "md5": "0d0b133fb0a1b66dad5501f2a861e19d",
+          "size": 557669,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/textures/modular_street_seating_connectors_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_street_seating/modular_street_seating_connectors_arm_1k.jpg",
+          "md5": "0d5bb2990258ddcb5f12e758b242c1da",
+          "size": 591917,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modular_street_seating/modular_street_seating.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/modular_street_seating/modular_street_seating.bin",
+          "md5": "5c0426b5068d5d41f0a301035ecac9ab",
+          "size": 977224,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 7617972,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "quiver_tree_02",
+      "name": "Quiver Tree 02",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/quiver_tree_02",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Dario Barresi, Rico Cilliers",
+      "polycount": 153887,
+      "dimensionsMm": [
+        872.0614314079285,
+        880.8198273181915,
+        1468.88018399477
+      ],
+      "dimensionsM": [
+        0.872061,
+        0.88082,
+        1.46888
+      ],
+      "tags": [
+        "south africa",
+        "karoo",
+        "succulent",
+        "aloe"
+      ],
+      "categories": [
+        "nature",
+        "trees",
+        "plants",
+        "collection: namaqualand"
+      ],
+      "modelUrl": "/assets/polyhaven/models/quiver_tree_02/quiver_tree_02_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/quiver_tree_02/quiver_tree_02_1k.gltf",
+      "fileMd5": "1002e67d6921204df06b9a97f4f30cff",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/quiver_tree_02/quiver_tree_02_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/quiver_tree_02/quiver_tree_02_1k.gltf",
+          "md5": "1002e67d6921204df06b9a97f4f30cff",
+          "size": 2809,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/quiver_tree_02/quiver_tree_02.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/quiver_tree_02/quiver_tree_02.bin",
+          "md5": "63635d61c58151eb4fb0b2caaf6b373c",
+          "size": 2060604,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/quiver_tree_02/textures/quiver_tree_02_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/quiver_tree_02/quiver_tree_02_arm_1k.jpg",
+          "md5": "36d19d0ef3d38ed92c557d9eb2203302",
+          "size": 759729,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/quiver_tree_02/textures/quiver_tree_02_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/quiver_tree_02/quiver_tree_02_nor_gl_1k.jpg",
+          "md5": "5ddb37eb256e324a0929e465d429f5a7",
+          "size": 988408,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/quiver_tree_02/textures/quiver_tree_02_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/quiver_tree_02/quiver_tree_02_diff_1k.jpg",
+          "md5": "7f14325c48fc30112476b851d7e05232",
+          "size": 736321,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 4547871,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "concrete_cat_statue",
+      "name": "Concrete Cat Statue",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/concrete_cat_statue",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Rico Cilliers, Riley Queen",
+      "polycount": 11950,
+      "dimensionsMm": [
+        152.97183394432068,
+        250.0000149011612,
+        283.0095653557052
+      ],
+      "dimensionsM": [
+        0.152972,
+        0.25,
+        0.28301
+      ],
+      "tags": [
+        "garden",
+        "outdoor",
+        "landscaping",
+        "gardening",
+        "statue",
+        "concrete",
+        "sculpture",
+        "cat",
+        "lawn decoration"
+      ],
+      "categories": [
+        "decorative"
+      ],
+      "modelUrl": "/assets/polyhaven/models/concrete_cat_statue/concrete_cat_statue_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/concrete_cat_statue/concrete_cat_statue_1k.gltf",
+      "fileMd5": "18b2270606be6fdca04c2f876274e673",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/concrete_cat_statue/concrete_cat_statue_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/concrete_cat_statue/concrete_cat_statue_1k.gltf",
+          "md5": "18b2270606be6fdca04c2f876274e673",
+          "size": 2853,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/concrete_cat_statue/concrete_cat_statue.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/concrete_cat_statue/concrete_cat_statue.bin",
+          "md5": "100da2074e7461c81898146f0da2a821",
+          "size": 291316,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/concrete_cat_statue/textures/concrete_cat_statue_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/concrete_cat_statue/concrete_cat_statue_arm_1k.jpg",
+          "md5": "94cc77ffa6977477ab1873277efe92cb",
+          "size": 796684,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/concrete_cat_statue/textures/concrete_cat_statue_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/concrete_cat_statue/concrete_cat_statue_nor_gl_1k.jpg",
+          "md5": "7f87b8c08f651b7d90e9b9273420c811",
+          "size": 1121259,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/concrete_cat_statue/textures/concrete_cat_statue_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/concrete_cat_statue/concrete_cat_statue_diff_1k.jpg",
+          "md5": "dbff9567dc512d338c2857fb03709d01",
+          "size": 886225,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 3098337,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "outdoor_table_chair_set_01",
+      "name": "Outdoor Table Chair Set 01",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/outdoor_table_chair_set_01",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "James Ray Cock",
+      "polycount": 9828,
+      "dimensionsMm": [
+        776.0046124458313,
+        1831.0473561286926,
+        858.5816156119108
+      ],
+      "dimensionsM": [
+        0.776005,
+        1.831047,
+        0.858582
+      ],
+      "tags": [
+        "outdoor",
+        "foldable",
+        "folding",
+        "seating",
+        "coffee",
+        "diner",
+        "street",
+        "urban",
+        "deli",
+        "wood",
+        "city",
+        "cafe"
+      ],
+      "categories": [
+        "furniture",
+        "seating"
+      ],
+      "modelUrl": "/assets/polyhaven/models/outdoor_table_chair_set_01/outdoor_table_chair_set_01_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/outdoor_table_chair_set_01/outdoor_table_chair_set_01_1k.gltf",
+      "fileMd5": "e5f81fc86b52135f5a5897a51b859b07",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/outdoor_table_chair_set_01/outdoor_table_chair_set_01_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_1k.gltf",
+          "md5": "e5f81fc86b52135f5a5897a51b859b07",
+          "size": 6826,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/outdoor_table_chair_set_01/textures/outdoor_table_chair_set_01_table_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_table_nor_gl_1k.jpg",
+          "md5": "d284647b39e4ecda93b3ea85f40dc2d7",
+          "size": 43095,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/outdoor_table_chair_set_01/textures/outdoor_table_chair_set_01_chair_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_chair_arm_1k.jpg",
+          "md5": "52352847c3ce824803a9d500eec5614d",
+          "size": 179920,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/outdoor_table_chair_set_01/textures/outdoor_table_chair_set_01_table_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_table_arm_1k.jpg",
+          "md5": "cf5aa95ce8b83991eaf5048eacea0611",
+          "size": 201642,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/outdoor_table_chair_set_01/textures/outdoor_table_chair_set_01_table_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_table_diff_1k.jpg",
+          "md5": "afd8871dffcad88170a27b5fce6e3c7d",
+          "size": 151897,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/outdoor_table_chair_set_01/outdoor_table_chair_set_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/outdoor_table_chair_set_01/outdoor_table_chair_set_01.bin",
+          "md5": "8596ca40855bc417ac5248a54bd85990",
+          "size": 456856,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/outdoor_table_chair_set_01/textures/outdoor_table_chair_set_01_chair_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_chair_nor_gl_1k.jpg",
+          "md5": "ac08f5c3335c94e1dca986383265c23a",
+          "size": 46772,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/outdoor_table_chair_set_01/textures/outdoor_table_chair_set_01_chair_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_chair_diff_1k.jpg",
+          "md5": "cb6d4004ad957a6b89aabe4c8dddd6fd",
+          "size": 155372,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 1242380,
+      "polyhavenCredit": "Powered by Poly Haven"
+    }
+  ],
+  "materials": [
+    {
+      "id": "brushed_concrete",
+      "name": "Brushed Concrete ",
+      "type": "material",
+      "category": "concrete",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/brushed_concrete",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Dario Barresi, Dimitrios Savva",
+      "maps": {
+        "color": "/assets/polyhaven/textures/brushed_concrete/brushed_concrete_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/brushed_concrete/brushed_concrete_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/brushed_concrete/brushed_concrete_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/brushed_concrete/brushed_concrete_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/brushed_concrete/brushed_concrete_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/brushed_concrete/brushed_concrete_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete/brushed_concrete_diff_1k.jpg",
+          "md5": "731d450cd11906e926adeb2d5caa29f9",
+          "size": 847278,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/brushed_concrete/brushed_concrete_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete/brushed_concrete_nor_gl_1k.jpg",
+          "md5": "fc8c03e505d0f2acb932dde6deae557a",
+          "size": 849228,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/brushed_concrete/brushed_concrete_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete/brushed_concrete_rough_1k.jpg",
+          "md5": "e72fc05f68ea0a997a215d9701b16b2e",
+          "size": 701983,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/brushed_concrete/brushed_concrete_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete/brushed_concrete_arm_1k.jpg",
+          "md5": "1e7712c0e6f4094a594ac17e7b99b366",
+          "size": 783702,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/brushed_concrete/brushed_concrete_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete/brushed_concrete_disp_1k.jpg",
+          "md5": "87ca61036ec5de0799789549e5bd2b73",
+          "size": 495886,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 3678077,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "brick_pavement",
+      "name": "Brick Pavement",
+      "type": "material",
+      "category": "brick",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/brick_pavement",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Charlotte Baglioni",
+      "maps": {
+        "color": "/assets/polyhaven/textures/brick_pavement/brick_pavement_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/brick_pavement/brick_pavement_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/brick_pavement/brick_pavement_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/brick_pavement/brick_pavement_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/brick_pavement/brick_pavement_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/brick_pavement/brick_pavement_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_pavement/brick_pavement_diff_1k.jpg",
+          "md5": "07b2f4b1c1b74a3acd7d9cf44ee8f84e",
+          "size": 776499,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/brick_pavement/brick_pavement_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_pavement/brick_pavement_nor_gl_1k.jpg",
+          "md5": "1e1a2ce3aae3e1c06aa25ec27c083265",
+          "size": 904630,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/brick_pavement/brick_pavement_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_pavement/brick_pavement_rough_1k.jpg",
+          "md5": "03bf17323c8c3dc91850e95468f8090a",
+          "size": 334917,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/brick_pavement/brick_pavement_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_pavement/brick_pavement_arm_1k.jpg",
+          "md5": "2a7dbff017e7c2f9ec559da311260c69",
+          "size": 732792,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/brick_pavement/brick_pavement_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_pavement/brick_pavement_disp_1k.jpg",
+          "md5": "8a0520f73f8cd6113b4cb77cfb63707a",
+          "size": 513509,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 3262347,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "american_walnut_veneer",
+      "name": "American Walnut Veneer",
+      "type": "material",
+      "category": "wood",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/american_walnut_veneer",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Jenelle van Heerden",
+      "maps": {
+        "color": "/assets/polyhaven/textures/american_walnut_veneer/american_walnut_veneer_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/american_walnut_veneer/american_walnut_veneer_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/american_walnut_veneer/american_walnut_veneer_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/american_walnut_veneer/american_walnut_veneer_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/american_walnut_veneer/american_walnut_veneer_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/american_walnut_veneer/american_walnut_veneer_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/american_walnut_veneer/american_walnut_veneer_diff_1k.jpg",
+          "md5": "748b39ed2ba9dce314104055f18837f0",
+          "size": 579182,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/american_walnut_veneer/american_walnut_veneer_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/american_walnut_veneer/american_walnut_veneer_nor_gl_1k.jpg",
+          "md5": "4bd673f87d8aef1fcce85625d748fa0e",
+          "size": 414945,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/american_walnut_veneer/american_walnut_veneer_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/american_walnut_veneer/american_walnut_veneer_rough_1k.jpg",
+          "md5": "d9fa24afc4790122e9ba3c535af8b615",
+          "size": 691712,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/american_walnut_veneer/american_walnut_veneer_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/american_walnut_veneer/american_walnut_veneer_arm_1k.jpg",
+          "md5": "fd80998aa642d6521ce3c8e2ed13636d",
+          "size": 704116,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/american_walnut_veneer/american_walnut_veneer_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/american_walnut_veneer/american_walnut_veneer_disp_1k.jpg",
+          "md5": "7081945eaff4a6cff32a09e8fcd16eae",
+          "size": 160293,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 2550248,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "stone_pavers",
+      "name": "Stone Pavers",
+      "type": "material",
+      "category": "stone",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/stone_pavers",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Amal Kumar",
+      "maps": {
+        "color": "/assets/polyhaven/textures/stone_pavers/stone_pavers_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/stone_pavers/stone_pavers_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/stone_pavers/stone_pavers_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/stone_pavers/stone_pavers_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/stone_pavers/stone_pavers_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/stone_pavers/stone_pavers_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_pavers/stone_pavers_diff_1k.jpg",
+          "md5": "f4105e343506abd2fbeca014fe62c22a",
+          "size": 772390,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/stone_pavers/stone_pavers_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_pavers/stone_pavers_nor_gl_1k.jpg",
+          "md5": "bcc54ee7f372d58789b28fbc56c0f417",
+          "size": 910668,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/stone_pavers/stone_pavers_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_pavers/stone_pavers_rough_1k.jpg",
+          "md5": "6f3da8f919c76cc62e8796dd39e2aba5",
+          "size": 425066,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/stone_pavers/stone_pavers_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_pavers/stone_pavers_arm_1k.jpg",
+          "md5": "06dbe57b8e4bc3a94b3e85cdcbe500d5",
+          "size": 664699,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/stone_pavers/stone_pavers_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_pavers/stone_pavers_disp_1k.jpg",
+          "md5": "ee83e2b731999697bdfcc58a12e7100a",
+          "size": 418933,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 3191756,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "asphalt_01",
+      "name": "Asphalt 01",
+      "type": "material",
+      "category": "asphalt",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/asphalt_01",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Dario Barresi, Charlotte Baglioni",
+      "maps": {
+        "color": "/assets/polyhaven/textures/asphalt_01/asphalt_01_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/asphalt_01/asphalt_01_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/asphalt_01/asphalt_01_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/asphalt_01/asphalt_01_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/asphalt_01/asphalt_01_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/asphalt_01/asphalt_01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_01/asphalt_01_diff_1k.jpg",
+          "md5": "43c88946c38109d77a24456686a376f9",
+          "size": 739513,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/asphalt_01/asphalt_01_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_01/asphalt_01_nor_gl_1k.jpg",
+          "md5": "ff3e4a0fc157cfa014fbcac68e662c38",
+          "size": 1237059,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/asphalt_01/asphalt_01_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_01/asphalt_01_rough_1k.jpg",
+          "md5": "92ffad35bc543f59ffd9860c53a98214",
+          "size": 344964,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/asphalt_01/asphalt_01_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_01/asphalt_01_arm_1k.jpg",
+          "md5": "54750476b47b2a09e2951497766326a0",
+          "size": 1086945,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/asphalt_01/asphalt_01_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_01/asphalt_01_disp_1k.jpg",
+          "md5": "8a1ced950be75f6c278a078cea4b7034",
+          "size": 472536,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 3881017,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "interlocking_concrete_pavers",
+      "name": "Interlocking Concrete Pavers",
+      "type": "material",
+      "category": "interlocking-pavement",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/interlocking_concrete_pavers",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Amal Kumar",
+      "maps": {
+        "color": "/assets/polyhaven/textures/interlocking_concrete_pavers/interlocking_concrete_pavers_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/interlocking_concrete_pavers/interlocking_concrete_pavers_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/interlocking_concrete_pavers/interlocking_concrete_pavers_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/interlocking_concrete_pavers/interlocking_concrete_pavers_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/interlocking_concrete_pavers/interlocking_concrete_pavers_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/interlocking_concrete_pavers/interlocking_concrete_pavers_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/interlocking_concrete_pavers/interlocking_concrete_pavers_diff_1k.jpg",
+          "md5": "5b87a284763747870b74cc589080d227",
+          "size": 693979,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/interlocking_concrete_pavers/interlocking_concrete_pavers_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/interlocking_concrete_pavers/interlocking_concrete_pavers_nor_gl_1k.jpg",
+          "md5": "b8f2196f4c1919068dfd9cab9e651ba5",
+          "size": 1077102,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/interlocking_concrete_pavers/interlocking_concrete_pavers_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/interlocking_concrete_pavers/interlocking_concrete_pavers_rough_1k.jpg",
+          "md5": "052f1fd8e643ad4c70c4f0bbe94b4b4c",
+          "size": 414468,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/interlocking_concrete_pavers/interlocking_concrete_pavers_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/interlocking_concrete_pavers/interlocking_concrete_pavers_arm_1k.jpg",
+          "md5": "f3ada71bef6cd4e65600d0ed9b5c0ab1",
+          "size": 779888,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/interlocking_concrete_pavers/interlocking_concrete_pavers_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/interlocking_concrete_pavers/interlocking_concrete_pavers_disp_1k.jpg",
+          "md5": "bfb268f4f227db2a7283574cf15de632",
+          "size": 416563,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 3382000,
+      "polyhavenCredit": "Powered by Poly Haven"
+    }
+  ]
+}
