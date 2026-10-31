@@ -16,6 +16,10 @@ MODELS = [
     'metal_office_desk', 'electric_stove', 'modern_ceiling_lamp_01',
     'street_lamp_01', 'modular_street_seating', 'quiver_tree_02',
     'concrete_cat_statue', 'outdoor_table_chair_set_01',
+    # Follow-up batch: dining, bedroom, accessibility, education, lighting and planting.
+    'dining_table', 'modern_coffee_table_02', 'wooden_table_02', 'vintage_day_bed',
+    'wheelchair_01', 'SchoolDesk_01', 'SchoolChair_01', 'street_lamp_02',
+    'planter_box_01', 'potted_plant_01',
 ]
 TEXTURES = {
     'brushed_concrete': 'concrete',

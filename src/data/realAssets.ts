@@ -281,6 +281,355 @@ export const REAL_MODELS: AssetItem[] = [
     polycount: 9828,
     itemKey: "outdoor-set",
   },
+  {
+    "id": "ph_model_dining_table",
+    "name": "Dining Table",
+    "category": "interior",
+    "icon": "Utensils",
+    "tags": [
+      "dining table",
+      "vintage",
+      "rectangular",
+      "Poly Haven",
+      "CC0"
+    ],
+    "assetKind": "model",
+    "sourceAssetId": "dining_table",
+    "modelUrl": "/assets/polyhaven/models/dining_table/dining_table_1k.gltf",
+    "dimensionsM": [
+      2.255896,
+      1.390236,
+      0.876989
+    ],
+    "placement": "floor",
+    "orientation": {
+      "upAxis": "Y",
+      "forwardAxis": "+Z",
+      "pivot": "bottom-center",
+      "defaultRotationDegrees": 0
+    },
+    "source": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/dining_table",
+    "license": "CC0 1.0 Universal",
+    "licenseUrl": "https://polyhaven.com/license",
+    "author": "Aron Łyczek",
+    "polycount": 1048,
+    "itemKey": "dining"
+  },
+  {
+    "id": "ph_model_modern_coffee_table_02",
+    "name": "Modern Coffee Table 02",
+    "category": "interior",
+    "icon": "Box",
+    "tags": [
+      "coffee table",
+      "modern",
+      "contemporary",
+      "Poly Haven",
+      "CC0"
+    ],
+    "assetKind": "model",
+    "sourceAssetId": "modern_coffee_table_02",
+    "modelUrl": "/assets/polyhaven/models/modern_coffee_table_02/modern_coffee_table_02_1k.gltf",
+    "dimensionsM": [
+      1.199111,
+      1.199657,
+      0.36925
+    ],
+    "placement": "floor",
+    "orientation": {
+      "upAxis": "Y",
+      "forwardAxis": "+Z",
+      "pivot": "bottom-center",
+      "defaultRotationDegrees": 0
+    },
+    "source": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/modern_coffee_table_02",
+    "license": "CC0 1.0 Universal",
+    "licenseUrl": "https://polyhaven.com/license",
+    "author": "Amin",
+    "polycount": 13645,
+    "itemKey": "coffee-table"
+  },
+  {
+    "id": "ph_model_wooden_table_02",
+    "name": "Wooden Table 02",
+    "category": "interior",
+    "icon": "Utensils",
+    "tags": [
+      "table",
+      "wooden",
+      "Poly Haven",
+      "CC0"
+    ],
+    "assetKind": "model",
+    "sourceAssetId": "wooden_table_02",
+    "modelUrl": "/assets/polyhaven/models/wooden_table_02/wooden_table_02_1k.gltf",
+    "dimensionsM": [
+      1.134417,
+      0.706025,
+      0.799543
+    ],
+    "placement": "floor",
+    "orientation": {
+      "upAxis": "Y",
+      "forwardAxis": "+Z",
+      "pivot": "bottom-center",
+      "defaultRotationDegrees": 0
+    },
+    "source": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_table_02",
+    "license": "CC0 1.0 Universal",
+    "licenseUrl": "https://polyhaven.com/license",
+    "author": "Serhii Khromov",
+    "polycount": 196,
+    "itemKey": "table"
+  },
+  {
+    "id": "ph_model_vintage_day_bed",
+    "name": "Vintage Day Bed",
+    "category": "interior",
+    "icon": "BedDouble",
+    "tags": [
+      "day bed",
+      "sofa bed",
+      "vintage",
+      "Poly Haven",
+      "CC0"
+    ],
+    "assetKind": "model",
+    "sourceAssetId": "vintage_day_bed",
+    "modelUrl": "/assets/polyhaven/models/vintage_day_bed/vintage_day_bed_1k.gltf",
+    "dimensionsM": [
+      1.972555,
+      0.854776,
+      1.127347
+    ],
+    "placement": "floor",
+    "orientation": {
+      "upAxis": "Y",
+      "forwardAxis": "+Z",
+      "pivot": "bottom-center",
+      "defaultRotationDegrees": 0
+    },
+    "source": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/vintage_day_bed",
+    "license": "CC0 1.0 Universal",
+    "licenseUrl": "https://polyhaven.com/license",
+    "author": "Aron Łyczek",
+    "polycount": 2715,
+    "itemKey": "bed"
+  },
+  {
+    "id": "ph_model_wheelchair_01",
+    "name": "Wheelchair 01",
+    "category": "interior",
+    "icon": "Accessibility",
+    "tags": [
+      "wheelchair",
+      "accessibility",
+      "mobility",
+      "Poly Haven",
+      "CC0"
+    ],
+    "assetKind": "model",
+    "sourceAssetId": "wheelchair_01",
+    "modelUrl": "/assets/polyhaven/models/wheelchair_01/wheelchair_01_1k.gltf",
+    "dimensionsM": [
+      0.824091,
+      1.090867,
+      1.103502
+    ],
+    "placement": "floor",
+    "orientation": {
+      "upAxis": "Y",
+      "forwardAxis": "+Z",
+      "pivot": "bottom-center",
+      "defaultRotationDegrees": 0
+    },
+    "source": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wheelchair_01",
+    "license": "CC0 1.0 Universal",
+    "licenseUrl": "https://polyhaven.com/license",
+    "author": "Garreth Dean",
+    "polycount": 40252,
+    "itemKey": "chair"
+  },
+  {
+    "id": "ph_model_schooldesk_01",
+    "name": "School Desk 01",
+    "category": "interior",
+    "icon": "Laptop",
+    "tags": [
+      "school desk",
+      "education",
+      "classroom",
+      "Poly Haven",
+      "CC0"
+    ],
+    "assetKind": "model",
+    "sourceAssetId": "SchoolDesk_01",
+    "modelUrl": "/assets/polyhaven/models/SchoolDesk_01/SchoolDesk_01_1k.gltf",
+    "dimensionsM": [
+      0.711776,
+      0.545968,
+      0.88263
+    ],
+    "placement": "floor",
+    "orientation": {
+      "upAxis": "Y",
+      "forwardAxis": "+Z",
+      "pivot": "bottom-center",
+      "defaultRotationDegrees": 0
+    },
+    "source": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/SchoolDesk_01",
+    "license": "CC0 1.0 Universal",
+    "licenseUrl": "https://polyhaven.com/license",
+    "author": "Ethan Place",
+    "polycount": 4162,
+    "itemKey": "desk"
+  },
+  {
+    "id": "ph_model_schoolchair_01",
+    "name": "School Chair 01",
+    "category": "interior",
+    "icon": "Armchair",
+    "tags": [
+      "school chair",
+      "education",
+      "classroom",
+      "Poly Haven",
+      "CC0"
+    ],
+    "assetKind": "model",
+    "sourceAssetId": "SchoolChair_01",
+    "modelUrl": "/assets/polyhaven/models/SchoolChair_01/SchoolChair_01_1k.gltf",
+    "dimensionsM": [
+      0.565853,
+      0.675255,
+      1.006036
+    ],
+    "placement": "floor",
+    "orientation": {
+      "upAxis": "Y",
+      "forwardAxis": "+Z",
+      "pivot": "bottom-center",
+      "defaultRotationDegrees": 0
+    },
+    "source": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/SchoolChair_01",
+    "license": "CC0 1.0 Universal",
+    "licenseUrl": "https://polyhaven.com/license",
+    "author": "Ethan Place",
+    "polycount": 5072,
+    "itemKey": "chair"
+  },
+  {
+    "id": "ph_model_street_lamp_02",
+    "name": "Street Lamp 02",
+    "category": "objects",
+    "icon": "Lamp",
+    "tags": [
+      "street lamp",
+      "urban",
+      "lighting",
+      "Poly Haven",
+      "CC0"
+    ],
+    "assetKind": "model",
+    "sourceAssetId": "street_lamp_02",
+    "modelUrl": "/assets/polyhaven/models/street_lamp_02/street_lamp_02_1k.gltf",
+    "dimensionsM": [
+      0.386493,
+      0.806789,
+      1.675042
+    ],
+    "placement": "site",
+    "orientation": {
+      "upAxis": "Y",
+      "forwardAxis": "+Z",
+      "pivot": "bottom-center",
+      "defaultRotationDegrees": 0
+    },
+    "source": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/street_lamp_02",
+    "license": "CC0 1.0 Universal",
+    "licenseUrl": "https://polyhaven.com/license",
+    "author": "Josh Dean",
+    "polycount": 20338,
+    "itemKey": "street-light"
+  },
+  {
+    "id": "ph_model_planter_box_01",
+    "name": "Planter Box 01",
+    "category": "objects",
+    "icon": "Sprout",
+    "tags": [
+      "planter",
+      "garden",
+      "landscaping",
+      "Poly Haven",
+      "CC0"
+    ],
+    "assetKind": "model",
+    "sourceAssetId": "planter_box_01",
+    "modelUrl": "/assets/polyhaven/models/planter_box_01/planter_box_01_1k.gltf",
+    "dimensionsM": [
+      0.912611,
+      0.413668,
+      0.424968
+    ],
+    "placement": "site",
+    "orientation": {
+      "upAxis": "Y",
+      "forwardAxis": "+Z",
+      "pivot": "bottom-center",
+      "defaultRotationDegrees": 0
+    },
+    "source": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/planter_box_01",
+    "license": "CC0 1.0 Universal",
+    "licenseUrl": "https://polyhaven.com/license",
+    "author": "James Ray Cock",
+    "polycount": 8094,
+    "itemKey": "decor"
+  },
+  {
+    "id": "ph_model_potted_plant_01",
+    "name": "Potted Plant 01",
+    "category": "trees",
+    "icon": "Sprout",
+    "tags": [
+      "potted plant",
+      "indoor plant",
+      "landscape",
+      "Poly Haven",
+      "CC0"
+    ],
+    "assetKind": "model",
+    "sourceAssetId": "potted_plant_01",
+    "modelUrl": "/assets/polyhaven/models/potted_plant_01/potted_plant_01_1k.gltf",
+    "dimensionsM": [
+      0.588919,
+      0.636612,
+      1.350779
+    ],
+    "placement": "site",
+    "orientation": {
+      "upAxis": "Y",
+      "forwardAxis": "+Z",
+      "pivot": "bottom-center",
+      "defaultRotationDegrees": 0
+    },
+    "source": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/potted_plant_01",
+    "license": "CC0 1.0 Universal",
+    "licenseUrl": "https://polyhaven.com/license",
+    "author": "Rico Cilliers",
+    "polycount": 96030,
+    "itemKey": "tree"
+  },
 ];
 
 export const REAL_MATERIALS: AssetItem[] = [

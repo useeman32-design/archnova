@@ -907,7 +907,9 @@ function InteriorScene({
             scale={placedItem.scale}
             onClick={(event) => { event.stopPropagation(); onSelectItem?.(placedItem.id) }}
           >
-            <FurniturePiece item={placedItem.item} width={placedItem.width ?? defaults.width} depth={placedItem.depth ?? defaults.depth} height={placedItem.height ?? defaults.height} color={placedItem.color} />
+            {placedItem.assetId
+              ? <RealAssetModel assetId={placedItem.assetId} targetWorldSize={[(placedItem.width ?? defaults.width) * S, (placedItem.height ?? defaults.height) * S, (placedItem.depth ?? defaults.depth) * S]} />
+              : <FurniturePiece item={placedItem.item} width={placedItem.width ?? defaults.width} depth={placedItem.depth ?? defaults.depth} height={placedItem.height ?? defaults.height} color={placedItem.color} />}
             {selectedItemId === placedItem.id ? <Edges color="#1a56f5" /> : null}
           </group>
         )

@@ -323,7 +323,7 @@ export function PropertiesPanel({
                 {placedHere.length === 0 ? <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[11.5px] text-muted">No items yet. Choose a suggestion or drag an item from the library.</p> : placedHere.map((placedItem) => (
                   <div key={placedItem.id} className="flex items-center gap-2 rounded-lg border border-line p-2">
                     <button type="button" onClick={() => onSelectItem?.(placedItem.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                      <ObjectPreview item={placedItem.item} color={placedItem.color} />
+                      <ObjectPreview item={placedItem.item} color={placedItem.color} assetId={placedItem.assetId} />
                       <span className="truncate text-[11.5px] font-medium capitalize text-ink-text">{placedItem.item.replace(/[-_]/g, ' ')}</span>
                     </button>
                     <input type="color" value={placedItem.color} onChange={(event) => onUpdatePlacedItem?.(room.id, placedItem.id, { color: event.target.value })} className="h-7 w-8 cursor-pointer rounded border-0 bg-transparent p-0" aria-label={`Change ${placedItem.item} color`} />

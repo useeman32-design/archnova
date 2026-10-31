@@ -81,8 +81,8 @@ export function AssetsView({ onAdd }: { onAdd?: (asset: AssetItem) => void }) {
       )}
 
       <div className="mt-5 space-y-2 rounded-xl border border-dashed border-line bg-canvas-soft/50 px-4 py-3 text-[12px] leading-relaxed text-muted">
-        <p><strong className="text-ink-text">Starter library:</strong> 14 downloaded, MD5-verified CC0 glTF models and 6 downloaded PBR material sets. Model previews render the actual local GLTF files in a consistent neutral product stage.</p>
-        <p><strong className="text-ink-text">Coverage gaps:</strong> no suitable contemporary bed, wardrobe, refrigerator, sink/toilet, sedan/SUV, or palm model is in this starter import. Those records are intentionally not represented by fake geometry. The imported sofa is Poly Haven’s Sofa 02 and has an older visual style; other available models are identified by their exact source names.</p>
+        <p><strong className="text-ink-text">Starter library:</strong> {ASSETS.filter((asset) => asset.assetKind === 'model').length} locally bundled, MD5-verified CC0 glTF models and {ASSETS.filter((asset) => asset.assetKind === 'material').length} PBR material sets. Model previews render the actual local GLTF files in a consistent neutral product stage.</p>
+        <p><strong className="text-ink-text">Coverage gaps:</strong> the library still lacks a contemporary full-size bed and wardrobe, refrigerator, sink/toilet fixtures, a sedan/SUV, and a palm or mature species-diverse tree set. The imported day bed and dining table have vintage/worn styling, so they are not presented as contemporary options.</p>
         <p>Imported assets are courtesy credited as <strong className="text-ink-text">Powered by Poly Haven</strong>. Per-asset source, author, license, dimensions and checksum are recorded in the local manifest.</p>
       </div>
 

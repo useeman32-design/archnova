@@ -3,7 +3,7 @@
 **Audit date:** 2026-10-31
 **Scope:** repository audit, target taxonomy, source/license screen, and staged implementation plan. No third-party model or texture files were downloaded or incorporated during this audit stage.
 
-> **Milestone update (2026-10-31):** The follow-on first real-asset acquisition and implementation milestone is now complete. Fourteen CC0 Poly Haven GLTF models and six PBR material sets were downloaded, integrated and loader-verified. The current exact asset list, rights, workflow verification and remaining category gaps are in [`ARCHNOVA_REAL_ASSET_MILESTONE.md`](./ARCHNOVA_REAL_ASSET_MILESTONE.md). Sections below describe the repository as it stood during the initial audit; they are historical, not the current implementation state.
+> **Milestone update (2026-10-31):** The first real-asset milestone and a modest follow-up collection are now integrated. Twenty-four CC0 Poly Haven GLTF models and six PBR material sets are locally bundled; all 24 models were checksum-verified and parsed with Three.js GLTFLoader. The current exact asset list, rights, workflow verification and remaining category gaps are in [`ARCHNOVA_REAL_ASSET_MILESTONE.md`](./ARCHNOVA_REAL_ASSET_MILESTONE.md). Sections below describe the repository as it stood during the initial audit; they are historical, not the current implementation state.
 
 > **Checklist note:** The prompt contains the core requirements and broad asset families, but I could not find a separate, item-by-item checklist attached or in the repository. This document expands the categories explicitly named in the prompt into a proposed working taxonomy. If there is a canonical checklist, it should be compared against this taxonomy before declaring coverage complete.
 
@@ -132,7 +132,7 @@ Placed instances should store `assetId`, transform, parent room/floor/site, dime
 
 Before adoption: verify exact product page, creator, asset license/version, commercial permission, attribution wording, redistribution/embedding rights, allowed modification, end-user exports, attribution visibility, trademarks/logos, identifiable people/model releases, and any platform/API restrictions. Keep a local evidence record (license URL, access/acquisition date, invoice if paid, screenshot/text hash, attribution string). “Free download” is not a license label.
 
-## 5. Shortlisted starter candidates (metadata review only; not downloaded)
+## 5. Initial shortlist (historical metadata review; some candidates have since been imported)
 
 These are source pages to vet and test in a controlled first batch. The shortlist is deliberately small; it does not mean every candidate is aesthetically right for every design style.
 
@@ -195,9 +195,11 @@ Acquire a few assets at a time, review on mobile/browser and in low/high-end sce
 - Track bundle/network sizes and lazily load category/model resources. Avoid a giant eager download of all assets.
 - Audit licenses as a living pipeline; re-check marketplace and API terms before new integration or asset refresh.
 
-## 7. Recommended next implementation milestone (historical recommendation; now completed in starter scope)
+## 7. Recommended next implementation milestone
 
-The recommended first CC0 GLB vertical slice was completed at starter scale. The current implementation includes 14 imported models and six PBR packages, plus local GLTFLoader verification, shared project identity, preview, material application, and save/reload checks. See [`ARCHNOVA_REAL_ASSET_MILESTONE.md`](./ARCHNOVA_REAL_ASSET_MILESTONE.md). Do not bulk-expand the catalog until the remaining visual/browser acceptance pass and the next style/category acquisition are reviewed.
+The initial CC0 GLB vertical slice and one measured follow-up batch are complete: 24 imported models and six PBR packages. The current implementation includes local GLTFLoader verification, shared project identity, 2D/3D placement, real previews in Assets and the left tool drawer, PBR application, AI catalog validation and save/reload checks. See [`ARCHNOVA_REAL_ASSET_MILESTONE.md`](./ARCHNOVA_REAL_ASSET_MILESTONE.md).
+
+**Next:** finish browser/WebGL visual acceptance of room rendering, drawer previews and mobile performance before a larger acquisition. Then prioritize still-missing contemporary office seating, full-size bed/wardrobe, refrigerator and bathroom fixtures, vehicles, palm/mature landscape species, and human scale figures. Continue curating one reviewed category batch at a time; don't bulk-download unreviewed sources.
 
 ## 8. Source references checked
 

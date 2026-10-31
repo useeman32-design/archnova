@@ -126,7 +126,8 @@ export function LazyAssetPreview({ assetId, className = '' }: { assetId: string;
     observer.observe(host)
     return () => observer.disconnect()
   }, [host])
-  return <div ref={setHost} className={`overflow-hidden bg-[#eef1f4] ${className}`}>
+  const asset = getAsset(assetId)
+  return <div ref={setHost} role="img" aria-label={`${asset?.name ?? 'Imported asset'} 3D preview`} className={`overflow-hidden bg-[#eef1f4] ${className}`}>
     {visible ? <RealAssetPreview assetId={assetId} className="h-full w-full" /> : <div className="h-full w-full bg-gradient-to-br from-[#f5f7f9] to-[#e3e8ed]" />}
   </div>
 }

@@ -265,6 +265,23 @@ describe('Groq assistant client', () => {
     expect(fetchMock.mock.calls[0][0]).toContain('/models')
   })
 
+  it('matches a specifically named catalog model before a broad furniture-family fallback', async () => {
+    const body = JSON.stringify({ reply: 'I prepared the wheelchair for review.', actions: [{ type: 'add_furniture', room: 'Living Room', item: 'Wheelchair 01' }] })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: body } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [], prompt: 'Place Wheelchair 01 in the Living Room.',
+    })
+    expect(plan.actions).toEqual([{ type: 'add_furniture', room: 'Living Room', item: 'chair', assetId: 'ph_model_wheelchair_01' }])
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
+    const catalogMessage = request.messages.find((message: { content: string }) => message.content.startsWith('RUNTIME CATALOG AND CURRENT PROJECT STATE'))
+    expect(catalogMessage.content).toContain('ph_model_wheelchair_01')
+    expect(catalogMessage.content).toContain('"dimensionsM"')
+  })
+
   it('grounds extended operations in the live feature catalog and flags unmappable edits', async () => {
     const planText = JSON.stringify({
       reply: 'I updated the site and project finishes.',

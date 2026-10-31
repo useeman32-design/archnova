@@ -2,16 +2,18 @@
 
 **Product:** ArchNova by Pixel Studios  
 **Tagline:** Design Your Vision. Build Your Future.  
-**Status:** Phase 2 in progress — plot-boundary geometry/editor slice; assistant diagnostics and first provider-response reliability fixes complete locally
-**Last updated:** 2026-10-30
+**Status:** Phase 3 asset follow-up in progress — 24 CC0 models and 6 PBR sets are bundled; room GLTF rendering, left-drawer model previews, and exact-name AI asset selection are being improved in this working cycle. Browser visual acceptance is still required.
+**Last updated:** 2026-10-31
 
 This is the durable project log. Read it before starting each follow-up task, update the milestone status after meaningful work, and keep the application buildable. This plan is based on the user's expansion brief and the existing repository audit; it is not a claim of professional or regulatory approval.
 
 ## Current milestone
 
 **Milestone 0 — Repository audit and Phase 1 plan: complete.**  
-**Milestone 1 — Generalized, backward-compatible project/site model: core foundation complete locally (commit `4e34770`).**
-**Milestone 2 — Phase 2 site-boundary geometry/editor: interactive polygon editing and explicit edge labels/derived lengths complete locally; orientation, roads, setbacks and multi-building placement remain.**
+**Milestone 1 — Generalized, backward-compatible project/site model: core foundation complete (commit `4e34770`).**
+**Milestone 2 — Phase 2 site-boundary geometry/editor: interactive polygon editing and explicit edge labels/derived lengths are implemented; user-set north, road/access, setbacks and deterministic multi-building overlap checks remain.**
+**Milestone 3 — Real asset library: 24 CC0 Poly Haven models and 6 PBR packages are integrated; the latest work fixes interior GLTF rendering and adds real model previews to the editor drawer and Properties panel. Remaining content/style gaps are listed in `ARCHNOVA_REAL_ASSET_MILESTONE.md`.**
+**Milestone 4 — AI planning: proposal/approval, clarification, validation and recovery flows exist; the current work improves exact named-asset resolution and gives the model bounded asset dimensions/style metadata.**
 
 The codebase has assistant commits (`9035e2b`, `df13735`), the Phase 1 foundation (`4e34770`), Phase 2 site/mobile work (`be8071e`, `f7b3de4`), Groq recovery (`7d87b99`, `b538a11`), site-edge labels (`d93dc4f`), and assistant diagnostics (`3af56c2`) on `main`. The diagnostics code was pushed to `main` and the build to `gh-pages` (`6cc63a3`). GitHub Pages reports that build as successful, and cache-busted requests to the hosted URL now serve `assets/index-BZOM6Ewe.js` and `assets/index-DqppRJBW.css`. No `.github/workflows` deployment workflow exists; deployment is via the `gh-pages` branch. Do not put credentials in this file or in chat.
 
@@ -127,7 +129,14 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [x] Support separate-building proposals, deterministic fit choices (skip/add anyway/shrink), use remaining plot space before outside overflow, and mark unavoidable overflow red in 2D/3D. Explicit coordinates are not silently moved under strict fit.
 - [x] Add local product-render previews for ten site-library variants and connect relevant site-item selection cards; targeted/full tests cover the behavior. Remaining visual gap: gate and street-light previews, plus consistent non-site room/opening/furnishing catalogue renders, are not yet available; the image-generation limit was reached before those could be produced.
 - [x] Verify current assistant/site-fit slice: 60 tests across 10 files pass; `npx tsc -b --pretty false`, `git diff --check`, `npm run build`, and `npm run build:pages` pass. Existing Three.js chunk-size warning remains.
-- [ ] Deferred per user request for later: complete the outstanding selection-card product-render coverage (gate, street-light and non-site variants), then continue with north/access/setbacks and site/building overlap validation. Resume this thread when the user returns to it; no commit or deployment in this cycle.
+- [x] Fix the interior RoomScene path to render placed catalog GLTFs while retaining the procedural fallback for legacy items; give imported furniture/site model variants a live GLTF preview in the left tool drawer.
+- [x] Add ten curated Poly Haven CC0 model records and local packages (dining/coffee tables, vintage day bed, wheelchair, school furniture, street lamp, planter and potted plant); preserve vintage/stylized caveats and document remaining gaps.
+- [x] Improve assistant catalog context with dimensions/style metadata and exact name/ID resolution before generic furniture fallback; keep unknown-ID rejection and the user approval gate.
+- [x] Verify local work: 69 tests/12 files, typecheck, all 24 GLTF scenes/six PBR sets and 74.4 MB checksum/loader verification; production and Pages builds plus `git diff --check` pass. Builds retain the >500 kB JavaScript chunk warning.
+- [ ] Browser-level WebGL visual acceptance of interior model rendering and tool-drawer previews (automation/browser is not available in this workspace); retain as outstanding until manually viewed.
+- [ ] Complete remaining non-model catalogue thumbnails (notably the parametric gate and selected room/opening variants), then continue with user-set north/access, setbacks, and site/building overlap validation.
+- [x] Save the asset/AI/docs update as a local milestone commit (`feat: expand curated real asset library and room previews`).
+- [ ] Push `main` and publish the Pages build after safe GitHub authentication is available. No usable safe credential is configured in this environment; do not reuse the previously pasted token.
 
 ## Working rules
 

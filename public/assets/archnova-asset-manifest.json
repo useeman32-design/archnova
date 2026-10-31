@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-31T01:33:50Z",
+  "generatedAt": "2026-10-31T09:22:42Z",
   "source": "Poly Haven API",
   "sourceApi": "https://api.polyhaven.com/our-api",
   "licenseNotice": "All listed assets are CC0 1.0. Attribution is not required; ArchNova includes Powered by Poly Haven credit as courtesy.",
@@ -1202,6 +1202,830 @@
         }
       ],
       "downloadBytes": 1242380,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "dining_table",
+      "name": "Dining Table",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/dining_table",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Aron \u0141yczek",
+      "polycount": 1048,
+      "dimensionsMm": [
+        2255.895972251892,
+        1390.2360200881958,
+        876.989221200347
+      ],
+      "dimensionsM": [
+        2.255896,
+        1.390236,
+        0.876989
+      ],
+      "tags": [
+        "old",
+        "scratched",
+        "cloth-covered",
+        "rectangular",
+        "checkered-tablecloth",
+        "tapered-legs",
+        "worn"
+      ],
+      "categories": [
+        "collection: project_lighthouse",
+        "furniture",
+        "table"
+      ],
+      "modelUrl": "/assets/polyhaven/models/dining_table/dining_table_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/dining_table/dining_table_1k.gltf",
+      "fileMd5": "556aed1f86536dba7cc5917c36ee7ab7",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/dining_table/dining_table_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/dining_table/dining_table_1k.gltf",
+          "md5": "556aed1f86536dba7cc5917c36ee7ab7",
+          "size": 4165,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/dining_table/textures/dining_table_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dining_table/dining_table_nor_gl_1k.jpg",
+          "md5": "f9e982c15242ff9e544d4968c377abb2",
+          "size": 707020,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/dining_table/textures/dining_table_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dining_table/dining_table_diff_1k.jpg",
+          "md5": "a309bb6839c628305059775d7480c8b7",
+          "size": 852259,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/dining_table/textures/dining_table_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dining_table/dining_table_arm_1k.jpg",
+          "md5": "0be0f4618ef26ce517ebf049e90bcc7c",
+          "size": 689497,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/dining_table/dining_table.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/dining_table/dining_table.bin",
+          "md5": "13227e80b4c213bd7fee570e0b23fe8c",
+          "size": 30992,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 2283933,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "modern_coffee_table_02",
+      "name": "Modern Coffee Table 02",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/modern_coffee_table_02",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Amin",
+      "polycount": 13645,
+      "dimensionsMm": [
+        1199.1113424301147,
+        1199.6567845344543,
+        369.2496716976166
+      ],
+      "dimensionsM": [
+        1.199111,
+        1.199657,
+        0.36925
+      ],
+      "tags": [
+        "contemporary",
+        "modern",
+        "rectangular",
+        "stone",
+        "wood",
+        "deco",
+        "clean"
+      ],
+      "categories": [
+        "furniture",
+        "table"
+      ],
+      "modelUrl": "/assets/polyhaven/models/modern_coffee_table_02/modern_coffee_table_02_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/modern_coffee_table_02/modern_coffee_table_02_1k.gltf",
+      "fileMd5": "6840f431aa9f2b9096b32416a5b198f3",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_02/modern_coffee_table_02_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modern_coffee_table_02/modern_coffee_table_02_1k.gltf",
+          "md5": "6840f431aa9f2b9096b32416a5b198f3",
+          "size": 4979,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_02/textures/modern_coffee_table_02_base_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_coffee_table_02/modern_coffee_table_02_base_nor_gl_1k.jpg",
+          "md5": "02cffd400d675f77bb326fd9752b87c9",
+          "size": 119341,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_02/textures/modern_coffee_table_02_wood_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_coffee_table_02/modern_coffee_table_02_wood_nor_gl_1k.jpg",
+          "md5": "b11514f206d8821dbcd0f2456aa58599",
+          "size": 340139,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_02/textures/modern_coffee_table_02_base_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_coffee_table_02/modern_coffee_table_02_base_rough_1k.jpg",
+          "md5": "f75772d1830611aee991d33eaaa1205d",
+          "size": 220354,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_02/modern_coffee_table_02.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modern_coffee_table_02/modern_coffee_table_02.bin",
+          "md5": "f75c0faa37dfa96b99cee9639a36e0a5",
+          "size": 882992,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_02/textures/modern_coffee_table_02_wood_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_coffee_table_02/modern_coffee_table_02_wood_diff_1k.jpg",
+          "md5": "7cce41236a1d4240d9ce3498dcad9776",
+          "size": 710960,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_02/textures/modern_coffee_table_02_base_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_coffee_table_02/modern_coffee_table_02_base_diff_1k.jpg",
+          "md5": "338b60530424c187a35be09d9022cc39",
+          "size": 153120,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/modern_coffee_table_02/textures/modern_coffee_table_02_wood_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modern_coffee_table_02/modern_coffee_table_02_wood_rough_1k.jpg",
+          "md5": "3c2a2064d34cc7aa1e6629fef9879364",
+          "size": 523840,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 2955725,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "wooden_table_02",
+      "name": "Wooden Table 02",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/wooden_table_02",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Serhii Khromov",
+      "polycount": 196,
+      "dimensionsMm": [
+        1134.41663980484,
+        706.0248255729675,
+        799.5428870490286
+      ],
+      "dimensionsM": [
+        1.134417,
+        0.706025,
+        0.799543
+      ],
+      "tags": [
+        "wooden",
+        "worn",
+        "village",
+        "rural",
+        "natural",
+        "simple"
+      ],
+      "categories": [
+        "furniture",
+        "table"
+      ],
+      "modelUrl": "/assets/polyhaven/models/wooden_table_02/wooden_table_02_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/wooden_table_02/wooden_table_02_1k.gltf",
+      "fileMd5": "957c5d94784eed976cb4c6f0256a85e7",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/wooden_table_02/wooden_table_02_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/wooden_table_02/wooden_table_02_1k.gltf",
+          "md5": "957c5d94784eed976cb4c6f0256a85e7",
+          "size": 2687,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/wooden_table_02/textures/wooden_table_02_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wooden_table_02/wooden_table_02_diff_1k.jpg",
+          "md5": "07075a87918208594260c86c727e4396",
+          "size": 178379,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/wooden_table_02/textures/wooden_table_02_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wooden_table_02/wooden_table_02_nor_gl_1k.jpg",
+          "md5": "63ac7819b624149e77ae9459472ded6d",
+          "size": 122129,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/wooden_table_02/wooden_table_02.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/wooden_table_02/wooden_table_02.bin",
+          "md5": "a17c24e5366a0f7ad5522b88a4a9ea85",
+          "size": 7576,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/wooden_table_02/textures/wooden_table_02_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wooden_table_02/wooden_table_02_arm_1k.jpg",
+          "md5": "8ee06c71a226e7f53b2ba53da79a55be",
+          "size": 174545,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 485316,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "vintage_day_bed",
+      "name": "Vintage Day Bed",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/vintage_day_bed",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Aron \u0141yczek",
+      "polycount": 2715,
+      "dimensionsMm": [
+        1972.5552201271057,
+        854.77614402771,
+        1127.3465404283343
+      ],
+      "dimensionsM": [
+        1.972555,
+        0.854776,
+        1.127347
+      ],
+      "tags": [
+        "old",
+        "vintage",
+        "antique",
+        "wooden",
+        "couch",
+        "bench",
+        "sofa-bed",
+        "matress",
+        "chaise"
+      ],
+      "categories": [
+        "collection: project_lighthouse",
+        "furniture",
+        "bed",
+        "seating"
+      ],
+      "modelUrl": "/assets/polyhaven/models/vintage_day_bed/vintage_day_bed_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/vintage_day_bed/vintage_day_bed_1k.gltf",
+      "fileMd5": "1e252681b0bfdbe4aff997f52ea95101",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/vintage_day_bed/vintage_day_bed_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/vintage_day_bed/vintage_day_bed_1k.gltf",
+          "md5": "1e252681b0bfdbe4aff997f52ea95101",
+          "size": 2791,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/vintage_day_bed/textures/vintage_day_bed_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/vintage_day_bed/vintage_day_bed_nor_gl_1k.jpg",
+          "md5": "273b3d446777942c7df2154465789777",
+          "size": 856688,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/vintage_day_bed/textures/vintage_day_bed_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/vintage_day_bed/vintage_day_bed_diff_1k.jpg",
+          "md5": "240104a7390e20898a234297b9030fac",
+          "size": 807128,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/vintage_day_bed/textures/vintage_day_bed_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/vintage_day_bed/vintage_day_bed_arm_1k.jpg",
+          "md5": "d7278e9bb05a5e612a71ef7b493e0be9",
+          "size": 678880,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/vintage_day_bed/vintage_day_bed.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/vintage_day_bed/vintage_day_bed.bin",
+          "md5": "845d084810f5361db23508b3903a0d45",
+          "size": 80292,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 2425779,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "wheelchair_01",
+      "name": "Wheelchair 01",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/wheelchair_01",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Garreth Dean",
+      "polycount": 40252,
+      "dimensionsMm": [
+        824.0909576416016,
+        1090.866893529892,
+        1103.5015587694943
+      ],
+      "dimensionsM": [
+        0.824091,
+        1.090867,
+        1.103502
+      ],
+      "tags": [
+        "infirmary",
+        "hospital",
+        "wheelchair",
+        "medical",
+        "clinic",
+        "mobilityaid",
+        "foldingwheelchair"
+      ],
+      "categories": [
+        "props"
+      ],
+      "modelUrl": "/assets/polyhaven/models/wheelchair_01/wheelchair_01_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/wheelchair_01/wheelchair_01_1k.gltf",
+      "fileMd5": "53901a369849ad929d030279a3d1f719",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/wheelchair_01/wheelchair_01_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/wheelchair_01/wheelchair_01_1k.gltf",
+          "md5": "53901a369849ad929d030279a3d1f719",
+          "size": 2702,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/wheelchair_01/textures/wheelchair_01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wheelchair_01/wheelchair_01_diff_1k.jpg",
+          "md5": "8f3f7ef28ebe675f20fefb8fbafb8ac3",
+          "size": 126137,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/wheelchair_01/textures/wheelchair_01_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wheelchair_01/wheelchair_01_nor_gl_1k.jpg",
+          "md5": "256c08e1dcf3a937b7d66a845bd21f04",
+          "size": 210295,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/wheelchair_01/wheelchair_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/wheelchair_01/wheelchair_01.bin",
+          "md5": "419414082dc40cae13c9141d8922a218",
+          "size": 1183752,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/wheelchair_01/textures/wheelchair_01_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wheelchair_01/wheelchair_01_arm_1k.jpg",
+          "md5": "4c4d70458a7848b9d4f60d0b2ec84d2c",
+          "size": 225508,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 1748394,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "SchoolDesk_01",
+      "name": "School Desk 01",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/SchoolDesk_01",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Ethan Place",
+      "polycount": 4162,
+      "dimensionsMm": [
+        711.7760181427002,
+        545.9675788879395,
+        882.6298794883769
+      ],
+      "dimensionsM": [
+        0.711776,
+        0.545968,
+        0.88263
+      ],
+      "tags": [
+        "table",
+        "school",
+        "desk",
+        "wood",
+        "metal",
+        "classroom",
+        "student",
+        "single-seat",
+        "school furniture",
+        "storage-shelf",
+        "metal legs",
+        "student seating"
+      ],
+      "categories": [
+        "furniture"
+      ],
+      "modelUrl": "/assets/polyhaven/models/SchoolDesk_01/SchoolDesk_01_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/SchoolDesk_01/SchoolDesk_01_1k.gltf",
+      "fileMd5": "f327b010a117ab6af3dec7538cdf23ee",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/SchoolDesk_01/SchoolDesk_01_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/SchoolDesk_01/SchoolDesk_01_1k.gltf",
+          "md5": "f327b010a117ab6af3dec7538cdf23ee",
+          "size": 2686,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/SchoolDesk_01/textures/SchoolDesk_01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/SchoolDesk_01/SchoolDesk_01_diff_1k.jpg",
+          "md5": "f6be3e2428c88c86c1a328798b592e5e",
+          "size": 71566,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/SchoolDesk_01/textures/SchoolDesk_01_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/SchoolDesk_01/SchoolDesk_01_nor_gl_1k.jpg",
+          "md5": "b79a0c557ecea2c7d79433ac70547a43",
+          "size": 85765,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/SchoolDesk_01/textures/SchoolDesk_01_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/SchoolDesk_01/SchoolDesk_01_arm_1k.jpg",
+          "md5": "34b3a4444d2a2b0266e3bf3a6dfc9b2c",
+          "size": 134042,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/SchoolDesk_01/SchoolDesk_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/SchoolDesk_01/SchoolDesk_01.bin",
+          "md5": "af08b1337236d6b951ea9805032abd32",
+          "size": 127564,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 421623,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "SchoolChair_01",
+      "name": "School Chair 01",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/SchoolChair_01",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Ethan Place",
+      "polycount": 5072,
+      "dimensionsMm": [
+        565.8532977104187,
+        675.2548813819885,
+        1006.035539903678
+      ],
+      "dimensionsM": [
+        0.565853,
+        0.675255,
+        1.006036
+      ],
+      "tags": [
+        "prop",
+        "furniture",
+        "metal",
+        "plastic",
+        "chair",
+        "school"
+      ],
+      "categories": [
+        "furniture",
+        "seating"
+      ],
+      "modelUrl": "/assets/polyhaven/models/SchoolChair_01/SchoolChair_01_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/SchoolChair_01/SchoolChair_01_1k.gltf",
+      "fileMd5": "dea922d55d029fb99085b50196d1eec0",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/SchoolChair_01/SchoolChair_01_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/SchoolChair_01/SchoolChair_01_1k.gltf",
+          "md5": "dea922d55d029fb99085b50196d1eec0",
+          "size": 2695,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/SchoolChair_01/textures/SchoolChair_01_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/SchoolChair_01/SchoolChair_01_nor_gl_1k.jpg",
+          "md5": "223a0e5d115fb86cf1ae675fe73dc04a",
+          "size": 189532,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/SchoolChair_01/textures/SchoolChair_01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/SchoolChair_01/SchoolChair_01_diff_1k.jpg",
+          "md5": "2d5c9c77d97ba2edd5084a9d72b5dd63",
+          "size": 52590,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/SchoolChair_01/textures/SchoolChair_01_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/SchoolChair_01/SchoolChair_01_arm_1k.jpg",
+          "md5": "559daea007902aae5b5d5623a34b3a13",
+          "size": 104994,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/SchoolChair_01/SchoolChair_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/SchoolChair_01/SchoolChair_01.bin",
+          "md5": "d1f13f71f9f9979cde18c798e25dd9d3",
+          "size": 134912,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 484723,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "street_lamp_02",
+      "name": "Street Lamp 02",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/street_lamp_02",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Josh Dean",
+      "polycount": 20338,
+      "dimensionsMm": [
+        386.49316132068634,
+        806.7893021069672,
+        1675.0419437885284
+      ],
+      "dimensionsM": [
+        0.386493,
+        0.806789,
+        1.675042
+      ],
+      "tags": [
+        "street",
+        "road",
+        "light",
+        "lamppost",
+        "outdoor",
+        "pole",
+        "sidewalk",
+        "night",
+        "urban",
+        "city"
+      ],
+      "categories": [
+        "lighting",
+        "industrial",
+        "collection: hidden_alley"
+      ],
+      "modelUrl": "/assets/polyhaven/models/street_lamp_02/street_lamp_02_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/street_lamp_02/street_lamp_02_1k.gltf",
+      "fileMd5": "94023fbd7e6392d9276d91ca36c00144",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/street_lamp_02/street_lamp_02_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/street_lamp_02/street_lamp_02_1k.gltf",
+          "md5": "94023fbd7e6392d9276d91ca36c00144",
+          "size": 6429,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/street_lamp_02/textures/street_lamp_02_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/street_lamp_02/street_lamp_02_diff_1k.jpg",
+          "md5": "381097a4c700b86b1c8f7e0d115b1a0a",
+          "size": 303714,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/street_lamp_02/textures/street_lamp_02_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/street_lamp_02/street_lamp_02_arm_1k.jpg",
+          "md5": "d4d49b0153762ebe5ccde8e87af87dd5",
+          "size": 657710,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/street_lamp_02/street_lamp_02.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/street_lamp_02/street_lamp_02.bin",
+          "md5": "5c89269a65d65cdb33d018012f003ef7",
+          "size": 530092,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/street_lamp_02/textures/street_lamp_02_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/street_lamp_02/street_lamp_02_nor_gl_1k.jpg",
+          "md5": "39389c9a5c2c467ea559ac3ad3a03218",
+          "size": 372301,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 1870246,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "planter_box_01",
+      "name": "Planter Box 01",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/planter_box_01",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "James Ray Cock",
+      "polycount": 8094,
+      "dimensionsMm": [
+        912.6113951206207,
+        413.6679768562317,
+        424.96823612600565
+      ],
+      "dimensionsM": [
+        0.912611,
+        0.413668,
+        0.424968
+      ],
+      "tags": [
+        "old",
+        "wooden",
+        "wood",
+        "farmhouse",
+        "shed",
+        "outdoor",
+        "gardening",
+        "greenhouse",
+        "landscaping",
+        "garden",
+        "farm",
+        "planter",
+        "flower box",
+        "planters"
+      ],
+      "categories": [
+        "decorative",
+        "containers",
+        "potted plants",
+        "collection: the_shed"
+      ],
+      "modelUrl": "/assets/polyhaven/models/planter_box_01/planter_box_01_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/planter_box_01/planter_box_01_1k.gltf",
+      "fileMd5": "731d186af61b042dc4b4a2cd4744c35a",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/planter_box_01/planter_box_01_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/planter_box_01/planter_box_01_1k.gltf",
+          "md5": "731d186af61b042dc4b4a2cd4744c35a",
+          "size": 2787,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/planter_box_01/textures/planter_box_01_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/planter_box_01/planter_box_01_nor_gl_1k.jpg",
+          "md5": "a1b6f6fd3d45f05c9554e6a59fe0cab2",
+          "size": 707323,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/planter_box_01/textures/planter_box_01_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/planter_box_01/planter_box_01_arm_1k.jpg",
+          "md5": "201a4279feacf18a18e15af184fb4e52",
+          "size": 745610,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/planter_box_01/planter_box_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/planter_box_01/planter_box_01.bin",
+          "md5": "644c9dedd7c8b090a10fa2be597d36bb",
+          "size": 250580,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/planter_box_01/textures/planter_box_01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/planter_box_01/planter_box_01_diff_1k.jpg",
+          "md5": "f30b51ecd4af4d14cfa94794d6b47787",
+          "size": 633117,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 2339417,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "potted_plant_01",
+      "name": "Potted Plant 01",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/potted_plant_01",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Rico Cilliers",
+      "polycount": 96030,
+      "dimensionsMm": [
+        588.9185070991516,
+        636.6117596626282,
+        1350.7787585258484
+      ],
+      "dimensionsM": [
+        0.588919,
+        0.636612,
+        1.350779
+      ],
+      "tags": [
+        "potplant",
+        "plant",
+        "terracotta",
+        "pot",
+        "vase",
+        "medium",
+        "leaf",
+        "green"
+      ],
+      "categories": [
+        "decorative",
+        "plants",
+        "potted plants",
+        "nature"
+      ],
+      "modelUrl": "/assets/polyhaven/models/potted_plant_01/potted_plant_01_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/potted_plant_01/potted_plant_01_1k.gltf",
+      "fileMd5": "199e9e3d68f5447142db4066d60ae3f0",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/potted_plant_01/potted_plant_01_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/potted_plant_01/potted_plant_01_1k.gltf",
+          "md5": "199e9e3d68f5447142db4066d60ae3f0",
+          "size": 7969,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/potted_plant_01/textures/potted_plant_01_pot_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/potted_plant_01/potted_plant_01_pot_rough_1k.jpg",
+          "md5": "8f2e400f94843a9239229bfe99d16688",
+          "size": 173192,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/potted_plant_01/textures/potted_plant_01_leaves_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/potted_plant_01/potted_plant_01_leaves_nor_gl_1k.jpg",
+          "md5": "0a7ea996bb2a4e9e19a5299a5b654406",
+          "size": 177105,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/potted_plant_01/textures/potted_plant_01_pot_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/potted_plant_01/potted_plant_01_pot_diff_1k.jpg",
+          "md5": "67114dcd68232a6da88c627e144e65c4",
+          "size": 204900,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/potted_plant_01/potted_plant_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/potted_plant_01/potted_plant_01.bin",
+          "md5": "18377bd8d99b20a8d5fc5cf03cbf94b2",
+          "size": 5345188,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/potted_plant_01/textures/potted_plant_01_leaves_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/potted_plant_01/potted_plant_01_leaves_rough_1k.jpg",
+          "md5": "6251bfd59ced0360c16d9c286adbb131",
+          "size": 91706,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/potted_plant_01/textures/potted_plant_01_pot_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/potted_plant_01/potted_plant_01_pot_nor_gl_1k.jpg",
+          "md5": "7388c8cba421175fd70969df077988a1",
+          "size": 200349,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/potted_plant_01/textures/potted_plant_01_leaves_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/potted_plant_01/potted_plant_01_leaves_diff_1k.jpg",
+          "md5": "8cbaaa24c18c61be4201c473773dbffc",
+          "size": 124730,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 6325139,
       "polyhavenCredit": "Powered by Poly Haven"
     }
   ],

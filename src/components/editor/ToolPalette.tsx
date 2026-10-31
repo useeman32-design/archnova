@@ -35,6 +35,7 @@ import type { FinishOption } from '@/types'
 import type { ToolId, WorkspaceContext } from '@/pages/workspace/WorkspaceLayout'
 import { TOOL_GROUPS, type ToolVariant } from '@/data/toolLibrary'
 import { ROOF_TYPES, EXTERIOR_FINISHES, INTERIOR_FINISHES } from '@/data/catalog'
+import { LazyAssetPreview } from '@/components/assets/RealAssetModel'
 
 const ICONS: Record<string, LucideIcon> = {
   BedDouble, Sofa, Laptop, UtensilsCrossed, Utensils, Box, Bath, Car, Umbrella, Waves,
@@ -277,8 +278,10 @@ function VariantTile({
         armed ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-300' : 'border-line hover:border-brand-300 hover:bg-canvas-soft'
       }`}
     >
-      <span className="flex h-12 w-full items-center justify-center rounded-md border border-line-soft bg-canvas-soft/70">
-        <Icon className="h-5 w-5 text-ink-500" strokeWidth={1.6} />
+      <span className="flex h-12 w-full items-center justify-center overflow-hidden rounded-md border border-line-soft bg-canvas-soft/70">
+        {variant.assetId ? <LazyAssetPreview assetId={variant.assetId} className="h-full w-full" />
+          : variant.previewImage ? <img src={variant.previewImage} alt={`${variant.name} preview`} loading="lazy" className="h-full w-full object-cover" />
+          : <Icon className="h-5 w-5 text-ink-500" strokeWidth={1.6} />}
       </span>
       <span className="w-full truncate text-[11.5px] font-medium text-ink-text">{variant.name}</span>
       {variant.w ? (

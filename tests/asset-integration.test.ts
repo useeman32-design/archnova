@@ -11,7 +11,7 @@ beforeEach(() => localStorage.clear())
 
 describe('real asset starter collection', () => {
   it('registers only downloaded Poly Haven models/materials as imported assets with stable source identity', () => {
-    expect(REAL_MODELS).toHaveLength(14)
+    expect(REAL_MODELS).toHaveLength(24)
     expect(REAL_MATERIALS).toHaveLength(6)
     for (const asset of [...REAL_MODELS, ...REAL_MATERIALS]) {
       expect(asset.id).toMatch(/^ph_(model|material)_/)
@@ -21,6 +21,16 @@ describe('real asset starter collection', () => {
     }
     expect(ASSETS.some((asset) => asset.id === 'int_bed')).toBe(false)
     expect(ASSETS.some((asset) => asset.id === 'tree_palm')).toBe(false)
+  })
+
+  it('includes the screened follow-up collection in real catalogs with authored source dimensions', () => {
+    const ids = new Set(REAL_MODELS.map((asset) => asset.id))
+    for (const id of ['ph_model_dining_table', 'ph_model_modern_coffee_table_02', 'ph_model_wooden_table_02', 'ph_model_vintage_day_bed', 'ph_model_wheelchair_01', 'ph_model_schooldesk_01', 'ph_model_schoolchair_01', 'ph_model_street_lamp_02', 'ph_model_planter_box_01', 'ph_model_potted_plant_01']) expect(ids.has(id)).toBe(true)
+    for (const asset of REAL_MODELS) {
+      expect(asset.modelUrl).toMatch(/^\/assets\/polyhaven\/models\//)
+      expect(asset.dimensionsM?.every((dimension) => dimension > 0)).toBe(true)
+    }
+    expect(ASSETS.find((asset) => asset.id === 'ph_model_wheelchair_01')?.itemKey).toBe('chair')
   })
 
   it('resolves exact GLTF IDs for placement and does not invent a missing furniture model', () => {

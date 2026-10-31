@@ -45,6 +45,10 @@ are sent directly from the browser to Groq, so do not use this on a shared/untru
 | `/workspace/:id/3d`     | F — 3D preview (orbit/zoom, exterior/interior, roof & finish switches)   |
 | `/workspace/:id/drawings` | G — Drawing set for one project                            |
 
+### Real asset starter library
+
+The asset library now includes 24 locally bundled Poly Haven CC0 glTF models and 6 PBR material sets. Real models are not auto-placed into existing projects: open **Assets**, preview a model, choose **Place**, then click a room (for furniture) or the site plan (for landscape/site objects). Open **3D View** to inspect the placed model; use **Save** and reload to confirm its catalog identity persists. In the workspace's left tool drawer and room Properties panel, imported model tiles also show live model previews. The complete inventory, source/licensing and known coverage gaps are recorded in [`docs/ARCHNOVA_REAL_ASSET_MILESTONE.md`](docs/ARCHNOVA_REAL_ASSET_MILESTONE.md).
+
 The workspace also hosts the **AI Assistant** slide-over panel. Paste a Groq key and model ID,
 test the connection, describe a complete floor plan or request room-shape, room-size, door/window, furniture, or finish
 edits, then review and apply the proposed operations. Supported edits update the shared 2D/3D project
