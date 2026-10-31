@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, useState, type ReactNode } from 'react'
-import type { PlacedItem, Project } from '@/types'
+import type { LandscapeItem, PlacedItem, Project } from '@/types'
 import { HouseIllustration } from '@/components/illustrations/HouseIllustration'
 import { Spinner } from '@/components/ui/Feedback'
 
@@ -27,7 +27,7 @@ export interface MassingProps {
   onResizeLive?: (id: string, w: number, h: number) => void
   onEditBegin?: () => void
   onEditEnd?: () => void
-  ornaments?: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string; width?: number; length?: number }[]
+  ornaments?: LandscapeItem[]
   placed?: Record<string, PlacedItem[]>
   selectedItemId?: string | null
   onSelectItem?: (id: string | null) => void
@@ -36,7 +36,8 @@ export interface MassingProps {
   onSelectSite?: (id: string | null) => void
   onUpdateSiteLive?: (id: string, x: number, y: number, scale: number) => void
   pendingItem?: string | null
-  onPlaceInterior?: (item: string) => void
+  pendingAssetId?: string | null
+  onPlaceInterior?: (item: string, assetId?: string) => void
 }
 
 export function MassingViewer({ project, mode = 'exterior', className = '', ...rest }: MassingProps) {

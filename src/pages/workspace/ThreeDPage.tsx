@@ -73,7 +73,7 @@ export function ThreeDPage() {
       const placement = JSON.parse(raw) as PendingPlacement
       const target = ctx.selectedRoom ?? ctx.rooms[0]
       if (placement.tool === 'interior' && placement.variant.item && target) {
-        ctx.placeInterior(target.id, placement.variant.item)
+        ctx.placeInterior(target.id, placement.variant.item, undefined, placement.variant.assetId)
       } else if (placement.tool === 'door' && target) {
         ctx.addOpening(target.id, 'door', placement.variant.label ?? placement.variant.name, { width: placement.variant.w, height: placement.variant.h })
       } else if (placement.tool === 'window' && target) {
@@ -82,7 +82,7 @@ export function ThreeDPage() {
         const bounds = event.currentTarget.getBoundingClientRect()
         const x = ((event.clientX - bounds.left) / Math.max(bounds.width, 1)) * ctx.project.plot.width
         const y = ((event.clientY - bounds.top) / Math.max(bounds.height, 1)) * ctx.project.plot.length
-        ctx.addTreeAt({ x: Math.max(0, Math.min(ctx.project.plot.width, x)), y: Math.max(0, Math.min(ctx.project.plot.length, y)) }, placement.variant.kind, { width: placement.variant.w, length: placement.variant.h })
+        ctx.addTreeAt({ x: Math.max(0, Math.min(ctx.project.plot.width, x)), y: Math.max(0, Math.min(ctx.project.plot.length, y)) }, placement.variant.kind, { width: placement.variant.w, length: placement.variant.h }, placement.variant.assetId)
       }
     } catch { /* ignore invalid library payload */ }
   }
@@ -129,9 +129,10 @@ export function ThreeDPage() {
             return { ...state, placed: { ...state.placed, [roomId]: items }, rooms: state.rooms.map((room) => room.id === roomId ? { ...room, items } : room) }
           })}
           pendingItem={mode === 'interior' && ctx.pending?.tool === 'interior' ? ctx.pending.variant.item ?? null : null}
-          onPlaceInterior={(item) => {
+          pendingAssetId={mode === 'interior' && ctx.pending?.tool === 'interior' ? ctx.pending.variant.assetId ?? null : null}
+          onPlaceInterior={(item, assetId) => {
             const target = ctx.selectedRoom ?? ctx.rooms[0]
-            if (target) ctx.placeInterior(target.id, item)
+            if (target) ctx.placeInterior(target.id, item, undefined, assetId)
             ctx.setPending(null)
           }}
         />

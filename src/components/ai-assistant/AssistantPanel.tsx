@@ -11,7 +11,18 @@ import { TOOL_GROUPS, type ToolVariant } from '@/data/toolLibrary'
 const GROQ_KEY_STORAGE = 'archnova:groq-api-key'
 const GROQ_MODEL_STORAGE = 'archnova:groq-model'
 type DebugStatus = AssistantDebugEvent['status']
+type SiteFitChoice = NonNullable<AssistantPlan['siteFitMode']>
 type DebugEntry = { id: string; at: string; stage: string; status: DebugStatus; details?: unknown }
+type SiteBriefDraft = {
+  originalPrompt: string
+  buildingCount: '' | '1' | '2–3' | '4–6' | 'custom'
+  customBuildingCount: string
+  buildingRoles: string
+  stories: '' | '1' | '2' | '3+' | 'unsure'
+  plotChoice: '' | 'current' | 'recommend'
+  siteItems: { parking: boolean; roads: boolean; paths: boolean; landscaping: boolean; fence: boolean; gates: boolean }
+  notes: string
+}
 
 export function AssistantPanel({
   open,
@@ -50,7 +61,8 @@ export function AssistantPanel({
   const [requestError, setRequestError] = useState('')
   const [applyProgress, setApplyProgress] = useState<{ current: number; total: number; label: string } | null>(null)
   const [pendingPlan, setPendingPlan] = useState<AssistantPlan | null>(null)
-  const [applyStatus, setApplyStatus] = useState<{ ok: boolean; message: string; warnings: string[] } | null>(null)
+  const [siteBriefDraft, setSiteBriefDraft] = useState<SiteBriefDraft | null>(null)
+  const [applyStatus, setApplyStatus] = useState<{ ok: boolean; message: string; warnings: string[]; siteFitConflicts?: string[] } | null>(null)
   const [debugOpen, setDebugOpen] = useState(false)
   const [debugEntries, setDebugEntries] = useState<DebugEntry[]>([])
   const [debugCopyStatus, setDebugCopyStatus] = useState('')
@@ -88,7 +100,7 @@ export function AssistantPanel({
 
   useEffect(() => {
     if (open) endRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'end' })
-  }, [messages, open, busy, pendingPlan, applyStatus, applyProgress])
+  }, [messages, open, busy, pendingPlan, applyStatus, applyProgress, siteBriefDraft])
 
   const updateApiKey = (value: string) => {
     setApiKey(value)
@@ -136,15 +148,16 @@ export function AssistantPanel({
     }
   }
 
-  const send = async (raw: string) => {
+  const send = async (raw: string, displayText = raw) => {
     const text = raw.trim()
+    const visibleText = displayText.trim() || text
     if (!text || busy) return
     recordDebug('user.prompt-received', 'info', { prompt: text, model, projectId: project.id, roomCount: rooms.length })
     if (pendingPlan && isApplyConfirmation(text)) {
       recordDebug('proposal.approved-by-chat', 'info', { confirmation: text, actionTypes: pendingPlan.actions.map((action) => action.type) })
       setInput('')
       setRequestError('')
-      setMessages((previous) => [...previous, { id: uid('msg'), role: 'user', text, createdAt: Date.now() }])
+      setMessages((previous) => [...previous, { id: uid('msg'), role: 'user', text: visibleText, createdAt: Date.now() }])
       void applyPlanRef.current()
       return
     }
@@ -165,6 +178,21 @@ export function AssistantPanel({
       setRequestError('Paste your Groq API key in Groq settings before sending a prompt.')
       return
     }
+    if (shouldAskForLargeBrief(text)) {
+      const draft = createSiteBriefDraft(text)
+      recordDebug('assistant.brief-clarification-started', 'info', { prompt: text, plot: project.plot, questionGroups: ['building-count-and-roles', 'storeys', 'site-elements', 'plot-capacity'] })
+      setInput('')
+      setRequestError('')
+      setPendingPlan(null)
+      setApplyStatus(null)
+      setSiteBriefDraft(draft)
+      setMessages((previous) => [...previous,
+        { id: uid('msg'), role: 'user', text: visibleText, createdAt: Date.now() },
+        { id: uid('msg'), role: 'assistant', text: 'Before I plan a large facility, please confirm the separate building blocks, storey count, site elements, and whether to keep the current plot. I will use these answers to prepare a reviewable proposal.', createdAt: Date.now() },
+      ])
+      return
+    }
+    setSiteBriefDraft(null)
     setInput('')
     setBusy(true)
     setRequestError('')
@@ -178,7 +206,7 @@ export function AssistantPanel({
       .map((message) => ({ role: message.role, content: message.text }))
     setMessages((previous) => [
       ...previous,
-      { id: uid('msg'), role: 'user', text, createdAt: Date.now() },
+      { id: uid('msg'), role: 'user', text: visibleText, createdAt: Date.now() },
       { id: pendingId, role: 'assistant', text: `Reading the current ${rooms.length}-room plan and plot…`, createdAt: Date.now(), pending: true },
     ])
     try {
@@ -239,21 +267,22 @@ export function AssistantPanel({
     })
   }
 
-  const applyPlan = async () => {
+  const applyPlan = async (siteFitMode?: SiteFitChoice) => {
     if (!pendingPlan || busy) return
-    recordDebug('proposal.apply-started', 'info', { actionTypes: pendingPlan.actions.map((action) => action.type) })
+    const planToApply = siteFitMode ? { ...pendingPlan, siteFitMode } : pendingPlan
+    recordDebug('proposal.apply-started', 'info', { actionTypes: planToApply.actions.map((action) => action.type), siteFitMode: siteFitMode ?? 'strict' })
     setBusy(true)
     setApplyStatus(null)
     setRequestError('')
     setApplyProgress({ current: 0, total: 1, label: 'Checking geometry before applying…' })
     try {
-      const result = await onApplyPlan(pendingPlan, (current, total, label) => {
+      const result = await onApplyPlan(planToApply, (current, total, label) => {
         recordDebug('proposal.apply-progress', 'info', { current, total, label })
         setApplyProgress({ current, total, label })
       })
       if (!result.ok) {
         recordDebug('proposal.apply-failed', 'error', { errors: result.errors })
-        setApplyStatus({ ok: false, message: result.errors.join(' '), warnings: [] })
+        setApplyStatus({ ok: false, message: result.errors.join(' '), warnings: [], ...(result.siteFitConflicts?.length ? { siteFitConflicts: result.siteFitConflicts } : {}) })
         return
       }
       const message = `Applied ${result.appliedCount} design change${result.appliedCount === 1 ? '' : 's'} and saved the project.`
@@ -273,8 +302,23 @@ export function AssistantPanel({
 
   applyPlanRef.current = applyPlan
 
+  const submitSiteBrief = () => {
+    if (!siteBriefDraft) return
+    const count = siteBriefDraft.buildingCount === 'custom' ? siteBriefDraft.customBuildingCount.trim() : siteBriefDraft.buildingCount
+    const siteElements = Object.entries(siteBriefDraft.siteItems).map(([key, enabled]) => `${key}: ${enabled ? 'include' : 'omit'}`).join('; ')
+    const plotInstruction = siteBriefDraft.plotChoice === 'current'
+      ? `Use the current plot dimensions ${project.plot.width} × ${project.plot.length} ${project.plot.units} and its current boundary data.`
+      : 'Recommend a larger rectangular concept plot only if the requested program exceeds current capacity; propose new dimensions as a reviewable plot patch and do not invent surveyed boundary vertices.'
+    const confirmedPrompt = `${siteBriefDraft.originalPrompt}\n\n[CONFIRMED PROJECT BRIEF]\nSeparate buildings: ${count}. Requested building roles/segments: ${siteBriefDraft.buildingRoles.trim() || 'single primary facility'}. Storey preference: ${siteBriefDraft.stories}. Site elements: ${siteElements}. ${plotInstruction}${siteBriefDraft.notes.trim() ? ` Additional requirements: ${siteBriefDraft.notes.trim()}` : ''}\nPrepare one spatial campus proposal, using one add_building action for every separate structure; don't merge distinct structures under one roof. Include access roads or pedestrian paths only as selected. State assumptions and capacity limits. Do not claim the proposal was applied.`
+    const visibleSummary = `Confirmed design brief · ${count} building segment(s) · ${siteBriefDraft.stories} storey preference · ${siteBriefDraft.plotChoice === 'current' ? 'current plot' : 'recommend plot size'}`
+    recordDebug('assistant.brief-clarification-answered', 'success', { buildingCount: count, buildingRoles: siteBriefDraft.buildingRoles, stories: siteBriefDraft.stories, siteItems: siteBriefDraft.siteItems, plotChoice: siteBriefDraft.plotChoice })
+    setSiteBriefDraft(null)
+    void send(confirmedPrompt, visibleSummary)
+  }
+
   const clearConversation = () => {
     resetChat()
+    setSiteBriefDraft(null)
     setPendingPlan(null)
     setApplyStatus(null)
     setRequestError('')
@@ -341,6 +385,13 @@ export function AssistantPanel({
             </div>
           </div>
         ))}
+        {siteBriefDraft ? <SiteBriefQuestionnaire
+          draft={siteBriefDraft}
+          currentPlot={`${project.plot.width} × ${project.plot.length} ${project.plot.units}`}
+          onChange={setSiteBriefDraft}
+          onSubmit={submitSiteBrief}
+          onCancel={() => { setSiteBriefDraft(null); setMessages((previous) => [...previous, { id: uid('msg'), role: 'assistant', text: 'Briefing cancelled. No design changes were proposed.', createdAt: Date.now() }]) }}
+        /> : null}
 
         {debugOpen ? (
           <section aria-label="Assistant diagnostics" className="rounded-xl border border-amber-300 bg-amber-50/70 p-3">
@@ -372,6 +423,15 @@ export function AssistantPanel({
         {applyStatus ? <div role={applyStatus.ok ? 'status' : 'alert'} className={`rounded-xl border p-3 text-[12px] leading-relaxed ${applyStatus.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
           <p className="font-medium">{applyStatus.message}</p>
           {applyStatus.warnings.map((warning, index) => <p key={index} className="mt-1 text-[11px]">Check: {warning}</p>)}
+          {applyStatus.siteFitConflicts?.length ? <div className="mt-2 rounded-lg border border-amber-300 bg-white/80 p-2.5">
+            <p className="text-[10.5px] font-semibold">Plot-capacity choices for: {applyStatus.siteFitConflicts.join(', ')}</p>
+            <p className="mt-0.5 text-[10px]">Add anyway uses remaining plot space first; if none fits, overflow is shown outside the boundary in red.</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <button type="button" disabled={busy} onClick={() => void applyPlan('skip')} className="rounded-md border border-amber-300 bg-white px-2 py-1.5 text-[10px] font-semibold disabled:opacity-50">Skip items</button>
+              <button type="button" disabled={busy} onClick={() => void applyPlan('add-anyway')} className="rounded-md bg-red-700 px-2 py-1.5 text-[10px] font-semibold text-white disabled:opacity-50">Add anyway · mark overflow red</button>
+              <button type="button" disabled={busy} onClick={() => void applyPlan('shrink-to-fit')} className="rounded-md border border-amber-300 bg-white px-2 py-1.5 text-[10px] font-semibold disabled:opacity-50">Shrink to fit</button>
+            </div>
+          </div> : null}
         </div> : null}
         {requestError ? <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11.5px] leading-relaxed text-red-800">{requestError}</div> : null}
         <div ref={endRef} />
@@ -444,15 +504,89 @@ function PlanPreview({ plan, onApply, onDiscard, onChooseVariant, busy, progress
   )
 }
 
+function shouldAskForLargeBrief(prompt: string): boolean {
+  if (/\[CONFIRMED PROJECT BRIEF\]/i.test(prompt)) return false
+  const facility = /\b(hospital|medical center|clinic complex|marketplace|shopping mall|shopping centre|campus|university|school complex|ministry|office complex|industrial complex|estate|market)\b/i.test(prompt)
+  const createIntent = /\b(build|create|design|generate|plan|develop|construct)\b/i.test(prompt)
+  const projectScale = /\b(complete|full|entire|whole|from scratch|master ?plan|campus|complex|random plot|multiple buildings)\b/i.test(prompt)
+  return facility && createIntent && projectScale
+}
+
+function createSiteBriefDraft(originalPrompt: string): SiteBriefDraft {
+  return {
+    originalPrompt,
+    buildingCount: '',
+    customBuildingCount: '',
+    buildingRoles: '',
+    stories: '',
+    plotChoice: '',
+    siteItems: { parking: false, roads: false, paths: false, landscaping: false, fence: false, gates: false },
+    notes: '',
+  }
+}
+
+function SiteBriefQuestionnaire({ draft, currentPlot, onChange, onSubmit, onCancel }: {
+  draft: SiteBriefDraft
+  currentPlot: string
+  onChange: (next: SiteBriefDraft) => void
+  onSubmit: () => void
+  onCancel: () => void
+}) {
+  const update = (patch: Partial<SiteBriefDraft>) => onChange({ ...draft, ...patch })
+  const countValid = draft.buildingCount === 'custom' ? /^\d+$/.test(draft.customBuildingCount) && Number(draft.customBuildingCount) >= 2 && Number(draft.customBuildingCount) <= 12 : Boolean(draft.buildingCount)
+  const rolesValid = draft.buildingCount === '1' || Boolean(draft.buildingRoles.trim())
+  const canSubmit = countValid && rolesValid && Boolean(draft.stories) && Boolean(draft.plotChoice)
+  const siteChoices: { key: keyof SiteBriefDraft['siteItems']; label: string }[] = [
+    { key: 'parking', label: 'Parking' }, { key: 'roads', label: 'Access roads' }, { key: 'paths', label: 'Pedestrian paths' },
+    { key: 'landscaping', label: 'Landscaping' }, { key: 'fence', label: 'Perimeter fence' }, { key: 'gates', label: 'Gates' },
+  ]
+  const option = (active: boolean) => `rounded-lg border px-2.5 py-2 text-[10.5px] font-semibold transition-colors ${active ? 'border-brand-500 bg-brand-50 text-brand-800 ring-1 ring-brand-200' : 'border-line bg-white text-muted hover:border-brand-300'}`
+  return <section aria-label="Large project clarification" className="rounded-xl border border-indigo-200 bg-indigo-50/80 p-3">
+    <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-indigo-700" /><h3 className="text-[12px] font-semibold text-indigo-950">Plan the brief before generating</h3></div>
+    <p className="mt-1 text-[10.5px] text-indigo-900/80">These choices keep separate facility blocks distinct and let me check plot capacity before proposing geometry.</p>
+    <fieldset className="mt-3">
+      <legend className="text-[10.5px] font-semibold text-ink-text">How many separate building segments?</legend>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">{(['1', '2–3', '4–6', 'custom'] as const).map((count) => <button key={count} type="button" aria-pressed={draft.buildingCount === count} className={option(draft.buildingCount === count)} onClick={() => update({ buildingCount: count })}>{count === 'custom' ? 'Custom' : count}</button>)}</div>
+      {draft.buildingCount === 'custom' ? <input type="number" min={2} max={12} step={1} value={draft.customBuildingCount} onChange={(event) => update({ customBuildingCount: event.target.value })} aria-label="Custom number of buildings" placeholder="2–12" className="mt-2 w-24 rounded-md border border-line bg-white px-2 py-1.5 text-[11px]" /> : null}
+    </fieldset>
+    {draft.buildingCount && draft.buildingCount !== '1' ? <label className="mt-3 block text-[10.5px] font-semibold text-ink-text">What should the separate blocks be? <span className="font-normal text-muted">(or write “suggest roles”)</span>
+      <input value={draft.buildingRoles} onChange={(event) => update({ buildingRoles: event.target.value })} placeholder="Main hospital, surgery block, wards, admin, security…" className="mt-1.5 w-full rounded-lg border border-line bg-white px-2.5 py-2 text-[11px] font-normal text-ink-text" />
+    </label> : null}
+    <fieldset className="mt-3">
+      <legend className="text-[10.5px] font-semibold text-ink-text">Preferred storey count</legend>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">{([['1', '1 storey'], ['2', '2 storeys'], ['3+', '3+ storeys'], ['unsure', 'Not sure']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={draft.stories === value} className={option(draft.stories === value)} onClick={() => update({ stories: value })}>{label}</button>)}</div>
+    </fieldset>
+    <fieldset className="mt-3">
+      <legend className="text-[10.5px] font-semibold text-ink-text">Include these site elements</legend>
+      <div className="mt-1.5 grid grid-cols-2 gap-1.5">{siteChoices.map(({ key, label }) => <label key={key} className="flex items-center gap-2 rounded-md border border-indigo-100 bg-white px-2 py-1.5 text-[10px] text-ink-text"><input type="checkbox" checked={draft.siteItems[key]} onChange={(event) => update({ siteItems: { ...draft.siteItems, [key]: event.target.checked } })} className="accent-indigo-700" />{label}</label>)}</div>
+    </fieldset>
+    <fieldset className="mt-3">
+      <legend className="text-[10.5px] font-semibold text-ink-text">Plot choice</legend>
+      <div className="mt-1.5 grid grid-cols-1 gap-1.5"><button type="button" aria-pressed={draft.plotChoice === 'current'} className={option(draft.plotChoice === 'current')} onClick={() => update({ plotChoice: 'current' })}>Use current plot · {currentPlot}</button><button type="button" aria-pressed={draft.plotChoice === 'recommend'} className={option(draft.plotChoice === 'recommend')} onClick={() => update({ plotChoice: 'recommend' })}>Let the assistant recommend a larger concept plot if needed</button></div>
+    </fieldset>
+    <label className="mt-3 block text-[10.5px] font-semibold text-ink-text">Other requirements <span className="font-normal text-muted">(optional)</span>
+      <textarea value={draft.notes} onChange={(event) => update({ notes: event.target.value })} rows={2} placeholder="Capacity, priorities, access, or anything that must not be omitted…" className="mt-1.5 w-full resize-y rounded-lg border border-line bg-white px-2.5 py-2 text-[11px] font-normal text-ink-text" />
+    </label>
+    <div className="mt-3 flex gap-2"><button type="button" onClick={onSubmit} disabled={!canSubmit} className="flex-1 rounded-lg bg-indigo-700 px-3 py-2 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Continue to proposal</button><button type="button" onClick={onCancel} className="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-[11px] font-medium text-indigo-900">Cancel</button></div>
+  </section>
+}
+
 function isApplyConfirmation(value: string): boolean {
   return /^(?:yes|yes please|go ahead|do it|make it|create it|build it|apply|apply it|apply and save|approve|approve it|approved|save it|proceed|looks good|use this|create the house|create the plan|generate it)[.! ]*$/i.test(value.trim())
 }
 
 function choiceVariants(action: AssistantAction): ToolVariant[] {
+  if (action.type === 'add_site_item') {
+    const families: Record<string, string[]> = {
+      palm: ['palm', 'conifer', 'shrub', 'flower', 'hedge'], conifer: ['palm', 'conifer', 'shrub', 'flower', 'hedge'], shrub: ['palm', 'conifer', 'shrub', 'flower', 'hedge'], flower: ['palm', 'conifer', 'shrub', 'flower', 'hedge'], hedge: ['palm', 'conifer', 'shrub', 'flower', 'hedge'],
+      road: ['road', 'path'], path: ['road', 'path'], car: ['car', 'person'], person: ['car', 'person'], fence: ['fence'], gate: ['gate'], 'street-light': ['street-light'],
+    }
+    const kinds = families[action.kind] ?? [action.kind]
+    return TOOL_GROUPS.find((group) => group.tool === 'trees')?.categories.flatMap((category) => category.variants).filter((variant) => Boolean(variant.previewImage) && kinds.includes(variant.kind ?? '')) ?? []
+  }
   const tool = action.type === 'add_room' ? 'room'
     : action.type === 'add_opening' ? action.kind
-      : action.type === 'add_furniture' ? 'interior'
-        : action.type === 'add_site_item' ? 'trees' : null
+      : action.type === 'add_furniture' ? 'interior' : null
   if (!tool) return []
   const group = TOOL_GROUPS.find((candidate) => candidate.tool === tool)
   if (!group) return []
@@ -487,7 +621,7 @@ function ChoiceCard({ variant, selected, onClick }: { variant: ToolVariant; sele
   const icon = variant.icon.toLowerCase()
   const Icon = icon.includes('bed') ? BedDouble : icon.includes('sofa') || icon.includes('chair') ? Sofa : icon.includes('door') ? DoorOpen : icon.includes('window') ? AppWindow : icon.includes('car') ? Car : icon.includes('fence') ? Fence : icon.includes('lamp') ? Lamp : icon.includes('flower') ? Flower2 : icon.includes('sprout') ? Sprout : icon.includes('tree') ? icon.includes('palm') ? TreePalm : Trees : icon.includes('home') ? Home : Box
   return <button type="button" onClick={onClick} aria-pressed={selected} className={`flex w-[94px] shrink-0 flex-col items-start rounded-lg border p-2 text-left transition-colors ${selected ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-200' : 'border-line bg-white text-muted hover:border-brand-300 hover:bg-canvas-soft'}`}>
-    <span className="mb-1.5 flex h-11 w-full items-center justify-center rounded-md bg-gradient-to-br from-slate-50 to-slate-200"><Icon className="h-6 w-6 text-brand-700" /></span>
+    <span className="mb-1.5 flex h-14 w-full items-center justify-center overflow-hidden rounded-md bg-gradient-to-br from-slate-50 to-slate-200">{variant.previewImage ? <img src={variant.previewImage} alt={`${variant.name} preview`} loading="lazy" className="h-full w-full object-cover" /> : <Icon className="h-6 w-6 text-brand-700" />}</span>
     <span className="line-clamp-2 text-[10px] font-semibold leading-tight">{variant.name}</span>
     {variant.w ? <span className="mt-0.5 text-[9px] text-muted">{variant.w} × {variant.h} size</span> : null}
   </button>
@@ -538,6 +672,7 @@ function describeAction(action: AssistantAction, units: Units): string {
     case 'add_site_item': return `Add ${action.kind} to the site at (${action.x}, ${action.y})`
     case 'edit_site_item': return `Adjust site object ${action.site}${action.x !== undefined || action.y !== undefined ? ` · position ${action.x ?? 'unchanged'}, ${action.y ?? 'unchanged'}` : ''}${action.rotationDegrees !== undefined ? ` · rotation ${action.rotationDegrees}°` : ''}${action.scale !== undefined ? ` · scale ${action.scale}` : ''}${action.color ? ` · color ${action.color}` : ''}`
     case 'remove_site_item': return `Remove site object ${action.site}`
+    case 'add_building': return `Add separate ${action.role} building “${action.name}” for ${action.purpose.use} (${action.width} × ${action.length} ${units}, ${action.floorCount} floor${action.floorCount === 1 ? '' : 's'}${action.x !== undefined ? ` · center ${action.x}, ${action.y}` : ' · auto-sited'})`
   }
 }
 

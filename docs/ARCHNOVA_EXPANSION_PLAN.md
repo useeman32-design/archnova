@@ -2,7 +2,7 @@
 
 **Product:** ArchNova by Pixel Studios  
 **Tagline:** Design Your Vision. Build Your Future.  
-**Status:** Phase 2 in progress — plot-boundary geometry/editor slice; assistant diagnostics added for live troubleshooting
+**Status:** Phase 2 in progress — plot-boundary geometry/editor slice; assistant diagnostics and first provider-response reliability fixes complete locally
 **Last updated:** 2026-10-30
 
 This is the durable project log. Read it before starting each follow-up task, update the milestone status after meaningful work, and keep the application buildable. This plan is based on the user's expansion brief and the existing repository audit; it is not a claim of professional or regulatory approval.
@@ -121,6 +121,13 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [x] Verify the previous Pages delivery: the hosted URL served `assets/index-9ZZDJSFd.js` and `assets/index-BeUFGlsg.css`, matching that build.
 - [x] Push assistant diagnostics to `main` (`3af56c2`) and its static bundle to `gh-pages` (`6cc63a3`).
 - [x] Verify the new diagnostics build is live: GitHub Pages build for `6cc63a3` completed successfully, and cache-busted hosted requests serve `assets/index-BZOM6Ewe.js` and `assets/index-DqppRJBW.css`.
+- [x] Respond to the supplied live-session log: HTTP 429 TPM errors no longer trigger an immediate compact-context retry; SSE/JSON completion metadata (finish reason, usage, response ID/model, content size and done marker) is logged; malformed/empty direct-design responses receive one strict recovery attempt. Recovery results remain proposals and still require the existing user-approved “Apply and save” flow.
+- [x] Add regressions for TPM-429 handling, completion metadata, and malformed direct-design JSON recovery. Verification: 54 tests pass, TypeScript build, production build, Pages build, and `git diff --check` pass. Existing large-chunk warning remains.
+- [x] Add large-project structured clarification before plan generation: separate building segments/roles, storeys, site elements and current-versus-recommended plot; submit the confirmed brief to the model and retain the existing proposal/“Apply and save” approval gate. A component regression test verifies this path.
+- [x] Support separate-building proposals, deterministic fit choices (skip/add anyway/shrink), use remaining plot space before outside overflow, and mark unavoidable overflow red in 2D/3D. Explicit coordinates are not silently moved under strict fit.
+- [x] Add local product-render previews for ten site-library variants and connect relevant site-item selection cards; targeted/full tests cover the behavior. Remaining visual gap: gate and street-light previews, plus consistent non-site room/opening/furnishing catalogue renders, are not yet available; the image-generation limit was reached before those could be produced.
+- [x] Verify current assistant/site-fit slice: 60 tests across 10 files pass; `npx tsc -b --pretty false`, `git diff --check`, `npm run build`, and `npm run build:pages` pass. Existing Three.js chunk-size warning remains.
+- [ ] Deferred per user request for later: complete the outstanding selection-card product-render coverage (gate, street-light and non-site variants), then continue with north/access/setbacks and site/building overlap validation. Resume this thread when the user returns to it; no commit or deployment in this cycle.
 
 ## Working rules
 

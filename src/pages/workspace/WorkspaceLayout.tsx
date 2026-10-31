@@ -19,9 +19,11 @@ import { canonicalFurnitureKey, findFurniturePosition, getFurnitureDimensions, v
 import { findAvailableOpeningPosition, getFloorArchitecturalModel, validateOpenings } from '@/lib/architecturalModel'
 import { applyAssistantPlan as applyAssistantPlanChanges, type ApplyAssistantPlanResult } from '@/lib/applyAssistantPlan'
 import { conversionFactor, convertOrnaments, convertPlacedItem, convertRoomUnits, convertWallThicknesses } from '@/lib/unitConversion'
+import { pointInPolygon } from '@/lib/siteGeometry'
 import type { AssistantPlan } from '@/services/groqAssistant'
 import type { PendingPlacement, ToolVariant } from '@/data/toolLibrary'
 import { variantFromAsset, ASSET_LOOKUP } from '@/data/toolLibrary'
+import { REAL_MODELS } from '@/data/realAssets'
 import { Logo } from '@/components/layout/Logo'
 import { Button } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/FormControls'
@@ -75,6 +77,7 @@ export interface WorkspaceContext {
   removeRoomElement: (roomId: string, elementId: string) => void
   updateOrnament: (id: string, patch: Partial<Ornament>) => void
   removeOrnament: (id: string) => void
+  duplicateOrnament: (id: string) => void
   units: Units
   setUnits: (units: Units) => void
   selectedRoomId: string | null
@@ -109,8 +112,8 @@ export interface WorkspaceContext {
   addOpening: (roomId: string, type: 'door' | 'window', label?: string, size?: { width?: number; height?: number }, target?: Vec2) => boolean
   placementWarning: string | null
   clearPlacementWarning: () => void
-  placeInterior: (roomId: string, item: string, target?: Vec2) => void
-  addTreeAt: (point: Vec2, kind?: string, size?: { width?: number; length?: number }) => void
+  placeInterior: (roomId: string, item: string, target?: Vec2, assetId?: string) => void
+  addTreeAt: (point: Vec2, kind?: string, size?: { width?: number; length?: number }, assetId?: string) => void
   /* Editing with history */
   beginEdit: () => void
   liveEdit: (fn: (state: EditorState) => EditorState) => void
@@ -330,6 +333,14 @@ export function WorkspaceLayout() {
         setTool(placement.tool)
       }
     }
+    const materialId = searchParams.get('material')
+    const material = materialId ? ASSET_LOOKUP[materialId] : undefined
+    if (material?.assetKind === 'material') {
+      if (material.sourceAssetId === 'brushed_concrete') setPreviewExt('concrete')
+      else if (material.sourceAssetId === 'brick_pavement') setPreviewExt('brick')
+      else if (material.sourceAssetId === 'american_walnut_veneer') setPreviewInt('wood')
+      else if (material.sourceAssetId === 'stone_pavers') setPreviewExt('stone')
+    }
   }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const architecturalModel = useMemo(
@@ -448,11 +459,15 @@ export function WorkspaceLayout() {
   )
 
   const placeInterior = useCallback(
-    (roomId: string, item: string, target?: Vec2) => {
+    (roomId: string, item: string, target?: Vec2, assetId?: string) => {
       const room = editor.rooms.find((candidate) => candidate.id === roomId)
       if (!room) return
       const canonical = canonicalItem(item)
-      const dimensions = getFurnitureDimensions(canonical, units)
+      const sourceAsset = assetId ? REAL_MODELS.find((asset) => asset.id === assetId) : undefined
+      const unitFactor = room.units === 'ft' ? 3.28084 : 1
+      const dimensions = sourceAsset?.dimensionsM
+        ? { width: sourceAsset.dimensionsM[0] * unitFactor, depth: sourceAsset.dimensionsM[1] * unitFactor, height: sourceAsset.dimensionsM[2] * unitFactor }
+        : getFurnitureDimensions(canonical, room.units)
       const existing = editor.placed[roomId] ?? []
       const position = findFurniturePosition(room, existing, dimensions, target)
       if (!position) {
@@ -461,7 +476,7 @@ export function WorkspaceLayout() {
       }
       setPlacementWarning(null)
       const placedItem: PlacedItem = {
-        id: uid('item'), item: canonical, x: position.x, z: position.y, rotation: 0, scale: 1,
+        id: uid('item'), ...(sourceAsset ? { assetId: sourceAsset.id } : {}), item: canonical, x: position.x, z: position.y, rotation: 0, scale: 1,
         ...dimensions, color: defaultItemColor(canonical),
       }
       const next = [...existing, placedItem]
@@ -561,25 +576,52 @@ export function WorkspaceLayout() {
 
   const removeOrnament = useCallback((id: string) => {
     commit((state) => ({ ...state, ornaments: state.ornaments.filter((item) => item.id !== id) }))
+    setSelectedSiteId((selected) => selected === id ? null : selected)
   }, [commit])
 
+  const duplicateOrnament = useCallback((id: string) => {
+    const source = editor.ornaments.find((item) => item.id === id)
+    if (!source || !project) return
+    const w = (source.width ?? (units === 'ft' ? 2 : 0.6)) * source.scale
+    const l = (source.length ?? (units === 'ft' ? 2 : 0.6)) * source.scale
+    const margin = units === 'ft' ? 0.5 : 0.15
+    const offsets = [[w + margin, 0], [-(w + margin), 0], [0, l + margin], [0, -(l + margin)], [w + margin, l + margin], [-(w + margin), l + margin]]
+    const boundary = project.site?.boundary && project.site.boundary.status !== 'unknown' ? project.site.boundary.vertices : []
+    const fits = (x: number, y: number) => {
+      const hw = w / 2, hl = l / 2
+      const cos = Math.cos(source.rotation), sin = Math.sin(source.rotation)
+      const corners = [[-hw, -hl], [hw, -hl], [hw, hl], [-hw, hl]].map(([dx, dy]) => ({ x: x + dx * cos - dy * sin, y: y + dx * sin + dy * cos }))
+      return corners.every((point) => point.x >= 0 && point.y >= 0 && point.x <= project.plot.width && point.y <= project.plot.length)
+        && (boundary.length < 3 || corners.every((point) => pointInPolygon(point, boundary)))
+    }
+    const position = offsets.map(([dx, dy]) => ({ x: source.x + dx, y: source.y + dy })).find((point) => fits(point.x, point.y))
+    if (!position) { setPlacementWarning('No remaining in-boundary position is available for this duplicate.'); return }
+    const duplicate: Ornament = { ...source, id: uid('site'), x: round1(position.x), y: round1(position.y) }
+    commit((state) => ({ ...state, ornaments: [...state.ornaments, duplicate] }))
+    setSelectedSiteId(duplicate.id)
+    setPlacementWarning(null)
+  }, [commit, editor.ornaments, project, units])
+
   const addTreeAt = useCallback(
-    (point: Vec2, kind?: string, size?: { width?: number; length?: number }) => {
+    (point: Vec2, kind?: string, size?: { width?: number; length?: number }, assetId?: string) => {
       if (!project) return
       const ft = units === 'ft'
       const defaults: Record<string, { width: number; length: number }> = {
-        palm: { width: ft ? 3 : 0.9, length: ft ? 3 : 0.9 }, conifer: { width: ft ? 3 : 0.9, length: ft ? 3 : 0.9 },
+        palm: { width: ft ? 3 : 0.9, length: ft ? 3 : 0.9 }, conifer: { width: ft ? 3 : 0.9, length: ft ? 3 : 0.9 }, tree: { width: ft ? 3 : 0.9, length: ft ? 3 : 0.9 },
         shrub: { width: ft ? 2 : 0.6, length: ft ? 2 : 0.6 }, flower: { width: ft ? 2 : 0.6, length: ft ? 2 : 0.6 }, hedge: { width: ft ? 2 : 0.6, length: ft ? 8 : 2.4 },
+        bench: { width: ft ? 14.2 : 4.34, length: ft ? 2.5 : 0.77 }, 'outdoor-set': { width: ft ? 2.55 : 0.776, length: ft ? 6 : 1.831 }, 'street-light': { width: ft ? 2.3 : 0.704, length: ft ? 1.27 : 0.386 }, decor: { width: ft ? 0.5 : 0.15, length: ft ? 0.82 : 0.25 },
         car: { width: ft ? 7 : 2.1, length: ft ? 14 : 4.3 },
         fence: { width: ft ? 0.35 : 0.1, length: ft ? 10 : 3 },
         gate: { width: ft ? 12 : 3.6, length: ft ? 0.5 : 0.15 },
         road: { width: ft ? 16 : 5, length: ft ? 60 : 18 },
         path: { width: ft ? 4 : 1.2, length: ft ? 24 : 7.2 },
-        'street-light': { width: ft ? 0.5 : 0.15, length: ft ? 0.5 : 0.15 },
         person: { width: ft ? 1 : 0.3, length: ft ? 1 : 0.3 },
       }
       const base = defaults[kind ?? ''] ?? { width: ft ? 2 : 0.6, length: ft ? 2 : 0.6 }
-      const width = size?.width ?? base.width, length = size?.length ?? base.length
+      const sourceAsset = assetId ? REAL_MODELS.find((asset) => asset.id === assetId) : undefined
+      const unitFactor = ft ? 3.28084 : 1
+      const width = size?.width ?? (sourceAsset?.dimensionsM ? sourceAsset.dimensionsM[0] * unitFactor : base.width)
+      const length = size?.length ?? (sourceAsset?.dimensionsM ? sourceAsset.dimensionsM[1] * unitFactor : base.length)
       if (width > project.plot.width || length > project.plot.length) {
         setPlacementWarning(`${kind ?? 'Site object'} is larger than the current plot and could not be placed.`)
         return
@@ -591,7 +633,7 @@ export function WorkspaceLayout() {
       else setPlacementWarning(null)
       commit((state) => ({
         ...state,
-        ornaments: [...state.ornaments, { id: uid('site'), x: round1(x), y: round1(y), kind, rotation: 0, scale: 1, color: kind === 'car' ? '#53677e' : kind === 'person' ? '#455f87' : kind === 'road' ? '#555b62' : kind === 'path' ? '#c9c4b9' : kind === 'fence' || kind === 'gate' ? '#6c6254' : '#4f8a3f', width, length }],
+        ornaments: [...state.ornaments, { id: uid('site'), ...(sourceAsset ? { assetId: sourceAsset.id } : {}), x: round1(x), y: round1(y), kind, rotation: 0, scale: 1, color: kind === 'car' ? '#53677e' : kind === 'person' ? '#455f87' : kind === 'road' ? '#555b62' : kind === 'path' ? '#c9c4b9' : kind === 'fence' || kind === 'gate' ? '#6c6254' : '#4f8a3f', width, length }],
       }))
     },
     [commit, project, setPlacementWarning, units],
@@ -979,6 +1021,7 @@ export function WorkspaceLayout() {
     removeRoomElement,
     updateOrnament,
     removeOrnament,
+    duplicateOrnament,
     units,
     setUnits,
     selectedRoomId,
@@ -1151,6 +1194,7 @@ export function WorkspaceLayout() {
                 selectedSite={selectedSite}
                 onUpdateSite={updateOrnament}
                 onRemoveSite={removeOrnament}
+                onDuplicateSite={duplicateOrnament}
                 onSelectItem={selectItem}
                 onUpdatePlacedItem={updatePlacedItem}
                 onRemovePlacedItem={removePlacedItem}
@@ -1234,6 +1278,7 @@ export function WorkspaceLayout() {
                 selectedSite={selectedSite}
                 onUpdateSite={updateOrnament}
                 onRemoveSite={removeOrnament}
+                onDuplicateSite={duplicateOrnament}
                 onSelectItem={selectItem}
                 onUpdatePlacedItem={updatePlacedItem}
                 onRemovePlacedItem={removePlacedItem}

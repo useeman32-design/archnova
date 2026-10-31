@@ -35,8 +35,26 @@ describe('AI design-plan application', () => {
     expect(result.rooms.find((room) => room.name === 'Living Room')?.elements).toHaveLength(1)
     expect(result.rooms.find((room) => room.name === 'Kitchen')?.elements).toHaveLength(1)
     expect(result.placed[result.rooms[0].id]).toHaveLength(1)
+    expect(result.placed[result.rooms[0].id][0].assetId).toBe('ph_model_sofa_02')
     expect(result.projectPatch.name).toBe('AI bungalow concept')
     expect(result.appliedCount).toBe(8)
+  })
+
+  it('adds a distinct multi-floor building with a deterministic site footprint', () => {
+    const project = blankProject()
+    const plan: AssistantPlan = {
+      reply: 'A separate surgery block.',
+      actions: [{ type: 'add_building', name: 'Surgery Block', purpose: { category: 'institutional', use: 'hospital surgery' }, role: 'secondary', width: 24, length: 18, floorCount: 3 }],
+    }
+    const result = applyAssistantPlan({ plan, project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 } })
+    expect(result.ok).toBe(true)
+    const buildings = result.projectPatch.buildings ?? []
+    const block = buildings.find((building) => building.name === 'Surgery Block')
+    expect(block).toMatchObject({ purpose: { category: 'institutional', use: 'hospital surgery' }, role: 'secondary' })
+    expect(block?.floors).toHaveLength(3)
+    expect(block?.footprint).toMatchObject({ shape: 'polygon', source: 'ai-recommended', units: 'ft' })
+    expect(block?.footprint?.vertices).toHaveLength(4)
+    expect(result.projectPatch.buildings?.filter((building) => building.role === 'primary')).toHaveLength(1)
   })
 
   it('rejects a generated plan with overlapping rooms without partially applying it', () => {
@@ -68,6 +86,48 @@ describe('AI design-plan application', () => {
     const result = applyAssistantPlan({ plan, project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 } })
     expect(result.ok).toBe(true)
     expect(result.rooms[0]).toMatchObject({ name: 'Home Office', width: 12, length: 10, finish: 'wood' })
+  })
+
+  it('offers skip, overflow-red, and shrink-to-fit choices for site-capacity conflicts', () => {
+    const project = blankProject()
+    const plan: AssistantPlan = { reply: 'Add an access road.', actions: [{ type: 'add_site_item', kind: 'road', x: 25, y: 25, width: 16, length: 60 }] }
+    const input = { plan, project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 } }
+    const strict = applyAssistantPlan(input)
+    expect(strict.ok).toBe(false)
+    expect(strict.siteFitConflicts).toContain('road')
+
+    const skipped = applyAssistantPlan({ ...input, plan: { ...plan, siteFitMode: 'skip' } })
+    expect(skipped.ok).toBe(true)
+    expect(skipped.ornaments).toEqual([])
+    expect(skipped.warnings.join(' ')).toMatch(/skipped/i)
+
+    const overflow = applyAssistantPlan({ ...input, plan: { ...plan, siteFitMode: 'add-anyway' } })
+    expect(overflow.ok).toBe(true)
+    expect(overflow.ornaments[0].x).toBeGreaterThan(project.plot.width)
+    expect(overflow.warnings.join(' ')).toMatch(/outside the boundary in red/i)
+
+    const shrunk = applyAssistantPlan({ ...input, plan: { ...plan, siteFitMode: 'shrink-to-fit' } })
+    expect(shrunk.ok).toBe(true)
+    expect(shrunk.ornaments[0].length).toBeLessThan(60)
+    expect(shrunk.warnings.join(' ')).toMatch(/reduced and repositioned/i)
+  })
+
+  it('uses remaining plot space first, then supports red overflow or shrink for a separate building', () => {
+    const project = blankProject()
+    const plan: AssistantPlan = { reply: 'Add a separate service building.', actions: [{ type: 'add_building', name: 'Service Block', purpose: { category: 'institutional', use: 'hospital service' }, role: 'service', width: 80, length: 80, floorCount: 1 }] }
+    const strict = applyAssistantPlan({ plan, project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 } })
+    expect(strict.ok).toBe(false)
+    expect(strict.siteFitConflicts).toContain('Service Block')
+
+    const overflow = applyAssistantPlan({ plan: { ...plan, siteFitMode: 'add-anyway' }, project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 } })
+    expect(overflow.ok).toBe(true)
+    const outside = overflow.projectPatch.buildings?.find((building) => building.name === 'Service Block')
+    expect(outside?.footprint?.vertices.some((vertex) => vertex.x > project.plot.width)).toBe(true)
+
+    const shrunk = applyAssistantPlan({ plan: { ...plan, siteFitMode: 'shrink-to-fit' }, project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 } })
+    expect(shrunk.ok).toBe(true)
+    const fitted = shrunk.projectPatch.buildings?.find((building) => building.name === 'Service Block')
+    expect(fitted?.footprint?.vertices.every((vertex) => vertex.x >= 0 && vertex.y >= 0 && vertex.x <= project.plot.width && vertex.y <= project.plot.length)).toBe(true)
   })
 
   it('does not apply a plan when a room target is ambiguous or missing', () => {
@@ -111,14 +171,14 @@ describe('AI design-plan application', () => {
       actions: [
         { type: 'set_room_shape', room: 'Living Room', shape: 'custom', outline: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 0.5 }, { x: 0.5, y: 0.5 }, { x: 0.5, y: 1 }, { x: 0, y: 1 }] },
         { type: 'set_wall_thickness', kind: 'exterior', value: 1 },
-        { type: 'add_site_item', kind: 'palm', x: 4, y: 5 },
+        { type: 'add_site_item', kind: 'tree', assetId: 'ph_model_quiver_tree_02', x: 4, y: 5 },
         { type: 'add_site_item', kind: 'road', x: 30, y: 40, width: 10, length: 30, rotationDegrees: 90 },
       ],
     }
     const result = applyAssistantPlan({ plan, project, rooms: [living], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 } })
     expect(result.ok).toBe(true)
     expect(result.rooms[0].shape).toBe('custom')
-    expect(result.ornaments[0]).toMatchObject({ kind: 'palm', x: 4, y: 5 })
+    expect(result.ornaments[0]).toMatchObject({ kind: 'tree', assetId: 'ph_model_quiver_tree_02', x: 4, y: 5 })
     expect(result.ornaments[1]).toMatchObject({ kind: 'road', x: 30, y: 40, width: 10, length: 30, rotation: Math.PI / 2 })
     expect(result.wallThicknesses.exterior).toBe(1)
     expect(result.projectPatch.preferences?.exteriorFinish).toBe('paint')

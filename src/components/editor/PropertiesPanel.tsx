@@ -10,6 +10,8 @@ import { EmptyState } from '@/components/ui/Feedback'
 import { INTERIOR_FINISHES } from '@/data/catalog'
 import { Button } from '@/components/ui/Button'
 import { Box } from 'lucide-react'
+import { ASSET_LOOKUP } from '@/data/toolLibrary'
+import { LazyAssetPreview } from '@/components/assets/RealAssetModel'
 
 export type PropertyTab = 'room' | 'elements' | 'wall' | 'door' | 'window'
 
@@ -38,9 +40,10 @@ export interface PropertiesPanelProps {
   placed?: Record<string, PlacedItem[]>
   selectedItem?: PlacedItem | null
   selectedItemRoomId?: string | null
-  selectedSite?: { id: string; kind?: string; x: number; y: number; scale: number; rotation: number; color: string; width?: number; length?: number } | null
+  selectedSite?: { id: string; assetId?: string; kind?: string; x: number; y: number; scale: number; rotation: number; color: string; width?: number; length?: number } | null
   onUpdateSite?: (id: string, patch: Partial<{ x: number; y: number; scale: number; rotation: number; color: string; width: number; length: number }>) => void
   onRemoveSite?: (id: string) => void
+  onDuplicateSite?: (id: string) => void
   onSelectItem?: (id: string | null) => void
   onUpdatePlacedItem?: (roomId: string, itemId: string, patch: Partial<PlacedItem>) => void
   onRemovePlacedItem?: (roomId: string, itemId: string) => void
@@ -73,6 +76,7 @@ export function PropertiesPanel({
   selectedSite = null,
   onUpdateSite,
   onRemoveSite,
+  onDuplicateSite,
   onSelectItem,
   onUpdatePlacedItem,
   onRemovePlacedItem,
@@ -134,7 +138,7 @@ export function PropertiesPanel({
 
       <div className="flex-1 overflow-y-auto scroll-thin p-4">
         {selectedSite ? (
-          <SiteInspector site={selectedSite} onUpdate={onUpdateSite} onRemove={onRemoveSite} onClose={onClose} units={units} />
+          <SiteInspector site={selectedSite} onUpdate={onUpdateSite} onRemove={onRemoveSite} onDuplicate={onDuplicateSite} onClose={onClose} units={units} />
         ) : selectedItem && selectedItemRoomId ? (
           <ItemInspector
             item={selectedItem}
@@ -358,25 +362,26 @@ function RoomElementsList({ room, placed, onOpenTab, onSelectItem, onRemoveOpeni
     <div>
       <div className="mb-2 flex items-center justify-between"><h3 className="text-[12px] font-semibold text-ink-text">Furniture & appliances</h3><span className="text-[10px] text-muted">{placed.length}</span></div>
       {placed.length ? <div className="space-y-2">{placed.map((item) => <div key={item.id} className="flex items-center gap-2 rounded-lg border border-line p-2">
-        <button type="button" onClick={() => onSelectItem?.(item.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left"><ObjectPreview item={item.item} color={item.color} /><span className="min-w-0"><span className="block truncate text-[11.5px] font-medium capitalize text-ink-text">{item.item.replace(/[-_]/g, ' ')}</span><span className="text-[10px] text-muted">Select to adjust position, size or color</span></span></button>
+        <button type="button" onClick={() => onSelectItem?.(item.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left"><ObjectPreview item={item.item} color={item.color} assetId={item.assetId} /><span className="min-w-0"><span className="block truncate text-[11.5px] font-medium text-ink-text">{item.assetId ? (ASSET_LOOKUP[item.assetId]?.name ?? item.item.replace(/[-_]/g, ' ')) : item.item.replace(/[-_]/g, ' ')}</span><span className="text-[10px] text-muted">Select to adjust position, size or color</span></span></button>
         <button type="button" onClick={() => onRemoveItem?.(room.id, item.id)} aria-label={`Remove ${item.item}`} className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
       </div>)}</div> : <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[11px] text-muted">No placed items yet. Add furniture from the Interior library.</p>}
     </div>
   </div>
 }
 
-function SiteInspector({ site, onUpdate, onRemove, onClose, units }: {
-  site: { id: string; kind?: string; x: number; y: number; scale: number; rotation: number; color: string; width?: number; length?: number }
+function SiteInspector({ site, onUpdate, onRemove, onDuplicate, onClose, units }: {
+  site: { id: string; assetId?: string; kind?: string; x: number; y: number; scale: number; rotation: number; color: string; width?: number; length?: number }
   onUpdate?: (id: string, patch: Partial<{ x: number; y: number; scale: number; rotation: number; color: string; width: number; length: number }>) => void
   onRemove?: (id: string) => void
+  onDuplicate?: (id: string) => void
   onClose?: () => void
   units: Units
 }) {
-  const title = (site.kind ?? 'landscape object').replace(/[-_]/g, ' ')
+  const title = site.assetId ? (ASSET_LOOKUP[site.assetId]?.name ?? (site.kind ?? 'landscape object').replace(/[-_]/g, ' ')) : (site.kind ?? 'landscape object').replace(/[-_]/g, ' ')
   return (
     <div className="space-y-4">
-      <ObjectPreview item={site.kind ?? 'tree'} color={site.color} large />
-      <div><p className="text-[15px] font-semibold capitalize text-ink-text">{title}</p><p className="mt-1 text-[11.5px] text-muted">Site object · editable placement and scale</p></div>
+      <ObjectPreview item={site.kind ?? 'tree'} color={site.color} assetId={site.assetId} large />
+      <div><p className="text-[15px] font-semibold text-ink-text">{title}</p><p className="mt-1 text-[11.5px] text-muted">Site object · editable placement and scale{site.assetId ? ` · saved catalog ID ${site.assetId}` : ''}</p></div>
       <div className="grid grid-cols-2 gap-3">
         <NumberField label="Plot X" min={0} max={1000} step={0.5} suffix={units} value={Number(site.x.toFixed(2))} onChange={(event) => onUpdate?.(site.id, { x: Number(event.target.value) })} />
         <NumberField label="Plot Y" min={0} max={1000} step={0.5} suffix={units} value={Number(site.y.toFixed(2))} onChange={(event) => onUpdate?.(site.id, { y: Number(event.target.value) })} />
@@ -389,7 +394,7 @@ function SiteInspector({ site, onUpdate, onRemove, onClose, units }: {
       </div>
       <label className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[12px] font-medium text-muted">Object color<input type="color" value={site.color} onChange={(event) => onUpdate?.(site.id, { color: event.target.value })} className="h-8 w-12 cursor-pointer rounded border-0 bg-transparent p-0" /></label>
       <p className="text-[11px] text-muted">Drag the object in the floor plan or use numeric controls to reposition it.</p>
-      <div className="flex gap-2"><Button size="sm" variant="secondary" className="flex-1" onClick={onClose}>Done</Button><Button size="sm" variant="danger" onClick={() => onRemove?.(site.id)} icon={<Trash2 className="h-3.5 w-3.5" />}>Remove</Button></div>
+      <div className="flex gap-2"><Button size="sm" variant="secondary" className="flex-1" onClick={onClose}>Done</Button><Button size="sm" variant="secondary" onClick={() => onDuplicate?.(site.id)} icon={<Copy className="h-3.5 w-3.5" />}>Duplicate</Button><Button size="sm" variant="danger" onClick={() => onRemove?.(site.id)} icon={<Trash2 className="h-3.5 w-3.5" />}>Remove</Button></div>
     </div>
   )
 }
@@ -414,10 +419,10 @@ function ItemInspector({ item, roomId, room, units, issues, onUpdate, onRemove, 
   const step = units === 'ft' ? 0.25 : 0.05
   return (
     <div className="space-y-4">
-      <ObjectPreview item={item.item} color={item.color} large />
+      <ObjectPreview item={item.item} color={item.color} assetId={item.assetId} large />
       <div>
-        <p className="text-[15px] font-semibold capitalize text-ink-text">{item.item.replace(/[-_]/g, ' ')}</p>
-        <p className="mt-1 text-[11.5px] text-muted">In {room?.name ?? 'selected room'} · editable to scale</p>
+        <p className="text-[15px] font-semibold text-ink-text">{item.assetId ? (ASSET_LOOKUP[item.assetId]?.name ?? item.item.replace(/[-_]/g, ' ')) : item.item.replace(/[-_]/g, ' ')}</p>
+        <p className="mt-1 text-[11.5px] text-muted">In {room?.name ?? 'selected room'} · editable to scale{item.assetId ? ` · saved catalog ID ${item.assetId}` : ''}</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <NumberField label="Width" min={units === 'ft' ? 0.5 : 0.15} max={roomWidth} step={step} suffix={units} value={width} onChange={(event) => onUpdate?.(roomId, item.id, { width: Number(event.target.value) })} />
@@ -443,8 +448,9 @@ function ItemInspector({ item, roomId, room, units, issues, onUpdate, onRemove, 
   )
 }
 
-function ObjectPreview({ item, color, large = false }: { item: string; color: string; large?: boolean }) {
+function ObjectPreview({ item, color, assetId, large = false }: { item: string; color: string; assetId?: string; large?: boolean }) {
   const key = item.toLowerCase()
+  if (assetId) return <LazyAssetPreview assetId={assetId} className={`rounded-xl border border-line ${large ? 'h-36 w-full' : 'h-10 w-12'}`} />
   return (
     <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-gradient-to-br from-[#f5f7fa] to-[#e7ebf0] ${large ? 'h-36 w-full' : 'h-10 w-12'}`}>
       <svg viewBox="0 0 120 80" className={large ? 'h-32 w-48' : 'h-8 w-10'} aria-label={`${item} model preview`}>

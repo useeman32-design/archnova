@@ -1,10 +1,13 @@
-import type { ArchitecturalWall, Element, PlacedItem, Project, Room, Units, Vec2 } from '@/types'
+import type { ArchitecturalWall, Building, Element, PlacedItem, Project, Room, SiteBoundary, Units, Vec2 } from '@/types'
 import { conversionFactor, convertPlacedItem, convertRoomUnits, convertWallThicknesses } from '@/lib/unitConversion'
 import type { AssistantSiteItem } from '@/services/groqAssistant'
-import { canonicalFurnitureKey, findFurniturePosition, getFurnitureDimensions, validateFurniture } from '@/lib/furniture'
+import { canonicalFurnitureKey, findFurniturePosition, validateFurniture } from '@/lib/furniture'
+import { REAL_MODELS } from '@/data/realAssets'
 import { findAvailableOpeningPosition, getFloorArchitecturalModel, validateOpenings } from '@/lib/architecturalModel'
 import { validatePlan, type PlanIssue } from '@/lib/planValidation'
 import type { AssistantPlan, AssistantRoomSpec } from '@/services/groqAssistant'
+import { normalizeProjectModel } from '@/lib/projectModel'
+import { pointInPolygon, polygonBounds } from '@/lib/siteGeometry'
 
 export interface ApplyAssistantPlanInput {
   plan: AssistantPlan
@@ -26,11 +29,13 @@ export interface ApplyAssistantPlanResult {
   appliedCount: number
   errors: string[]
   warnings: string[]
+  siteFitConflicts?: string[]
 }
 
 export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssistantPlanResult {
   const { plan, project } = input
   const sourceUnits = project.plot.units
+  const siteFitMode = plan.siteFitMode ?? 'strict'
   const editorUnits = input.units ?? sourceUnits
   const units = plan.plot?.units ?? sourceUnits
   const plotFactor = conversionFactor(sourceUnits, units)
@@ -42,6 +47,8 @@ export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssista
   }))
   let ornaments = structuredClone(input.ornaments).map((item) => ({ ...item, x: round4(item.x * editorFactor), y: round4(item.y * editorFactor), ...(item.width !== undefined ? { width: round4(item.width * editorFactor) } : {}), ...(item.length !== undefined ? { length: round4(item.length * editorFactor) } : {}) }))
   let wallThicknesses = convertWallThicknesses(input.wallThicknesses, editorUnits, units)
+  let buildings = (normalizeProjectModel(project).buildings ?? []).map((building) => convertBuildingUnits(structuredClone(building), plotFactor, units))
+  let buildingsChanged = false
   const convertedOriginalRooms = structuredClone(rooms)
   const convertedOriginalPlaced = structuredClone(placed)
   const convertedOriginalOrnaments = structuredClone(ornaments)
@@ -52,6 +59,7 @@ export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssista
   let plotShape = plan.plot?.shape ?? project.plot.shape
   let appliedCount = 0
   const errors: string[] = []
+  const siteFitConflicts: string[] = []
   const operationWarnings: string[] = []
   const { preferences: preferencePatch, ...projectFields } = plan.project ?? {}
   const shouldPatchPreferences = Boolean(preferencePatch || editorUnits !== units || plan.wallThicknesses)
@@ -129,10 +137,80 @@ export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssista
       appliedCount += 1
       continue
     }
+    if (action.type === 'add_building') {
+      const rotation = (action.rotationDegrees ?? 0) * Math.PI / 180
+      let width = action.width, length = action.length
+      const occupied = buildings.map((building) => building.footprint ? polygonBounds(building.footprint.vertices) : null).filter((bounds): bounds is { minX: number; minY: number; maxX: number; maxY: number } => Boolean(bounds))
+      const primaryHasFootprint = buildings.some((building) => building.role === 'primary' && (building.footprint?.vertices.length ?? 0) >= 3)
+      if (!primaryHasFootprint && rooms.length) occupied.push({
+        minX: Math.min(...rooms.map((room) => room.rect.x)), minY: Math.min(...rooms.map((room) => room.rect.y)),
+        maxX: Math.max(...rooms.map((room) => room.rect.x + room.rect.w)), maxY: Math.max(...rooms.map((room) => room.rect.y + room.rect.h)),
+      })
+      const requestedCenter = action.x !== undefined && action.y !== undefined ? { x: action.x, y: action.y } : null
+      const fitsAt = (center: Vec2 | null) => {
+        if (!center) return false
+        const corners = rotatedBuildingCorners(center, width, length, rotation)
+        const bounds = polygonBounds(corners)
+        return Boolean(bounds && buildingFootprintInsideSite(corners, plotWidth, plotLength, project.site?.boundary, plotFactor) && !occupied.some((other) => boundsOverlap(bounds, other, 1)))
+      }
+      let center = requestedCenter
+      if (!center) center = findBuildingPosition(width, length, rotation, plotWidth, plotLength, occupied, project.site?.boundary, plotFactor)
+      let placementFits = fitsAt(center)
+      let overflowPlacement = false
+      if (!placementFits && siteFitMode === 'shrink-to-fit') {
+        const factor = Math.min(1, plotWidth / width, plotLength / length)
+        width = round4(width * factor)
+        length = round4(length * factor)
+        center = requestedCenter && fitsAt(requestedCenter) ? requestedCenter : findBuildingPosition(width, length, rotation, plotWidth, plotLength, occupied, project.site?.boundary, plotFactor)
+        placementFits = fitsAt(center)
+        if (placementFits) operationWarnings.push(`${action.name} was uniformly reduced to ${width} × ${length} ${units} to fit available plot capacity.`)
+      }
+      if (!placementFits && siteFitMode === 'skip') {
+        operationWarnings.push(`${action.name} was skipped because no clear plot space remained.`)
+        siteFitConflicts.push(action.name)
+        continue
+      }
+      if (!placementFits && siteFitMode === 'add-anyway') {
+        center = findBuildingPosition(width, length, rotation, plotWidth, plotLength, occupied, project.site?.boundary, plotFactor)
+        placementFits = fitsAt(center)
+        if (!placementFits) {
+          center = { x: plotWidth + width / 2 + 2, y: Math.max(length / 2, Math.min(plotLength - length / 2, plotLength / 2)) }
+          overflowPlacement = true
+          operationWarnings.push(`${action.name} could not fit in remaining plot space and was placed outside the boundary in red.`)
+        } else operationWarnings.push(`${action.name} was moved to remaining plot space.`)
+      }
+      if (!center || (!overflowPlacement && !placementFits)) {
+        siteFitConflicts.push(action.name)
+        errors.push(`No clear plot area could fit ${action.name} (${width} × ${length} ${units}); choose skip, add anyway, or shrink to fit.`)
+        break
+      }
+      const footprint = makeBuildingFootprint(action.name, center, width, length, rotation, units)
+      const newBuilding: Building = {
+        id: `ai-building-${crypto.randomUUID()}`,
+        name: action.name,
+        purpose: action.purpose,
+        role: action.role,
+        floors: Array.from({ length: action.floorCount }, (_, index) => ({
+          id: `ai-floor-${crypto.randomUUID()}`,
+          name: index === 0 ? 'Ground Floor' : `Level ${index + 1}`,
+          level: index + 1,
+          rooms: [],
+        })),
+        footprint,
+        assumptions: ['AI-recommended rectangular site footprint; dimensions and placement are conceptual and require user review.'],
+      }
+      buildings.push(newBuilding)
+      buildingsChanged = true
+      appliedCount += 1
+      continue
+    }
+
     if (action.type === 'add_site_item') {
-      if (action.x > plotWidth || action.y > plotLength) { errors.push('The site object must be placed within the plot.'); break }
       const dimensions = defaultSiteDimensions(action.kind, units)
-      ornaments.push({ id: `ai-site-${crypto.randomUUID()}`, kind: action.kind, x: round4(action.x), y: round4(action.y), rotation: (action.rotationDegrees ?? 0) * Math.PI / 180, scale: action.scale ?? 1, color: action.color ?? siteColor(action.kind), width: action.width ?? dimensions.width, length: action.length ?? dimensions.length })
+      const asset = action.assetId ? REAL_MODELS.find((candidate) => candidate.id === action.assetId) : undefined
+      const unitFactor = units === 'ft' ? 3.28084 : 1
+      const modelSize = asset?.dimensionsM ? { width: asset.dimensionsM[0] * unitFactor, length: asset.dimensionsM[1] * unitFactor } : dimensions
+      ornaments.push({ id: `ai-site-${crypto.randomUUID()}`, ...(asset ? { assetId: asset.id } : {}), kind: action.kind, x: round4(action.x), y: round4(action.y), rotation: (action.rotationDegrees ?? 0) * Math.PI / 180, scale: action.scale ?? 1, color: action.color ?? siteColor(action.kind), width: action.width ?? modelSize.width, length: action.length ?? modelSize.length })
       appliedCount += 1
       continue
     }
@@ -142,7 +220,6 @@ export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssista
       if (action.type === 'remove_site_item') ornaments = ornaments.filter((candidate) => candidate.id !== site.id)
       else {
         const x = action.x ?? site.x, y = action.y ?? site.y
-        if (x < 0 || y < 0 || x > plotWidth || y > plotLength) { errors.push('The site object must remain within the plot.'); break }
         ornaments = ornaments.map((candidate) => candidate.id === site.id ? { ...candidate, x: round4(x), y: round4(y), ...(action.rotationDegrees !== undefined ? { rotation: action.rotationDegrees * Math.PI / 180 } : {}), ...(action.scale !== undefined ? { scale: action.scale } : {}), ...(action.width !== undefined ? { width: action.width } : {}), ...(action.length !== undefined ? { length: action.length } : {}), ...(action.color ? { color: action.color } : {}) } : candidate)
       }
       appliedCount += 1
@@ -245,13 +322,16 @@ export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssista
       appliedCount += 1
     } else if (action.type === 'add_furniture' && room) {
       const itemKey = canonicalFurnitureKey(action.item)
-      const defaults = getFurnitureDimensions(itemKey, units)
+      const asset = action.assetId ? REAL_MODELS.find((candidate) => candidate.id === action.assetId && candidate.category === 'interior') : REAL_MODELS.find((candidate) => candidate.category === 'interior' && canonicalFurnitureKey(candidate.itemKey ?? '') === itemKey)
+      if (!asset?.dimensionsM) { errors.push(`No imported GLTF model is registered for ${action.item}; the assistant will not substitute procedural furniture.`); break }
+      const unitFactor = room.units === 'ft' ? 3.28084 : 1
+      const defaults = { width: asset.dimensionsM[0] * unitFactor, depth: asset.dimensionsM[1] * unitFactor, height: asset.dimensionsM[2] * unitFactor }
       const dimensions = { width: action.width ?? defaults.width, depth: action.depth ?? defaults.depth, height: action.height ?? defaults.height }
       const current = placed[room.id] ?? room.items ?? []
       const position = findFurniturePosition(room, current, dimensions)
       if (!position) { errors.push(`No clear floor area in ${room.name} can fit ${action.item}.`); break }
       const next: PlacedItem = {
-        id: `ai-${crypto.randomUUID()}`, item: itemKey, x: position.x, z: position.y, rotation: 0, scale: 1,
+        id: `ai-${crypto.randomUUID()}`, assetId: asset.id, item: itemKey, x: position.x, z: position.y, rotation: 0, scale: 1,
         ...dimensions, color: furnitureColor(itemKey),
       }
       placed[room.id] = [...current, next]
@@ -295,7 +375,7 @@ export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssista
     }
   }
 
-  if (errors.length) return { ok: false, rooms: input.rooms, placed: input.placed, ornaments: input.ornaments, wallThicknesses: input.wallThicknesses, projectPatch: {}, appliedCount: 0, errors, warnings: [] }
+  if (errors.length) return { ok: false, rooms: input.rooms, placed: input.placed, ornaments: input.ornaments, wallThicknesses: input.wallThicknesses, projectPatch: {}, appliedCount: 0, errors, warnings: [], ...(siteFitConflicts.length ? { siteFitConflicts } : {}) }
 
   if (plotWidth !== project.plot.width || plotLength !== project.plot.length || units !== project.plot.units || plotShape !== project.plot.shape) {
     projectPatch.plot = { ...project.plot, width: plotWidth, length: plotLength, units, shape: plotShape }
@@ -315,13 +395,54 @@ export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssista
     return { ok: false, rooms: input.rooms, placed: input.placed, ornaments: input.ornaments, wallThicknesses: input.wallThicknesses, projectPatch: {}, appliedCount: 0, errors: newErrors.map((issue) => issue.message), warnings: [] }
   }
   const baselineWarnings = new Set(beforeIssues.filter((issue) => issue.severity === 'warning').map(issueKey))
-  const warnings = [...new Set([...afterIssues.filter((issue) => issue.severity === 'warning' && !baselineWarnings.has(issueKey(issue))).map((issue) => issue.message), ...operationWarnings])]
+  let warnings = [...new Set([...afterIssues.filter((issue) => issue.severity === 'warning' && !baselineWarnings.has(issueKey(issue))).map((issue) => issue.message), ...operationWarnings])]
   const createdOrRemovedRoom = plan.actions.some((action) => action.type === 'create_house' || action.type === 'add_room' || action.type === 'remove_room')
   if (createdOrRemovedRoom && !plan.project?.bedrooms && !(plan.project && 'bedrooms' in plan.project)) projectPatch.bedrooms = rooms.filter((room) => room.category === 'bedroom').length
   if (createdOrRemovedRoom && !plan.project?.bathrooms && !(plan.project && 'bathrooms' in plan.project)) projectPatch.bathrooms = rooms.filter((room) => room.category === 'bathroom').length
+  if (buildingsChanged || plotFactor !== 1) {
+    buildings = buildings.map((building) => building.role === 'primary'
+      ? { ...building, floors: syncPrimaryBuildingFloor(building.floors, rooms) }
+      : building)
+    projectPatch.buildings = buildings
+  }
   const initialSites = new Map(convertedOriginalOrnaments.map((site) => [site.id, site]))
-  const outOfBoundsSite = ornaments.find((site) => !siteWithinPlot(site, plotWidth, plotLength) && (() => { const before = initialSites.get(site.id); return !before || before.x !== site.x || before.y !== site.y || before.width !== site.width || before.length !== site.length || before.rotation !== site.rotation || before.scale !== site.scale })())
-  if (outOfBoundsSite) return { ok: false, rooms: input.rooms, placed: input.placed, ornaments: input.ornaments, wallThicknesses: input.wallThicknesses, projectPatch: {}, appliedCount: 0, errors: [`Site object ${outOfBoundsSite.kind ?? outOfBoundsSite.id} would sit outside the plot.`], warnings: [] }
+  const changedOutOfBounds = ornaments.filter((site) => {
+    const before = initialSites.get(site.id)
+    const changed = !before || before.x !== site.x || before.y !== site.y || before.width !== site.width || before.length !== site.length || before.rotation !== site.rotation || before.scale !== site.scale
+    return changed && !siteFitsBoundary(site, plotWidth, plotLength, project.site?.boundary, plotFactor)
+  })
+  if (changedOutOfBounds.length && siteFitMode === 'strict') {
+    const names = changedOutOfBounds.map((site) => site.kind ?? site.id)
+    return { ok: false, rooms: input.rooms, placed: input.placed, ornaments: input.ornaments, wallThicknesses: input.wallThicknesses, projectPatch: {}, appliedCount: 0, errors: changedOutOfBounds.map((site) => `Site object ${site.kind ?? site.id} would extend outside the plot boundary.`), warnings: [], siteFitConflicts: names }
+  }
+  if (changedOutOfBounds.length && siteFitMode === 'skip') {
+    for (const site of changedOutOfBounds) {
+      const original = initialSites.get(site.id)
+      ornaments = original ? ornaments.map((item) => item.id === site.id ? original : item) : ornaments.filter((item) => item.id !== site.id)
+    }
+    appliedCount = Math.max(0, appliedCount - changedOutOfBounds.length)
+    warnings.push(...changedOutOfBounds.map((site) => `${site.kind ?? site.id} was skipped because it did not fit inside the site boundary.`))
+  } else if (changedOutOfBounds.length && siteFitMode === 'shrink-to-fit') {
+    ornaments = ornaments.map((site) => changedOutOfBounds.some((outside) => outside.id === site.id) ? fitSiteItemToPlot(site, plotWidth, plotLength, project.site?.boundary, plotFactor) : site)
+    const stillOutside = ornaments.filter((site) => changedOutOfBounds.some((outside) => outside.id === site.id) && !siteFitsBoundary(site, plotWidth, plotLength, project.site?.boundary, plotFactor))
+    if (stillOutside.length) {
+      const names = stillOutside.map((site) => site.kind ?? site.id)
+      return { ok: false, rooms: input.rooms, placed: input.placed, ornaments: input.ornaments, wallThicknesses: input.wallThicknesses, projectPatch: {}, appliedCount: 0, errors: stillOutside.map((site) => `${site.kind ?? site.id} could not be shrunk into the defined boundary.`), warnings: [], siteFitConflicts: names }
+    }
+    warnings.push(...changedOutOfBounds.map((site) => `${site.kind ?? site.id} was reduced and repositioned to fit inside the plot.`))
+  } else if (changedOutOfBounds.length && siteFitMode === 'add-anyway') {
+    for (const site of changedOutOfBounds) {
+      const center = findSiteItemPosition(site, plotWidth, plotLength, project.site?.boundary, plotFactor, buildings, ornaments.filter((item) => item.id !== site.id), rooms)
+      if (center) {
+        ornaments = ornaments.map((item) => item.id === site.id ? { ...item, x: center.x, y: center.y } : item)
+        warnings.push(`${site.kind ?? site.id} was moved into remaining plot space.`)
+      } else {
+        const halfW = siteHalfWidth(site), halfL = siteHalfLength(site)
+        ornaments = ornaments.map((item) => item.id === site.id ? { ...item, x: round4(plotWidth + halfW + 2), y: round4(Math.max(halfL, plotLength / 2)) } : item)
+        warnings.push(`${site.kind ?? site.id} did not fit in remaining plot space and is shown outside the boundary in red.`)
+      }
+    }
+  }
   return { ok: true, rooms, placed, ornaments, wallThicknesses, projectPatch, appliedCount, errors: [], warnings }
 }
 
@@ -410,12 +531,165 @@ function defaultSiteDimensions(kind: string, units: Units): { width: number; len
   const [width, length] = sizes[kind] ?? [2, 2]
   return { width: round4(width * f), length: round4(length * f) }
 }
+function convertBuildingUnits(building: Building, factor: number, units: Units): Building {
+  if (factor === 1) return building
+  return {
+    ...building,
+    floors: building.floors.map((floor) => ({ ...floor, rooms: floor.rooms.map((room) => convertRoomUnits(room, units)) })),
+    ...(building.footprint ? { footprint: {
+      ...building.footprint,
+      units,
+      vertices: building.footprint.vertices.map((vertex) => ({ ...vertex, x: round4(vertex.x * factor), y: round4(vertex.y * factor) })),
+      ...(building.footprint.area !== undefined ? { area: round4(building.footprint.area * factor * factor) } : {}),
+    } } : {}),
+  }
+}
+
+function syncPrimaryBuildingFloor(floors: Building['floors'], rooms: Room[]): Building['floors'] {
+  const next = structuredClone(floors)
+  const ground = next.findIndex((floor) => floor.level === 1)
+  if (ground >= 0) next[ground] = { ...next[ground], rooms: structuredClone(rooms) }
+  else next.unshift({ id: `ai-floor-${crypto.randomUUID()}`, name: 'Ground Floor', level: 1, rooms: structuredClone(rooms) })
+  return next
+}
+
+function makeBuildingFootprint(name: string, center: Vec2, width: number, length: number, rotation: number, units: Units): SiteBoundary {
+  const vertices = rotatedBuildingCorners(center, width, length, rotation)
+  return {
+    id: `ai-footprint-${crypto.randomUUID()}`,
+    shape: 'polygon',
+    vertices: vertices.map((point, index) => ({ ...point, id: `ai-footprint:${name}:${index + 1}:${crypto.randomUUID()}` })),
+    units,
+    status: 'defined',
+    source: 'ai-recommended',
+    area: round4(width * length),
+    assumptions: ['AI-recommended rectangular building footprint in plot coordinates; concept only.'],
+  }
+}
+
+function rotatedBuildingCorners(center: Vec2, width: number, length: number, rotation: number): Vec2[] {
+  const cos = Math.cos(rotation), sin = Math.sin(rotation)
+  return [
+    { x: -width / 2, y: -length / 2 }, { x: width / 2, y: -length / 2 },
+    { x: width / 2, y: length / 2 }, { x: -width / 2, y: length / 2 },
+  ].map((point) => ({ x: round4(center.x + point.x * cos - point.y * sin), y: round4(center.y + point.x * sin + point.y * cos) }))
+}
+
+function findBuildingPosition(width: number, length: number, rotation: number, plotWidth: number, plotLength: number, occupied: { minX: number; minY: number; maxX: number; maxY: number }[], boundary?: SiteBoundary, boundaryScale = 1): Vec2 | null {
+  if (width > plotWidth || length > plotLength) return null
+  const columns = 32, rows = 32
+  const candidates: Vec2[] = []
+  for (let row = 0; row <= rows; row += 1) {
+    for (let column = 0; column <= columns; column += 1) {
+      candidates.push({ x: (plotWidth * column) / columns, y: (plotLength * row) / rows })
+    }
+  }
+  const center = { x: plotWidth / 2, y: plotLength / 2 }
+  candidates.sort((a, b) => Math.hypot(a.x - center.x, a.y - center.y) - Math.hypot(b.x - center.x, b.y - center.y))
+  for (const candidate of candidates) {
+    const corners = rotatedBuildingCorners(candidate, width, length, rotation)
+    const bounds = polygonBounds(corners)
+    if (!bounds || !buildingFootprintInsideSite(corners, plotWidth, plotLength, boundary, boundaryScale)) continue
+    if (occupied.some((other) => boundsOverlap(bounds, other, 1))) continue
+    return candidate
+  }
+  return null
+}
+
+function buildingFootprintInsideSite(corners: Vec2[], plotWidth: number, plotLength: number, boundary?: SiteBoundary, boundaryScale = 1): boolean {
+  if (corners.some((point) => point.x < 0 || point.y < 0 || point.x > plotWidth || point.y > plotLength)) return false
+  if (!boundary || boundary.status === 'unknown' || boundary.vertices.length < 3) return true
+  const polygon = boundary.vertices.map((point) => ({ x: point.x * boundaryScale, y: point.y * boundaryScale }))
+  const samples = [...corners]
+  for (let i = 0; i < corners.length; i += 1) {
+    const a = corners[i], b = corners[(i + 1) % corners.length]
+    for (const t of [0.25, 0.5, 0.75]) samples.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
+  }
+  samples.push({ x: corners.reduce((sum, point) => sum + point.x, 0) / corners.length, y: corners.reduce((sum, point) => sum + point.y, 0) / corners.length })
+  return samples.every((point) => pointInPolygon(point, polygon))
+}
+
+function boundsOverlap(a: { minX: number; minY: number; maxX: number; maxY: number }, b: { minX: number; minY: number; maxX: number; maxY: number }, gap: number): boolean {
+  return a.minX < b.maxX + gap && a.maxX + gap > b.minX && a.minY < b.maxY + gap && a.maxY + gap > b.minY
+}
+
 function siteWithinPlot(site: AssistantSiteItem, width: number, length: number): boolean {
+  const halfW = siteHalfWidth(site)
+  const halfL = siteHalfLength(site)
+  return site.x - halfW >= 0 && site.y - halfL >= 0 && site.x + halfW <= width && site.y + halfL <= length
+}
+
+function siteHalfWidth(site: AssistantSiteItem): number {
   const scaledWidth = (site.width ?? 0) * site.scale
   const scaledLength = (site.length ?? 0) * site.scale
-  const halfW = Math.abs(Math.cos(site.rotation)) * scaledWidth / 2 + Math.abs(Math.sin(site.rotation)) * scaledLength / 2
-  const halfL = Math.abs(Math.sin(site.rotation)) * scaledWidth / 2 + Math.abs(Math.cos(site.rotation)) * scaledLength / 2
-  return site.x - halfW >= 0 && site.y - halfL >= 0 && site.x + halfW <= width && site.y + halfL <= length
+  return Math.abs(Math.cos(site.rotation)) * scaledWidth / 2 + Math.abs(Math.sin(site.rotation)) * scaledLength / 2
+}
+
+function siteHalfLength(site: AssistantSiteItem): number {
+  const scaledWidth = (site.width ?? 0) * site.scale
+  const scaledLength = (site.length ?? 0) * site.scale
+  return Math.abs(Math.sin(site.rotation)) * scaledWidth / 2 + Math.abs(Math.cos(site.rotation)) * scaledLength / 2
+}
+
+function siteCorners(site: AssistantSiteItem): Vec2[] {
+  const width = (site.width ?? 0) * site.scale, length = (site.length ?? 0) * site.scale
+  return [{ x: -width / 2, y: -length / 2 }, { x: width / 2, y: -length / 2 }, { x: width / 2, y: length / 2 }, { x: -width / 2, y: length / 2 }].map((point) => ({
+    x: site.x + point.x * Math.cos(site.rotation) - point.y * Math.sin(site.rotation),
+    y: site.y + point.x * Math.sin(site.rotation) + point.y * Math.cos(site.rotation),
+  }))
+}
+
+function siteFitsBoundary(site: AssistantSiteItem, width: number, length: number, boundary?: SiteBoundary, boundaryScale = 1): boolean {
+  if (!siteWithinPlot(site, width, length)) return false
+  if (!boundary || boundary.status === 'unknown' || boundary.vertices.length < 3) return true
+  const polygon = boundary.vertices.map((point) => ({ x: point.x * boundaryScale, y: point.y * boundaryScale }))
+  const corners = siteCorners(site)
+  if (!corners.every((point) => pointInPolygon(point, polygon))) return false
+  return corners.every((point, index) => {
+    const next = corners[(index + 1) % corners.length]
+    return [0.25, 0.5, 0.75].every((t) => pointInPolygon({ x: point.x + (next.x - point.x) * t, y: point.y + (next.y - point.y) * t }, polygon))
+  })
+}
+
+function fitSiteItemToPlot(site: AssistantSiteItem, plotWidth: number, plotLength: number, boundary?: SiteBoundary, boundaryScale = 1): AssistantSiteItem {
+  const baseWidth = site.width ?? 3, baseLength = site.length ?? 3
+  const envelopeScale = Math.min(1, plotWidth / Math.max(2 * siteHalfWidth(site), 1e-6), plotLength / Math.max(2 * siteHalfLength(site), 1e-6))
+  let candidate: AssistantSiteItem = { ...site, width: round4(baseWidth * envelopeScale), length: round4(baseLength * envelopeScale) }
+  const polygon = boundary && boundary.status !== 'unknown' && boundary.vertices.length >= 3
+    ? boundary.vertices.map((point) => ({ x: point.x * boundaryScale, y: point.y * boundaryScale }))
+    : []
+  const center = polygon.length ? { x: polygon.reduce((sum, point) => sum + point.x, 0) / polygon.length, y: polygon.reduce((sum, point) => sum + point.y, 0) / polygon.length } : { x: plotWidth / 2, y: plotLength / 2 }
+  for (let index = 0; index < 14; index += 1) {
+    candidate = { ...candidate, x: center.x, y: center.y }
+    if (siteFitsBoundary(candidate, plotWidth, plotLength, boundary, boundaryScale)) return candidate
+    candidate = { ...candidate, width: round4((candidate.width ?? baseWidth) * 0.8), length: round4((candidate.length ?? baseLength) * 0.8) }
+  }
+  return { ...candidate, x: round4(Math.min(plotWidth, Math.max(0, center.x))), y: round4(Math.min(plotLength, Math.max(0, center.y))) }
+}
+
+function findSiteItemPosition(
+  item: AssistantSiteItem,
+  plotWidth: number,
+  plotLength: number,
+  boundary: SiteBoundary | undefined,
+  boundaryScale: number,
+  buildings: Building[],
+  existingItems: AssistantSiteItem[],
+  rooms: Room[],
+): Vec2 | null {
+  const centers = Array.from({ length: 33 * 33 }, (_, index) => ({ x: plotWidth * ((index % 33) / 32), y: plotLength * (Math.floor(index / 33) / 32) }))
+  centers.sort((a, b) => Math.hypot(a.x - item.x, a.y - item.y) - Math.hypot(b.x - item.x, b.y - item.y))
+  const obstacles = buildings.map((building) => building.footprint ? polygonBounds(building.footprint.vertices) : null).filter((bounds): bounds is NonNullable<typeof bounds> => Boolean(bounds))
+  if (!buildings.some((building) => building.role === 'primary' && (building.footprint?.vertices.length ?? 0) >= 3) && rooms.length) obstacles.push({ minX: Math.min(...rooms.map((room) => room.rect.x)), minY: Math.min(...rooms.map((room) => room.rect.y)), maxX: Math.max(...rooms.map((room) => room.rect.x + room.rect.w)), maxY: Math.max(...rooms.map((room) => room.rect.y + room.rect.h)) })
+  const siteObstacles = existingItems.map((site) => polygonBounds(siteCorners(site))).filter((bounds): bounds is NonNullable<typeof bounds> => Boolean(bounds))
+  for (const center of centers) {
+    const candidate = { ...item, x: center.x, y: center.y }
+    const bounds = polygonBounds(siteCorners(candidate))
+    if (!bounds || !siteFitsBoundary(candidate, plotWidth, plotLength, boundary, boundaryScale)) continue
+    if (obstacles.some((other) => boundsOverlap(bounds, other, 0.5)) || siteObstacles.some((other) => boundsOverlap(bounds, other, 0.25))) continue
+    return center
+  }
+  return null
 }
 function siteColor(kind: string): string { return kind === 'car' ? '#53677e' : kind === 'person' ? '#455f87' : kind === 'road' ? '#555b62' : kind === 'path' ? '#c9c4b9' : kind === 'fence' || kind === 'gate' ? '#6c6254' : '#4f8a3f' }
 function issueKey(issue: PlanIssue) { return `${issue.code}|${issue.roomId ?? ''}|${issue.message}` }

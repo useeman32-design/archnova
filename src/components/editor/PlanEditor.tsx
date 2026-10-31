@@ -204,14 +204,14 @@ export function PlanEditor() {
       return
     }
     if (tool === 'trees') {
-      ctx.addTreeAt(point, variant.kind, { width: variant.w, length: variant.h })
+      ctx.addTreeAt(point, variant.kind, { width: variant.w, length: variant.h }, variant.assetId)
       return
     }
     const room = roomAt(point)
     if (!room) return
     if (tool === 'door') ctx.addOpening(room.id, 'door', variant.label, { width: variant.w, height: variant.h }, point)
     if (tool === 'window') ctx.addOpening(room.id, 'window', variant.label, { width: variant.w, height: variant.h }, point)
-    if (tool === 'interior' && variant.item) ctx.placeInterior(room.id, variant.item, point)
+    if (tool === 'interior' && variant.item) ctx.placeInterior(room.id, variant.item, point, variant.assetId)
   }
 
   const handleRoomClick = (room: Room, point?: Vec2) => {
@@ -219,7 +219,7 @@ export function PlanEditor() {
       const { tool, variant } = ctx.pending
       if (tool === 'door') return ctx.addOpening(room.id, 'door', variant.label, { width: variant.w, height: variant.h }, point)
       if (tool === 'window') return ctx.addOpening(room.id, 'window', variant.label, { width: variant.w, height: variant.h }, point)
-      if (tool === 'interior' && variant.item) return ctx.placeInterior(room.id, variant.item, point)
+      if (tool === 'interior' && variant.item) return ctx.placeInterior(room.id, variant.item, point, variant.assetId)
     }
     ctx.selectRoom(room.id === selectedRoomId ? null : room.id)
   }
@@ -365,6 +365,7 @@ export function PlanEditor() {
             wallThicknesses={wallThicknesses}
             plot={{ width: project.plot.width, length: project.plot.length }}
             siteBoundary={project.site?.boundary}
+            buildingFootprints={(project.buildings ?? []).filter((building) => building.role !== 'primary' && Boolean(building.footprint)).map((building) => ({ id: building.id, name: building.name, role: building.role, footprint: building.footprint! }))}
             boundaryEditMode={boundaryEditMode}
             boundaryDraft={boundaryDraft}
             boundaryDraftEdgeLabels={boundaryEdgeLabels}

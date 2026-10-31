@@ -14,8 +14,9 @@ export function AssetsPage() {
       navigate('/projects/new')
       return
     }
-    // Deep-link into the workspace with the asset armed as a pending placement.
-    navigate(`/workspace/${latest.id}?add=${asset.id}`)
+    // Model IDs arm a placement; material IDs switch the workspace preview finish.
+    const query = asset.assetKind === 'material' ? `material=${encodeURIComponent(asset.id)}` : `add=${encodeURIComponent(asset.id)}`
+    navigate(`/workspace/${latest.id}?${query}`)
   }
 
   return (

@@ -161,10 +161,12 @@ export type OutdoorFeature =
 
 export type FinishOption = 'render' | 'paint' | 'brick' | 'stone' | 'wood' | 'glass' | 'tile' | 'marble' | 'concrete' | 'carpet' | 'terrazzo' | 'metal'
 
-export type SiteElementKind = 'palm' | 'conifer' | 'shrub' | 'flower' | 'hedge' | 'car' | 'person' | 'fence' | 'gate' | 'street-light' | 'path' | 'road'
+export type SiteElementKind = 'palm' | 'conifer' | 'shrub' | 'flower' | 'hedge' | 'car' | 'person' | 'fence' | 'gate' | 'street-light' | 'path' | 'road' | 'tree' | 'bench' | 'outdoor-set' | 'decor'
 
 export interface LandscapeItem extends Vec2 {
   id: string
+  /** Stable imported model catalog ID; omitted for legacy/parametric site objects. */
+  assetId?: string
   kind?: SiteElementKind | string
   rotation: number
   scale: number
@@ -176,6 +178,8 @@ export interface LandscapeItem extends Vec2 {
 
 export interface PlacedItem {
   id: string
+  /** Stable imported model catalog ID; old projects omit this and keep procedural rendering. */
+  assetId?: string
   item: string
   /** Room-relative normalized floor position; center is 0, 0. */
   x: number

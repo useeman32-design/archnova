@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { OrbitControls, TransformControls, Edges } from '@react-three/drei'
-import { CanvasTexture, DoubleSide, RepeatWrapping, SRGBColorSpace, Shape, type Mesh, type Object3D } from 'three'
-import type { ArchitecturalWall, FinishOption, PlacedItem, Project, Room, SiteVertex, WallOpening } from '@/types'
+import { CanvasTexture, DoubleSide, ExtrudeGeometry, RepeatWrapping, SRGBColorSpace, Shape, type Mesh, type Object3D } from 'three'
+import type { ArchitecturalWall, Building, FinishOption, LandscapeItem, PlacedItem, Project, Room, SiteBoundary, SiteVertex, WallOpening } from '@/types'
 import { getFloorArchitecturalModel, wallLength, wallSolidSections, type WallThicknessSettings } from '@/lib/architecturalModel'
 import { canonicalFurnitureKey, getFurnitureDimensions } from '@/lib/furniture'
+import { pointInPolygon } from '@/lib/siteGeometry'
+import { RealAssetModel } from '@/components/assets/RealAssetModel'
+import { PbrSurfaceMaterial, pbrIdForFinish, SITE_PBR_ID } from '@/components/3d-viewer/PbrSurfaceMaterial'
+import { REAL_MODELS } from '@/data/realAssets'
 
 /**
  * React Three Fiber scene for the massing preview.
@@ -63,7 +67,7 @@ export interface MassingCanvasProps {
   onResizeLive?: (id: string, w: number, h: number) => void
   onEditBegin?: () => void
   onEditEnd?: () => void
-  ornaments?: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string; width?: number; length?: number }[]
+  ornaments?: LandscapeItem[]
   placed?: Record<string, PlacedItem[]>
   selectedItemId?: string | null
   onSelectItem?: (id: string | null) => void
@@ -72,7 +76,8 @@ export interface MassingCanvasProps {
   onSelectSite?: (id: string | null) => void
   onUpdateSiteLive?: (id: string, x: number, y: number, scale: number) => void
   pendingItem?: string | null
-  onPlaceInterior?: (item: string) => void
+  pendingAssetId?: string | null
+  onPlaceInterior?: (item: string, assetId?: string) => void
 }
 
 export default function MassingCanvas(props: MassingCanvasProps) {
@@ -93,13 +98,30 @@ export default function MassingCanvas(props: MassingCanvasProps) {
   }, [selectedId])
 
   const rooms = useMemo(() => project.floors.flatMap((floor) => floor.rooms), [project.floors])
-  const sceneTarget = useMemo<[number, number, number]>(() => {
-    const bounds = rooms.length ? {
-      minX: Math.min(...rooms.map((room) => room.rect.x)), minY: Math.min(...rooms.map((room) => room.rect.y)),
-      maxX: Math.max(...rooms.map((room) => room.rect.x + room.rect.w)), maxY: Math.max(...rooms.map((room) => room.rect.y + room.rect.h)),
-    } : { minX: 0, minY: 0, maxX: project.plot.width, maxY: project.plot.length }
-    return [((bounds.minX + bounds.maxX) / 2 - project.plot.width / 2) * S, 0.6, ((bounds.minY + bounds.maxY) / 2 - project.plot.length / 2) * S]
-  }, [rooms, project.plot.width, project.plot.length])
+  const siteBounds = useMemo(() => {
+    const points: { x: number; y: number }[] = rooms.flatMap((room) => [
+      { x: room.rect.x, y: room.rect.y }, { x: room.rect.x + room.rect.w, y: room.rect.y + room.rect.h },
+    ])
+    for (const building of project.buildings ?? []) if (building.role !== 'primary') points.push(...(building.footprint?.vertices ?? []))
+    for (const site of props.ornaments ?? []) {
+      const width = (site.width ?? 3) * site.scale, length = (site.length ?? 3) * site.scale
+      const halfW = Math.abs(Math.cos(site.rotation)) * width / 2 + Math.abs(Math.sin(site.rotation)) * length / 2
+      const halfL = Math.abs(Math.sin(site.rotation)) * width / 2 + Math.abs(Math.cos(site.rotation)) * length / 2
+      points.push({ x: site.x - halfW, y: site.y - halfL }, { x: site.x + halfW, y: site.y + halfL })
+    }
+    if (!points.length) return { minX: 0, minY: 0, maxX: project.plot.width, maxY: project.plot.length }
+    return {
+      minX: Math.min(0, ...points.map((point) => point.x)), minY: Math.min(0, ...points.map((point) => point.y)),
+      maxX: Math.max(project.plot.width, ...points.map((point) => point.x)), maxY: Math.max(project.plot.length, ...points.map((point) => point.y)),
+    }
+  }, [rooms, project.buildings, project.plot.width, project.plot.length, props.ornaments])
+  const sceneTarget = useMemo<[number, number, number]>(() => [
+    ((siteBounds.minX + siteBounds.maxX) / 2 - project.plot.width / 2) * S,
+    0.6,
+    ((siteBounds.minY + siteBounds.maxY) / 2 - project.plot.length / 2) * S,
+  ], [siteBounds, project.plot.width, project.plot.length])
+  const sceneWidth = Math.max(project.plot.width, siteBounds.maxX - siteBounds.minX)
+  const sceneLength = Math.max(project.plot.length, siteBounds.maxY - siteBounds.minY)
   const selectedRoom = rooms.find((r) => r.id === selectedId) ?? null
 
   useEffect(() => {
@@ -154,7 +176,7 @@ export default function MassingCanvas(props: MassingCanvasProps) {
       camera={mode === 'interior' ? { position: [0, 0.5, 0.01], fov: 70 } : { position: [sceneTarget[0] + 5.4, 4.2, sceneTarget[2] + 6.4], fov: 42 }}
       onPointerMissed={() => { onSelectRoom?.(null); props.onSelectSite?.(null); props.onSelectItem?.(null) }}
     >
-      <CameraController mode={mode} topDown={topDown} target={sceneTarget} plotWidth={project.plot.width} plotLength={project.plot.length} orbitRef={orbitRef} />
+      <CameraController mode={mode} topDown={topDown} target={sceneTarget} plotWidth={sceneWidth} plotLength={sceneLength} orbitRef={orbitRef} />
       {mode === 'interior' ? (
         <InteriorScene
           rooms={rooms}
@@ -169,6 +191,7 @@ export default function MassingCanvas(props: MassingCanvasProps) {
           selectedItemId={props.selectedItemId ?? null}
           onSelectItem={props.onSelectItem}
           pendingItem={props.pendingItem ?? null}
+          pendingAssetId={props.pendingAssetId ?? null}
           onPlaceInterior={props.onPlaceInterior}
         />
       ) : (
@@ -309,7 +332,7 @@ function ExteriorScene({
   siteRefs: React.MutableRefObject<Map<string, Object3D>>
   selectedSiteId: string | null
   onSelectSite?: (id: string | null) => void
-  ornaments: { id: string; x: number; y: number; kind?: string; rotation: number; scale: number; color: string; width?: number; length?: number }[]
+  ornaments: LandscapeItem[]
   placed: Record<string, PlacedItem[]>
   selectedItemId: string | null
   onSelectItem?: (id: string | null) => void
@@ -358,6 +381,7 @@ function ExteriorScene({
           <Edges color="#0f766e" threshold={1} />
         </mesh>
       ) : null}
+      {(project.buildings ?? []).filter((building) => building.role !== 'primary' && (building.footprint?.vertices.length ?? 0) >= 3).map((building) => <SiteBuildingMass key={building.id} building={building} plotWidth={plotW} plotLength={plotL} siteBoundary={project.site?.boundary} />)}
 
       {project.floors.flatMap((floor) =>
         floor.rooms.map((room) => {
@@ -413,15 +437,19 @@ function ExteriorScene({
         return <group key={`top-items-${room.id}`} position={[cx, floorY, cz]}>
           {items.map((item) => {
             const defaults = getFurnitureDimensions(item.item, room.units)
+            const height = item.height ?? defaults.height
+            const ceilingMounted = REAL_MODELS.some((asset) => asset.id === item.assetId && asset.placement === 'ceiling')
             return <group
               key={item.id}
               ref={(obj) => { if (obj) itemRefs.current.set(item.id, obj); else itemRefs.current.delete(item.id) }}
-              position={[item.x * room.rect.w * S, 0, item.z * room.rect.h * S]}
+              position={[item.x * room.rect.w * S, ceilingMounted ? WALL_H - height * S : 0, item.z * room.rect.h * S]}
               rotation={[0, item.rotation, 0]}
               scale={item.scale}
               onClick={(event) => { event.stopPropagation(); onSelectItem?.(item.id) }}
             >
-              <FurniturePiece item={item.item} width={item.width ?? defaults.width} depth={item.depth ?? defaults.depth} height={item.height ?? defaults.height} color={item.color} />
+              {item.assetId
+                ? <RealAssetModel assetId={item.assetId} targetWorldSize={[(item.width ?? defaults.width) * S, (item.height ?? defaults.height) * S, (item.depth ?? defaults.depth) * S]} />
+                : <FurniturePiece item={item.item} width={item.width ?? defaults.width} depth={item.depth ?? defaults.depth} height={item.height ?? defaults.height} color={item.color} />}
               {selectedItemId === item.id ? <Edges color="#1a56f5" /> : null}
             </group>
           })}
@@ -430,9 +458,17 @@ function ExteriorScene({
 
       {ornaments.map((site) => {
         const [sx, sz] = toWorld(site.x, site.y)
+        const scaledWidth = (site.width ?? 3) * site.scale, scaledLength = (site.length ?? 3) * site.scale
+        const halfW = Math.abs(Math.cos(site.rotation)) * scaledWidth / 2 + Math.abs(Math.sin(site.rotation)) * scaledLength / 2
+        const halfL = Math.abs(Math.sin(site.rotation)) * scaledWidth / 2 + Math.abs(Math.cos(site.rotation)) * scaledLength / 2
+        const footprintCorners = [{ x: -halfW, y: -halfL }, { x: halfW, y: -halfL }, { x: halfW, y: halfL }, { x: -halfW, y: halfL }].map((point) => ({ x: site.x + point.x, y: site.y + point.y }))
+        const boundaryVertices = project.site?.boundary && project.site.boundary.status !== 'unknown' ? project.site.boundary.vertices : []
+        const overflow = footprintCorners.some((point) => point.x < 0 || point.y < 0 || point.x > plotW || point.y > plotL)
+          || (boundaryVertices.length >= 3 && footprintCorners.some((point) => !pointInPolygon(point, boundaryVertices)))
         return <group key={site.id} ref={(obj) => { if (obj) siteRefs.current.set(site.id, obj); else siteRefs.current.delete(site.id) }} position={[sx, 0, sz]} rotation={[0, site.rotation, 0]} scale={site.scale} onClick={(event) => { event.stopPropagation(); onSelectSite?.(site.id) }}>
           {site.id === selectedSiteId ? <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}><ringGeometry args={[0.28, 0.34, 28]} /><meshBasicMaterial color="#1a56f5" /></mesh> : null}
-          <SiteObject kind={site.kind} color={site.color} width={(site.width ?? 3) * S} length={(site.length ?? 3) * S} />
+          <SiteObject kind={site.kind} assetId={site.assetId} sourceWorldScale={S * (project.plot.units === 'ft' ? 3.28084 : 1)} color={site.color} width={(site.width ?? 3) * S} length={(site.length ?? 3) * S} />
+          {overflow ? <mesh position={[0, 0.05, 0]}><boxGeometry args={[(site.width ?? 3) * S + 0.12, 0.06, (site.length ?? 3) * S + 0.12]} /><meshBasicMaterial color="#dc2626" transparent opacity={0} /><Edges color="#dc2626" threshold={2} /></mesh> : null}
         </group>
       })}
 
@@ -443,6 +479,36 @@ function ExteriorScene({
       ) : null}
     </>
   )
+}
+
+function SiteBuildingMass({ building, plotWidth, plotLength, siteBoundary }: { building: Building; plotWidth: number; plotLength: number; siteBoundary?: SiteBoundary }) {
+  const footprint = building.footprint
+  const height = Math.max(1, building.floors.length) * (WALL_H + SLAB)
+  const geometry = useMemo(() => {
+    const vertices = footprint?.vertices ?? []
+    if (vertices.length < 3) return null
+    const shape = new Shape()
+    vertices.forEach((point, index) => {
+      const x = (point.x - plotWidth / 2) * S
+      const y = -(point.y - plotLength / 2) * S
+      if (index === 0) shape.moveTo(x, y)
+      else shape.lineTo(x, y)
+    })
+    shape.closePath()
+    return new ExtrudeGeometry(shape, { depth: height, bevelEnabled: false, curveSegments: 1 })
+  }, [footprint, plotWidth, plotLength, height])
+  useEffect(() => () => geometry?.dispose(), [geometry])
+  if (!geometry) return null
+  const vertices = footprint?.vertices ?? []
+  const boundaryVertices = siteBoundary && siteBoundary.status !== 'unknown' ? siteBoundary.vertices : []
+  const overflow = vertices.some((point) => point.x < 0 || point.y < 0 || point.x > plotWidth || point.y > plotLength)
+    || (boundaryVertices.length >= 3 && vertices.some((point) => !pointInPolygon(point, boundaryVertices)))
+  const color = overflow ? '#fecaca' : building.role === 'service' ? '#e6c59a' : building.role === 'other' ? '#cbd5e1' : '#b8c7e0'
+  const edgeColor = overflow ? '#dc2626' : building.role === 'service' ? '#9a5b16' : '#425c82'
+  return <mesh geometry={geometry} position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
+    <meshStandardMaterial color={color} roughness={0.82} />
+    <Edges color={edgeColor} threshold={8} />
+  </mesh>
 }
 
 function ExteriorWall({
@@ -478,9 +544,7 @@ function ExteriorWall({
   const validOpenings = openings
 .filter((opening) => opening.offset >= 0 && opening.width > 0 && opening.offset + opening.width <= length && opening.sillHeight >= 0 && opening.sillHeight + opening.height <= height / scale)
     .sort((a, b) => a.offset - b.offset)
-  const material = wall.kind === 'exterior'
-    ? <meshStandardMaterial map={wallTexture} color={wallColor} roughness={exteriorFinish === 'metal' ? 0.32 : exteriorFinish === 'glass' ? 0.18 : 0.82} metalness={exteriorFinish === 'metal' ? 0.48 : 0} />
-    : <meshStandardMaterial color="#e4e0d6" roughness={0.86} />
+  const pbrMaterialId = wall.kind === 'exterior' ? pbrIdForFinish(exteriorFinish) : null
   const sections = wallSolidSections({ ...wall, height: height / scale }, validOpenings)
 
   return (
@@ -488,7 +552,11 @@ function ExteriorWall({
       {sections.map((part, index) => (
         <mesh key={`wall-${wall.id}-${index}`} position={[(part.offsetStart + part.offsetEnd) * scale / 2 - length * scale / 2, (part.elevationStart + part.elevationEnd) * scale / 2, 0]} castShadow receiveShadow>
           <boxGeometry args={[(part.offsetEnd - part.offsetStart) * scale, (part.elevationEnd - part.elevationStart) * scale, thickness]} />
-          {material}
+          {pbrMaterialId
+            ? <PbrSurfaceMaterial materialId={pbrMaterialId} repeat={2.4} color={wallColor} />
+            : wall.kind === 'exterior'
+              ? <meshStandardMaterial map={wallTexture} color={wallColor} roughness={exteriorFinish === 'metal' ? 0.32 : exteriorFinish === 'glass' ? 0.18 : 0.82} metalness={exteriorFinish === 'metal' ? 0.48 : 0} />
+              : <meshStandardMaterial color="#e4e0d6" roughness={0.86} />}
         </mesh>
       ))}
       {validOpenings.map((opening) => (
@@ -601,9 +669,10 @@ function makeRoomShape(room: Room, scale: number): Shape {
   return shape
 }
 
-function SiteObject({ kind = 'palm', color, width, length }: { kind?: string; color: string; width: number; length: number }) {
+function SiteObject({ kind = 'palm', assetId, sourceWorldScale = 1, color, width, length }: { kind?: string; assetId?: string; sourceWorldScale?: number; color: string; width: number; length: number }) {
+  if (assetId) return <RealAssetModel assetId={assetId} sourceWorldScale={sourceWorldScale} />
   if (kind === 'road' || kind === 'path') return <group>
-    <mesh position={[0, 0.012, 0]} receiveShadow><boxGeometry args={[width, 0.022, length]} /><meshStandardMaterial color={kind === 'road' ? '#555a61' : '#c9c3b7'} roughness={0.95} /></mesh>
+    <mesh position={[0, 0.012, 0]} receiveShadow><boxGeometry args={[width, 0.022, length]} /><PbrSurfaceMaterial materialId={kind === 'road' ? SITE_PBR_ID.asphalt : SITE_PBR_ID.paving} repeat={4} roughness={0.92} color={kind === 'road' ? '#ffffff' : '#e7e4dd'} /></mesh>
     {kind === 'road' ? <mesh position={[0, 0.025, 0]}><boxGeometry args={[0.025, 0.004, length * 0.78]} /><meshStandardMaterial color="#e6d89e" /></mesh> : null}
   </group>
   if (kind === 'fence') {
@@ -745,6 +814,7 @@ function InteriorScene({
   selectedItemId,
   onSelectItem,
   pendingItem,
+  pendingAssetId,
   onPlaceInterior,
 }: {
   rooms: Room[]
@@ -756,7 +826,8 @@ function InteriorScene({
   selectedItemId: string | null
   onSelectItem?: (id: string | null) => void
   pendingItem: string | null
-  onPlaceInterior?: (item: string) => void
+  pendingAssetId: string | null
+  onPlaceInterior?: (item: string, assetId?: string) => void
 }) {
   const room = useMemo(() => {
     if (selected) return selected
@@ -778,6 +849,7 @@ function InteriorScene({
 
   if (!room || !roomFloorShape) return null
   const items = placed[room.id] ?? room.items ?? []
+  const hasCeilingFixture = items.some((item) => REAL_MODELS.some((asset) => asset.id === item.assetId && asset.placement === 'ceiling'))
 
   return (
     <>
@@ -794,16 +866,18 @@ function InteriorScene({
         onClick={(event) => {
           if (!pendingItem) return
           event.stopPropagation()
-          onPlaceInterior?.(pendingItem)
+          onPlaceInterior?.(pendingItem, pendingAssetId ?? undefined)
         }}
       >
         <shapeGeometry args={[roomFloorShape]} />
-        <meshStandardMaterial map={floorTexture ?? undefined} color={room.finishColor ?? '#ffffff'} roughness={finish === 'marble' || finish === 'glass' ? 0.18 : finish === 'tile' ? 0.28 : finish === 'carpet' ? 0.96 : 0.72} metalness={finish === 'metal' ? 0.45 : 0} />
+        {pbrIdForFinish(finish)
+          ? <PbrSurfaceMaterial materialId={pbrIdForFinish(finish)!} repeat={2.2} color={room.finishColor ?? '#ffffff'} />
+          : <meshStandardMaterial map={floorTexture ?? undefined} color={room.finishColor ?? '#ffffff'} roughness={finish === 'marble' || finish === 'glass' ? 0.18 : finish === 'tile' ? 0.28 : finish === 'carpet' ? 0.96 : 0.72} metalness={finish === 'metal' ? 0.45 : 0} />}
       </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, WALL_H + 0.006, 0]}>
+      {!hasCeilingFixture ? <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, WALL_H + 0.006, 0]}>
         <shapeGeometry args={[roomFloorShape]} />
         <meshStandardMaterial color="#f4f1ea" roughness={0.9} side={2} />
-      </mesh>
+      </mesh> : null}
 
       {/* The room cutaway uses the same wall/opening graph as the 2D plan and exterior model. */}
       {roomWalls.map((wall) => (

@@ -1,3 +1,5 @@
+import { REAL_MODELS } from './realAssets'
+
 /**
  * ArchNova tool library — the categories and variants behind the editor's
  * left tool drawer (Photoshop/Corel-style). Variants carry default sizes so
@@ -15,8 +17,12 @@ export interface ToolVariant {
   label?: string
   /** Interior item key matched by the 3D interior builder. */
   item?: string
-  /** Tree ornament kind. */
+  /** Tree or site-object kind. */
   kind?: string
+  /** Stable ID of a verified imported model. */
+  assetId?: string
+  /** Optional local architectural product preview for site-tool variants. */
+  previewImage?: string
 }
 
 export interface ToolCategory {
@@ -134,92 +140,36 @@ export const TOOL_GROUPS: ToolGroup[] = [
   {
     tool: 'interior',
     title: 'Interior items',
-    blurb: 'Place furniture into a room — it also appears in the 3D interior.',
-    categories: [
-      {
-        id: 'int_living',
-        label: 'Living',
-        variants: [
-          { id: 'in_sofa', name: '3-seat Sofa', icon: 'Sofa', item: 'sofa' },
-          { id: 'in_armchair', name: 'Armchair', icon: 'Armchair', item: 'armchair' },
-          { id: 'in_tv', name: 'TV Stand', icon: 'Monitor', item: 'tv' },
-          { id: 'in_lamp', name: 'Floor Lamp', icon: 'Lamp', item: 'lamp' },
-          { id: 'in_chair', name: 'Dining Chair', icon: 'Armchair', item: 'chair' },
-          { id: 'in_table', name: 'Coffee Table', icon: 'Box', item: 'coffee-table' },
-          { id: 'in_ac', name: 'Wall AC Unit', icon: 'Box', item: 'ac' },
-          { id: 'in_fan', name: 'Ceiling Fan', icon: 'Lamp', item: 'fan' },
-          { id: 'in_bulb', name: 'Ceiling Light', icon: 'Lamp', item: 'bulb' },
-        ],
-      },
-      {
-        id: 'int_bed',
-        label: 'Bedroom',
-        variants: [
-          { id: 'in_bed', name: 'Double Bed', icon: 'BedDouble', item: 'bed' },
-          { id: 'in_wardrobe', name: 'Wardrobe', icon: 'Box', item: 'wardrobe' },
-          { id: 'in_bedside', name: 'Bedside Table', icon: 'Table', item: 'bedside-table' },
-        ],
-      },
-      {
-        id: 'int_kitchen',
-        label: 'Kitchen & dining',
-        variants: [
-          { id: 'in_cabinet', name: 'Cabinet Run', icon: 'UtensilsCrossed', item: 'kitchen' },
-          { id: 'in_island', name: 'Kitchen Island', icon: 'PanelTop', item: 'island' },
-          { id: 'in_sink', name: 'Kitchen Sink', icon: 'Waves', item: 'sink' },
-          { id: 'in_cooker', name: 'Cooker / Hob', icon: 'CookingPot', item: 'cooker' },
-          { id: 'in_fridge', name: 'Refrigerator', icon: 'Refrigerator', item: 'fridge' },
-          { id: 'in_dining', name: 'Dining Table', icon: 'Utensils', item: 'dining' },
-          { id: 'in_chairs', name: 'Dining Chair', icon: 'Armchair', item: 'chair' },
-        ],
-      },
-      {
-        id: 'int_bath',
-        label: 'Bath & office',
-        variants: [
-          { id: 'in_bath', name: 'Bathtub', icon: 'Bath', item: 'bath' },
-          { id: 'in_shower', name: 'Shower', icon: 'Waves', item: 'shower' },
-          { id: 'in_washbasin', name: 'Washbasin', icon: 'Waves', item: 'washbasin' },
-          { id: 'in_toilet', name: 'Toilet', icon: 'Box', item: 'toilet' },
-          { id: 'in_desk', name: 'Study Desk', icon: 'Laptop', item: 'desk' },
-        ],
-      },
-      {
-        id: 'int_utility',
-        label: 'Laundry & garage',
-        variants: [
-          { id: 'in_washer', name: 'Washer', icon: 'Box', item: 'washer' },
-          { id: 'in_dryer', name: 'Dryer', icon: 'Box', item: 'dryer' },
-          { id: 'in_car', name: 'Vehicle footprint', icon: 'Car', item: 'vehicle-footprint' },
-          { id: 'in_shelf', name: 'Storage rack', icon: 'Box', item: 'storage-rack' },
-        ],
-      },
-    ],
+    blurb: 'Place verified imported furniture, appliance and lighting models; each keeps its stable catalog ID in the project.',
+    categories: [{
+      id: 'real-interior-models',
+      label: 'Imported models',
+      variants: REAL_MODELS.filter((asset) => asset.category === 'interior' && asset.itemKey).map((asset) => ({
+        id: asset.id, name: asset.name, icon: asset.icon, item: asset.itemKey, assetId: asset.id,
+      })),
+    }],
   },
   {
     tool: 'trees',
     title: 'Site & landscape',
-    blurb: 'Place trees, cars, fences, gates, lights, paths and roads at the clicked plot location.',
-    categories: [
-      {
-        id: 'trees',
-        label: 'Site objects',
-        variants: [
-          { id: 'tr_palm', name: 'Palm Tree', icon: 'TreePalm', kind: 'palm' },
-          { id: 'tr_conifer', name: 'Conifer', icon: 'TreePine', kind: 'conifer' },
-          { id: 'tr_shrub', name: 'Shrub Bed', icon: 'Sprout', kind: 'shrub' },
-          { id: 'tr_flower', name: 'Flower Bed', icon: 'Flower2', kind: 'flower' },
-          { id: 'tr_hedge', name: 'Hedge Row', icon: 'Trees', kind: 'hedge' },
-          { id: 'site_car', name: 'Parked Car', icon: 'Car', kind: 'car', w: 7, h: 14 },
-          { id: 'site_person', name: 'Person Scale Figure', icon: 'Armchair', kind: 'person' },
-          { id: 'site_fence', name: 'Fence Segment', icon: 'Fence', kind: 'fence', w: 0.35, h: 10 },
-          { id: 'site_gate', name: 'Compound Gate', icon: 'DoorClosed', kind: 'gate', w: 12, h: 0.5 },
-          { id: 'site_light', name: 'Street Light', icon: 'Lamp', kind: 'street-light' },
-          { id: 'site_path', name: 'Footpath Segment', icon: 'Box', kind: 'path', w: 4, h: 24 },
-          { id: 'site_road', name: 'Road Segment', icon: 'Box', kind: 'road', w: 16, h: 60 },
-        ],
-      },
-    ],
+    blurb: 'Use imported catalog models for detailed objects and editable parametric systems for roads, paths, gates and fences.',
+    categories: [{
+      id: 'site-models-and-systems',
+      label: 'Site assets',
+      variants: [
+        ...REAL_MODELS.filter((asset) => asset.category === 'trees' || asset.category === 'objects').map((asset) => ({
+          id: asset.id,
+          name: asset.name,
+          icon: asset.icon,
+          assetId: asset.id,
+          kind: asset.itemKey === 'tree' ? 'tree' : asset.itemKey,
+        })),
+        { id: 'site_fence', name: 'Dimension-driven Fence Segment', icon: 'Fence', kind: 'fence', w: 0.35, h: 10, previewImage: `${import.meta.env.BASE_URL}previews/site-fence.jpg` },
+        { id: 'site_gate', name: 'Dimension-driven Compound Gate', icon: 'DoorClosed', kind: 'gate', w: 12, h: 0.5 },
+        { id: 'site_path', name: 'Dimension-driven Footpath Segment', icon: 'Box', kind: 'path', w: 4, h: 24, previewImage: `${import.meta.env.BASE_URL}previews/site-path.jpg` },
+        { id: 'site_road', name: 'Dimension-driven Road Segment', icon: 'Box', kind: 'road', w: 16, h: 60, previewImage: `${import.meta.env.BASE_URL}previews/site-road.jpg` },
+      ],
+    }],
   },
 ]
 
@@ -229,46 +179,31 @@ export interface PendingPlacement {
   variant: ToolVariant
 }
 
-import { ASSETS } from './assets'
+import { ASSETS, type AssetItem } from './assets'
 
-export const ASSET_LOOKUP: Record<string, { id: string; name: string; category: string }> =
-  Object.fromEntries(ASSETS.map((a) => [a.id, { id: a.id, name: a.name, category: a.category }]))
+export const ASSET_LOOKUP: Record<string, AssetItem> = Object.fromEntries(ASSETS.map((asset) => [asset.id, asset]))
 
-/** Maps an asset-library record to a placeable tool variant (where possible). */
-export function variantFromAsset(asset: {
-  id: string
-  name: string
-  category: string
-}): PendingPlacement | null {
-  const name = asset.name
-  if (asset.category === 'interior') {
-    const item = name.toLowerCase().includes('sofa') ? 'sofa'
-      : name.toLowerCase().includes('armchair') ? 'armchair'
-      : name.toLowerCase().includes('bed') ? 'bed'
-      : name.toLowerCase().includes('wardrobe') ? 'wardrobe'
-      : name.toLowerCase().includes('tv') ? 'tv'
-      : name.toLowerCase().includes('desk') ? 'desk'
-      : name.toLowerCase().includes('kitchen') ? 'kitchen'
-      : name.toLowerCase().includes('refrigerator') ? 'fridge'
-      : name.toLowerCase().includes('lamp') ? 'lamp'
-      : name.toLowerCase().includes('bathtub') ? 'bath'
-      : name.toLowerCase().includes('dining') ? 'dining'
-      : 'sofa'
-    return { tool: 'interior', variant: { id: `as_${asset.id}`, name, icon: 'Sofa', item } }
+/** Only real catalog IDs or explicit editable parametric systems resolve here. */
+export function variantFromAsset(asset: AssetItem): PendingPlacement | null {
+  if (asset.assetKind === 'material') return null
+  const variant = { id: `as_${asset.id}`, name: asset.name, icon: asset.icon, assetId: asset.assetKind === 'model' ? asset.id : undefined }
+  if (asset.assetKind === 'model' && asset.category === 'interior' && asset.itemKey) {
+    return { tool: 'interior', variant: { ...variant, item: asset.itemKey } }
   }
-  if (asset.category === 'trees') {
-    const kind = name.toLowerCase().includes('palm') ? 'palm'
-      : name.toLowerCase().includes('conifer') ? 'conifer'
-      : name.toLowerCase().includes('shrub') ? 'shrub'
-      : name.toLowerCase().includes('flower') ? 'flower'
-      : 'hedge'
-    return { tool: 'trees', variant: { id: `as_${asset.id}`, name, icon: 'TreePine', kind } }
+  if (asset.assetKind === 'model' && (asset.category === 'trees' || asset.category === 'objects')) {
+    const kind = asset.itemKey === 'tree' ? 'tree'
+      : asset.itemKey === 'bench' ? 'bench'
+      : asset.itemKey === 'street-light' ? 'street-light'
+      : asset.itemKey === 'outdoor-set' ? 'outdoor-set'
+      : asset.itemKey === 'decor' ? 'decor'
+      : 'site-object'
+    return { tool: 'trees', variant: { ...variant, kind } }
   }
-  if (asset.category === 'objects') {
-    const lower = name.toLowerCase()
-    if (lower.includes('gate')) return { tool: 'door', variant: { id: `as_${asset.id}`, name, icon: 'Fence', label: name } }
-    if (lower.includes('door')) return { tool: 'door', variant: { id: `as_${asset.id}`, name, icon: 'DoorOpen', label: name } }
-    if (lower.includes('window')) return { tool: 'window', variant: { id: `as_${asset.id}`, name, icon: 'AppWindow', label: name } }
+  if (asset.assetKind === 'parametric') {
+    if (asset.parametricTool === 'door' || asset.parametricTool === 'window') {
+      return { tool: asset.parametricTool, variant: { ...variant, label: asset.name } }
+    }
+    if (asset.parametricTool === 'trees') return { tool: 'trees', variant: { ...variant, kind: asset.name.toLowerCase().includes('gate') ? 'gate' : 'fence' } }
   }
   return null
 }

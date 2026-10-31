@@ -19,14 +19,16 @@ describe('Groq assistant client', () => {
       unsupported: ['An upper floor needs a separate design workflow.'],
     })
     const chunks = [...streamedPlan].map((token) => `data: ${JSON.stringify({ choices: [{ delta: { content: token } }] })}\n`).join('')
-    const fetchMock = vi.fn().mockResolvedValue(new Response(`${chunks}data: [DONE]\n`, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
+    const completion = `data: ${JSON.stringify({ id: 'req-test', model: DEFAULT_GROQ_MODEL, choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 22, completion_tokens: 10, total_tokens: 32 } })}\n`
+    const fetchMock = vi.fn().mockResolvedValue(new Response(`${chunks}${completion}data: [DONE]\n`, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
     vi.stubGlobal('fetch', fetchMock)
     const project = createProjectFromForm(defaultNewProjectForm())
     const progress = vi.fn()
+    const debug = vi.fn()
     const plan = await requestAssistantPlan({
       apiKey: 'gsk-test-user-key', model: DEFAULT_GROQ_MODEL,
       context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
-      history: [], prompt: 'Add a study to this project.', onProgress: progress,
+      history: [], prompt: 'Add a study to this project.', onProgress: progress, onDebug: debug,
     })
     expect(fetchMock).toHaveBeenCalledOnce()
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
@@ -44,6 +46,10 @@ describe('Groq assistant client', () => {
     expect(plan.actions).toEqual([{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 9, x: 2, y: 3 } }])
     expect(plan.unsupported).toEqual(['An upper floor needs a separate design workflow.'])
     expect(progress).toHaveBeenCalledWith(expect.stringContaining('Groq is'))
+    expect(debug).toHaveBeenCalledWith(expect.objectContaining({
+      stage: 'initial.completion-metadata', status: 'success',
+      details: expect.objectContaining({ responseId: 'req-test', model: DEFAULT_GROQ_MODEL, finishReason: 'stop', receivedDoneMarker: true, contentCharacters: streamedPlan.length, usage: { prompt_tokens: 22, completion_tokens: 10, total_tokens: 32 } }),
+    }))
   })
 
   it('retries a direct edit once when Groq replies conversationally without an operation', async () => {
@@ -70,6 +76,57 @@ describe('Groq assistant client', () => {
     expect(debug).toHaveBeenCalledWith(expect.objectContaining({ stage: 'action-recovery.normalized-plan', status: 'success', details: expect.objectContaining({ outcome: 'proposal-ready' }) }))
     expect(debug).toHaveBeenCalledWith(expect.objectContaining({ stage: 'assistant.result', status: 'success', details: expect.objectContaining({ outcome: 'proposal-ready-after-retry' }) }))
     expect(JSON.stringify(debug.mock.calls)).not.toContain('secret-test-key')
+  })
+
+  it('recovers once from malformed JSON on a direct design request', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const jsonResponse = (content: string) => new Response(JSON.stringify({ id: 'req-malformed', model: DEFAULT_GROQ_MODEL, choices: [{ message: { content }, finish_reason: 'stop' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse('{"reply":"I can add a study", "actions": ['))
+      .mockResolvedValueOnce(jsonResponse(JSON.stringify({ reply: 'I prepared a study proposal.', actions: [{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 10 } }] })))
+    vi.stubGlobal('fetch', fetchMock)
+    const debug = vi.fn()
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [], prompt: 'Add a study room.', onDebug: debug,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(plan.actions).toEqual([{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 10 } }])
+    expect(debug).toHaveBeenCalledWith(expect.objectContaining({ stage: 'initial.parse-failed', status: 'error' }))
+    expect(debug).toHaveBeenCalledWith(expect.objectContaining({ stage: 'action-recovery.normalized-plan', status: 'success' }))
+  })
+
+  it('recovers from an empty HTTP 200 completion on a direct design request', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const recovery = new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ reply: 'I prepared a study proposal.', actions: [{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 10 } }] }) } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response('', { status: 200, headers: { 'Content-Type': 'application/json' } })).mockResolvedValueOnce(recovery)
+    vi.stubGlobal('fetch', fetchMock)
+    const debug = vi.fn()
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [], prompt: 'Add a study room.', onDebug: debug,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(plan.actions).toHaveLength(1)
+    expect(debug).toHaveBeenCalledWith(expect.objectContaining({ stage: 'initial.completion-metadata', status: 'warning', details: expect.objectContaining({ contentCharacters: 0 }) }))
+  })
+
+  it('normalizes a distinct multi-floor building placement as a separate site action', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const planText = JSON.stringify({
+      reply: 'I will add the surgery block.',
+      actions: [{ type: 'add_building', name: 'Surgery Block', purpose: { category: 'institutional', use: 'hospital surgery' }, role: 'secondary', width: 42, length: 30, floorCount: 3 }],
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: planText } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: 'ft' },
+      history: [], prompt: 'Add a separate hospital surgery block.',
+    })
+    expect(plan.actions).toEqual([{ type: 'add_building', name: 'Surgery Block', purpose: { category: 'institutional', use: 'hospital surgery' }, role: 'secondary', width: 42, length: 30, floorCount: 3 }])
+    expect(plan.reply).toMatch(/distinct building footprint/i)
   })
 
   it('normalizes a room-by-room create_house response and uses room defaults for omitted dimensions', async () => {
@@ -147,6 +204,27 @@ describe('Groq assistant client', () => {
     expect(retryBody.messages).toHaveLength(3)
   })
 
+  it('does not mistake a tokens-per-minute 429 for a compact-context retry', async () => {
+    vi.useFakeTimers()
+    const limited = () => new Response(JSON.stringify({ error: { message: 'Rate limit reached on tokens per minute (TPM). Try again later.' } }), { status: 429, headers: { 'Retry-After': '0.001' } })
+    const fetchMock = vi.fn().mockImplementation(limited)
+    vi.stubGlobal('fetch', fetchMock)
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const pending = requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [], prompt: 'Add a path near the entrance.',
+    })
+    const rejection = expect(pending).rejects.toThrow(/rate limit or quota/i)
+    await vi.advanceTimersByTimeAsync(2)
+    await vi.advanceTimersByTimeAsync(2)
+    await rejection
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(JSON.parse(String((init as RequestInit).body)).max_completion_tokens).toBe(1400)
+    }
+  })
+
   it('retries transient rate limits twice and reports retry progress', async () => {
     vi.useFakeTimers()
     const success = new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ reply: 'Done.', actions: [] }) } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -196,7 +274,8 @@ describe('Groq assistant client', () => {
       wallThicknesses: { exterior: 0.75 },
       actions: [
         { type: 'set_wall_thickness', kind: 'interior', value: 0.375 },
-        { type: 'add_site_item', kind: 'palm', x: 5, y: 6, rotationDegrees: 45 },
+        { type: 'add_site_item', assetId: 'ph_model_quiver_tree_02', x: 5, y: 6, rotationDegrees: 45 },
+        { type: 'add_furniture', room: 'Living Room', assetId: 'ph_model_modern_arm_chair_01' },
         { type: 'add_furniture', room: 'Living Room', item: 'imaginary-teleporter' },
       ],
     })
@@ -209,7 +288,8 @@ describe('Groq assistant client', () => {
     })
     expect(plan.actions).toEqual([
       { type: 'set_wall_thickness', kind: 'interior', value: 0.375 },
-      { type: 'add_site_item', kind: 'palm', x: 5, y: 6, rotationDegrees: 45 },
+      { type: 'add_site_item', kind: 'tree', assetId: 'ph_model_quiver_tree_02', x: 5, y: 6, rotationDegrees: 45 },
+      { type: 'add_furniture', room: 'Living Room', item: 'armchair', assetId: 'ph_model_modern_arm_chair_01' },
     ])
     expect(plan.project?.location).toBe('Lagos')
     expect(plan.project?.preferences?.outdoor).toEqual(['garden'])

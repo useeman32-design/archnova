@@ -4,7 +4,7 @@ import { formatArea } from '@/lib/format'
 import { roomArea } from '@/lib/floorPlan'
 import { canonicalFurnitureKey, getFurnitureDimensions } from '@/lib/furniture'
 import { getFloorArchitecturalModel, pointAlongWall, wallLength, type WallThicknessSettings } from '@/lib/architecturalModel'
-import { describeSiteEdgeLabel, findSiteEdgeLabel, siteEdgeLength } from '@/lib/siteGeometry'
+import { describeSiteEdgeLabel, findSiteEdgeLabel, pointInPolygon, polygonBounds, siteEdgeLength } from '@/lib/siteGeometry'
 
 /**
  * CAD-style 2D plan renderer.
@@ -44,6 +44,7 @@ export interface FloorPlanDiagramProps {
   /** Plot extents keep an empty, start-from-scratch project drawable. */
   plot?: { width: number; length: number }
   siteBoundary?: SiteBoundary
+  buildingFootprints?: { id: string; name: string; role: string; footprint: SiteBoundary }[]
   boundaryEditMode?: boolean
   boundaryDraft?: SiteVertex[]
   boundaryDraftEdgeLabels?: SiteEdgeLabel[]
@@ -88,6 +89,7 @@ export function FloorPlanDiagram({
   wallThicknesses,
   plot,
   siteBoundary,
+  buildingFootprints = [],
   boundaryEditMode = false,
   boundaryDraft = [],
   boundaryDraftEdgeLabels = [],
@@ -134,13 +136,28 @@ export function FloorPlanDiagram({
   const buildingMinY = hasRooms ? Math.min(...rooms.map((room) => room.rect.y)) : 0
   const buildingMaxX = hasRooms ? Math.max(...rooms.map((room) => room.rect.x + room.rect.w)) : 0
   const buildingMaxY = hasRooms ? Math.max(...rooms.map((room) => room.rect.y + room.rect.h)) : 0
+  const overflowPoints = [
+    ...buildingFootprints.flatMap((building) => building.footprint.vertices),
+    ...trees.flatMap((tree) => {
+      const width = (tree.width ?? (tree.kind === 'car' ? 7 : 3)) * tree.scale
+      const length = (tree.length ?? (tree.kind === 'car' ? 14 : 3)) * tree.scale
+      const halfW = Math.abs(Math.cos(tree.rotation)) * width / 2 + Math.abs(Math.sin(tree.rotation)) * length / 2
+      const halfL = Math.abs(Math.sin(tree.rotation)) * width / 2 + Math.abs(Math.cos(tree.rotation)) * length / 2
+      return [{ x: tree.x - halfW, y: tree.y - halfL }, { x: tree.x + halfW, y: tree.y + halfL }]
+    }),
+  ]
+  const overflowBounds = polygonBounds(overflowPoints)
+  const viewMinX = Math.min(minX, overflowBounds?.minX ?? minX)
+  const viewMinY = Math.min(minY, overflowBounds?.minY ?? minY)
+  const viewMaxX = Math.max(maxX, overflowBounds?.maxX ?? maxX)
+  const viewMaxY = Math.max(maxY, overflowBounds?.maxY ?? maxY)
 
   const padX = 12
   const padY = 20
-  const vbX = minX - padX
-  const vbY = minY - padY
-  const vbW = maxX - minX + padX * 2
-  const vbH = maxY - minY + padY * 2
+  const vbX = viewMinX - padX
+  const vbY = viewMinY - padY
+  const vbW = viewMaxX - viewMinX + padX * 2
+  const vbH = viewMaxY - viewMinY + padY * 2
 
   useLayoutEffect(() => {
     if (!hasContent) return
@@ -379,6 +396,23 @@ export function FloorPlanDiagram({
           opacity="0.7"
         />
       ) : null}
+      {buildingFootprints.map((building) => {
+        const vertices = building.footprint.vertices
+        if (vertices.length < 3) return null
+        const withinEnvelope = vertices.every((point) => !plot || (point.x >= 0 && point.y >= 0 && point.x <= plot.width && point.y <= plot.length))
+        const boundaryPolygon = siteBoundary && siteBoundary.status !== 'unknown' && siteBoundary.vertices.length >= 3 ? siteBoundary.vertices : null
+        const withinDefinedBoundary = !boundaryPolygon || vertices.every((point) => pointInPolygon(point, boundaryPolygon))
+        const overflow = !withinEnvelope || !withinDefinedBoundary
+        const center = { x: vertices.reduce((sum, point) => sum + point.x, 0) / vertices.length, y: vertices.reduce((sum, point) => sum + point.y, 0) / vertices.length }
+        const fill = overflow ? 'rgba(220,38,38,0.12)' : building.role === 'service' ? 'rgba(245,158,11,0.13)' : 'rgba(37,99,235,0.12)'
+        const stroke = overflow ? '#dc2626' : building.role === 'service' ? '#b45309' : '#2563eb'
+        return <g key={building.id} aria-label={`${building.name} separate building footprint`}>
+          <polygon points={vertices.map((point) => `${point.x},${point.y}`).join(' ')} fill={fill} stroke={stroke} strokeWidth={u(1.25)} strokeDasharray={overflow ? `${u(2.5)} ${u(1.5)}` : undefined} strokeLinejoin="round">
+            <title>{`${building.name} · ${building.role} building${overflow ? ' · outside plot boundary' : ''}`}</title>
+          </polygon>
+          <text x={center.x} y={center.y} textAnchor="middle" dominantBaseline="middle" fontSize={u(7)} fontWeight={700} fill={overflow ? '#b91c1c' : stroke} stroke="white" strokeWidth={u(2.5)} paintOrder="stroke" pointerEvents="none">{building.name}{overflow ? ' · OUTSIDE' : ''}</text>
+        </g>
+      })}
       {canRenderEdgeLabels ? (
         <g aria-label="Plot edge labels" pointerEvents="none">
           {edgeLabelVertices.map((vertex, index) => {
@@ -686,6 +720,14 @@ export function FloorPlanDiagram({
         const length = (tree.length ?? (tree.kind === 'car' ? 14 : 3)) * tree.scale
         const radius = Math.max(width, length) / 2
         const angle = tree.rotation * 180 / Math.PI
+        const footprintCorners = [{ x: -width / 2, y: -length / 2 }, { x: width / 2, y: -length / 2 }, { x: width / 2, y: length / 2 }, { x: -width / 2, y: length / 2 }].map((point) => ({
+          x: tree.x + point.x * Math.cos(tree.rotation) - point.y * Math.sin(tree.rotation),
+          y: tree.y + point.x * Math.sin(tree.rotation) + point.y * Math.cos(tree.rotation),
+        }))
+        const outsideEnvelope = Boolean(plot && footprintCorners.some((point) => point.x < 0 || point.y < 0 || point.x > plot.width || point.y > plot.length))
+        const boundaryVertices = siteBoundary && siteBoundary.status !== 'unknown' && siteBoundary.vertices.length >= 3 ? siteBoundary.vertices : null
+        const outsideBoundary = Boolean(boundaryVertices && footprintCorners.some((point) => !pointInPolygon(point, boundaryVertices)))
+        const overflow = outsideEnvelope || outsideBoundary
         return (
           <g key={tree.id} style={{ cursor: selected ? 'move' : 'pointer' }} onClick={(event) => { event.stopPropagation(); onSelectTree?.(tree.id) }} onPointerDown={(event) => startTreeDrag(event, tree, 'move')} onPointerMove={moveTreeDrag} onPointerUp={endTreeDrag} onPointerCancel={endTreeDrag} aria-label={`Select ${tree.kind ?? 'landscape object'}`}>
             <g transform={`translate(${tree.x} ${tree.y}) rotate(${angle})`} opacity={0.96}>
@@ -700,6 +742,15 @@ export function FloorPlanDiagram({
                   <line x1={-width / 2} y1={length * 0.28} x2={width / 2} y2={length * 0.28} stroke="#e7dfd3" strokeWidth={u(0.35)} />
                   {Array.from({ length: Math.max(2, Math.floor(length / 1.5)) }, (_, index) => <line key={index} x1={-width / 2} y1={-length / 2 + (index + 0.5) * length / Math.max(2, Math.floor(length / 1.5))} x2={width / 2} y2={-length / 2 + (index + 0.5) * length / Math.max(2, Math.floor(length / 1.5))} stroke="#f5f1e9" strokeWidth={u(0.18)} />)}
                 </> : <line x1={0} y1={-length / 2} x2={0} y2={length / 2} stroke="#d7c7a4" strokeWidth={u(0.25)} />}
+              </> : tree.kind === 'bench' ? <>
+                <rect x={-width / 2} y={-length / 2} width={width} height={length} rx={u(0.25)} fill="#8b6849" stroke={selected ? '#1a56f5' : '#584331'} strokeWidth={u(0.5)} />
+                {[-0.28, 0, 0.28].map((factor) => <line key={factor} x1={-width * 0.42} y1={length * factor} x2={width * 0.42} y2={length * factor} stroke="#d6bc98" strokeWidth={u(0.18)} />)}
+              </> : tree.kind === 'outdoor-set' ? <>
+                <circle cx={0} cy={0} r={Math.min(width, length) * 0.2} fill="#b79870" stroke="#6d5740" strokeWidth={u(0.5)} />
+                {[[-0.32,-0.32],[0.32,-0.32],[-0.32,0.32],[0.32,0.32]].map(([x,y]) => <circle key={`${x}-${y}`} cx={x * width} cy={y * length} r={Math.min(width,length) * 0.11} fill="#66725b" stroke="#424d3c" strokeWidth={u(0.35)} />)}
+              </> : tree.kind === 'decor' ? <>
+                <circle cx={0} cy={0} r={radius} fill="#d8d3ca" stroke={selected ? '#1a56f5' : '#77716a'} strokeWidth={u(0.7)} />
+                <path d={`M ${-radius*0.5} ${radius*0.25} Q 0 ${-radius*0.8} ${radius*0.5} ${radius*0.25} Q 0 ${radius*0.65} ${-radius*0.5} ${radius*0.25}`} fill="#918d86" stroke="#5b5852" strokeWidth={u(0.35)} />
               </> : tree.kind === 'street-light' ? <>
                 <circle cx={0} cy={0} r={width * 0.65} fill={selected ? '#dbeafe' : '#fff3be'} stroke={selected ? '#1a56f5' : '#8b7447'} strokeWidth={u(0.7)} />
                 <path d={`M 0 ${length / 2} L 0 ${-length * 0.25} Q 0 ${-length / 2} ${width} ${-length / 2}`} fill="none" stroke="#4b5563" strokeWidth={u(0.5)} />
@@ -715,6 +766,7 @@ export function FloorPlanDiagram({
                 <circle cx={0} cy={0} r={radius + 0.35} fill={selected ? '#dbeafe' : '#dbeccd'} stroke={selected ? '#1a56f5' : '#7fa668'} strokeWidth={selected ? u(1.4) : u(0.8)} />
                 <circle cx={0} cy={0} r={radius} fill={tree.color} stroke="#47643c" strokeWidth={u(0.5)} />
               </>}
+              {overflow ? <g pointerEvents="none"><rect x={-width / 2 - u(0.8)} y={-length / 2 - u(0.8)} width={width + u(1.6)} height={length + u(1.6)} fill="none" stroke="#dc2626" strokeWidth={u(1.2)} strokeDasharray={`${u(1.5)} ${u(0.9)}`} /><text x={0} y={-length / 2 - u(1.8)} textAnchor="middle" fontSize={u(2.2)} fontWeight={700} fill="#b91c1c" stroke="white" strokeWidth={u(0.8)} paintOrder="stroke">OUTSIDE PLOT</text></g> : null}
               {selected ? <rect x={-width / 2 - u(1)} y={-length / 2 - u(1)} width={width + u(2)} height={length + u(2)} fill="none" stroke="#1a56f5" strokeDasharray={`${u(1.5)} ${u(1)}`} /> : null}
             </g>
             {selected ? <circle cx={tree.x + width / 2} cy={tree.y + length / 2} r={u(3.2)} fill="#1a56f5" stroke="white" strokeWidth={u(1)} style={{ cursor: 'nwse-resize' }} onPointerDown={(event) => startTreeDrag(event, tree, 'resize')} onPointerMove={moveTreeDrag} onPointerUp={endTreeDrag} onPointerCancel={endTreeDrag} /> : null}
