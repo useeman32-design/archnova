@@ -42,7 +42,7 @@ function IconToggle({
 }
 
 const TOOL_HINTS: Record<string, string> = {
-  select: 'Select tool: click a room to edit, drag it to move, pull the blue handle to resize. Ctrl+Z undo · Ctrl+Shift+Z redo.',
+  select: 'Select tool: click and drag rooms, separately recorded building blocks, or site items to move them. Pull a room’s blue handle to resize. Ctrl+Z undo · Ctrl+Shift+Z redo.',
   pan: 'Pan: drag the canvas to move around.',
   measure: 'Measure: click two points to read a distance · click again to start over.',
 }
@@ -65,6 +65,8 @@ export function PlanEditor() {
   const [newRouteAccessId, setNewRouteAccessId] = useState('')
   const [newRouteTargetKey, setNewRouteTargetKey] = useState('')
   const [routeDrawingId, setRouteDrawingId] = useState<string | null>(null)
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null)
+  const [selectedInteriorFloor, setSelectedInteriorFloor] = useState(1)
   const [showPlanCheck, setShowPlanCheck] = useState(false)
   const planIssues = useMemo(() => {
     const roomIssues = validatePlan(
@@ -88,6 +90,13 @@ export function PlanEditor() {
   const planErrorCount = planIssues.filter((issue) => issue.severity === 'error').length
   const entranceBuildings = (project.buildings ?? []).filter((building) => building.footprint && building.footprint.status !== 'unknown' && building.footprint.vertices.length >= 3)
   const routeTargets = entranceBuildings.flatMap((building) => (building.entrances ?? []).map((entrance) => ({ building, entrance, key: JSON.stringify([building.id, entrance.id]) })))
+  const interiorBuildings = (project.buildings ?? []).filter((building) => building.role !== 'primary' && building.footprint && building.footprint.vertices.length >= 3)
+  const activeInteriorBuilding = interiorBuildings.find((building) => building.id === selectedBuildingId) ?? interiorBuildings[0]
+  const activeInteriorFloor = activeInteriorBuilding?.floors.find((floor) => floor.level === selectedInteriorFloor) ?? activeInteriorBuilding?.floors[0]
+  const buildingInteriorPlan = activeInteriorBuilding && activeInteriorFloor ? {
+    buildingId: activeInteriorBuilding.id, buildingName: activeInteriorBuilding.name,
+    floorLevel: activeInteriorFloor.level, floorName: activeInteriorFloor.name, rooms: activeInteriorFloor.rooms,
+  } : null
   const resolvedSiteRoutes = useMemo(() => (project.site?.routes ?? []).flatMap((route) => {
     const points = resolveSiteRoutePoints(route, project.site, project.buildings ?? [], project.plot.units)
     if (!points) return []
@@ -115,6 +124,8 @@ export function PlanEditor() {
     setBoundaryEditMode(false)
     setBoundaryDraft([])
     setRouteDrawingId(null)
+    setSelectedBuildingId(null)
+    setSelectedInteriorFloor(1)
     setNewRouteAccessId('')
     setNewRouteTargetKey('')
   }, [project.id])
@@ -174,6 +185,12 @@ export function PlanEditor() {
       next.push({ id: existing?.id ?? uid('building-entrance'), fromVertexId, toVertexId, fraction, type })
     }
     ctx.updateBuildingEntrances(buildingId, next)
+  }
+  const selectInteriorBuilding = (buildingId: string) => {
+    setSelectedBuildingId(buildingId || null)
+    const building = interiorBuildings.find((item) => item.id === buildingId)
+    setSelectedInteriorFloor(building?.floors[0]?.level ?? 1)
+    ctx.selectRoom(null)
   }
   const patchSiteRoute = (routeId: string, patch: Partial<SiteRoute>) => {
     const routes = project.site?.routes ?? []
@@ -314,6 +331,7 @@ export function PlanEditor() {
       if (tool === 'window') return ctx.addOpening(room.id, 'window', variant.label, { width: variant.w, height: variant.h }, point)
       if (tool === 'interior' && variant.item) return ctx.placeInterior(room.id, variant.item, point, variant.assetId)
     }
+    setSelectedBuildingId(null)
     ctx.selectRoom(room.id === selectedRoomId ? null : room.id)
   }
 
@@ -477,6 +495,16 @@ export function PlanEditor() {
       </details>
 
       <details className="shrink-0 border-b border-line bg-surface px-4 py-2">
+        <summary className="cursor-pointer text-[12px] font-semibold text-ink-text">Block interiors ({interiorBuildings.reduce((count, building) => count + building.floors.reduce((floorCount, floor) => floorCount + floor.rooms.length, 0), 0)} rooms)</summary>
+        <p className="mt-1 text-[10.5px] text-muted">Secondary blocks can store rooms, openings, and catalog furniture on each recorded floor. Choose a block and floor to preview its room layout on the 2D site plan; the 3D massing view includes its floors, walls, and openings. These remain conceptual designs.</p>
+        {interiorBuildings.length ? <div className="mt-2 flex flex-wrap items-end gap-2">
+          <label className="grid gap-1 text-[10px] text-muted"><span>Building block</span><select aria-label="Interior building block" value={activeInteriorBuilding?.id ?? ''} onChange={(event) => selectInteriorBuilding(event.target.value)} className="min-w-36 rounded-md border border-line bg-white px-2 py-1.5 text-[11px]">{interiorBuildings.map((building) => <option key={building.id} value={building.id}>{building.name} · {building.role}</option>)}</select></label>
+          <label className="grid gap-1 text-[10px] text-muted"><span>Floor</span><select aria-label="Interior building floor" value={activeInteriorFloor?.level ?? ''} onChange={(event) => setSelectedInteriorFloor(Number(event.target.value))} className="min-w-28 rounded-md border border-line bg-white px-2 py-1.5 text-[11px]">{activeInteriorBuilding?.floors.map((floor) => <option key={floor.id} value={floor.level}>{floor.name}</option>)}</select></label>
+        </div> : <p className="mt-2 text-[10.5px] text-muted">Add a separately recorded building block first. The primary building continues to use the existing room editor.</p>}
+        {activeInteriorBuilding && activeInteriorFloor ? activeInteriorFloor.rooms.length ? <ul className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-3">{activeInteriorFloor.rooms.map((room) => <li key={room.id} className="rounded-md border border-line-soft bg-canvas-soft/50 px-2 py-1 text-[10.5px] text-ink-text"><span className="font-medium">{room.name}</span> · {room.category}<span className="block text-[9.5px] text-muted">{room.rect.w} × {room.rect.h} {room.units} · {(room.elements ?? []).filter((element) => element.type === 'door' || element.type === 'window').length} openings · {(room.items ?? []).length} items</span></li>)}</ul> : <p className="mt-2 text-[10.5px] text-muted">No rooms on this floor yet. Ask the assistant to add rooms to “{activeInteriorBuilding.name}”, naming the floor, then review and apply the proposal.</p> : null}
+      </details>
+
+      <details className="shrink-0 border-b border-line bg-surface px-4 py-2">
         <summary className="cursor-pointer text-[12px] font-semibold text-ink-text">Site circulation routes ({project.site?.routes?.length ?? 0})</summary>
         <p className="mt-1 text-[10.5px] text-muted">Create a conceptual connection between a chosen plot access point and an explicitly marked entrance. The initial segment is direct; add user-drawn bends on the plan. This is not survey geometry, a legal-access check, or code compliance.</p>
         {project.site?.accessPoints?.length && routeTargets.length ? <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-line-soft bg-canvas-soft/50 p-2">
@@ -536,6 +564,10 @@ export function PlanEditor() {
             siteAccessPoints={boundaryEditMode ? boundaryAccessPoints : project.site?.accessPoints}
             siteRoutes={resolvedSiteRoutes}
             buildingFootprints={(project.buildings ?? []).filter((building) => building.role !== 'primary' && Boolean(building.footprint)).map((building) => ({ id: building.id, name: building.name, role: building.role, footprint: building.footprint!, entrances: building.entrances ?? [] }))}
+            buildingInterior={buildingInteriorPlan}
+            selectedBuildingId={selectedBuildingId}
+            onSelectBuilding={(id) => { if (id) selectInteriorBuilding(id); else setSelectedBuildingId(null) }}
+            onMoveBuilding={ctx.moveBuildingFootprint}
             boundaryEditMode={boundaryEditMode}
             boundaryDraft={boundaryDraft}
             boundaryDraftEdgeLabels={boundaryEdgeLabels}

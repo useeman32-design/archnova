@@ -121,6 +121,20 @@ export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssista
     }
 
     if (action.type === 'add_room') {
+      if (action.building) {
+        const building = resolveBuilding(buildings, action.building)
+        if (!building) { errors.push(`I couldn't identify one building matching “${action.building}”. Use its exact name or ID.`); break }
+        const floorLevel = action.floor ?? 1
+        const floor = building.floors.find((candidate) => candidate.level === floorLevel)
+        if (!floor) { errors.push(`${building.name} has no recorded floor ${floorLevel}.`); break }
+        if (!building.footprint || building.footprint.vertices.length < 3) { errors.push(`${building.name} has no explicit footprint for an interior room placement.`); break }
+        const room = makeRoomInsideFootprint(action.room, floor.rooms, building.footprint, units, floorLevel)
+        if (!room) { errors.push(`Could not fit ${action.room.name} inside ${building.name}, floor ${floorLevel}, without leaving the footprint or overlapping another room.`); break }
+        buildings = buildings.map((candidate) => candidate.id === building.id ? { ...candidate, floors: candidate.floors.map((item) => item.level === floorLevel ? { ...item, rooms: [...item.rooms, room] } : item) } : candidate)
+        buildingsChanged = true
+        appliedCount += 1
+        continue
+      }
       const room = makeRoom(action.room, rooms, plotWidth, plotLength, units)
       if (!room) { errors.push(`Could not find a clear plot position for ${action.room.name}.`); break }
       rooms.push(room)
@@ -224,6 +238,62 @@ export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssista
         const x = action.x ?? site.x, y = action.y ?? site.y
         ornaments = ornaments.map((candidate) => candidate.id === site.id ? { ...candidate, x: round4(x), y: round4(y), ...(action.rotationDegrees !== undefined ? { rotation: action.rotationDegrees * Math.PI / 180 } : {}), ...(action.scale !== undefined ? { scale: action.scale } : {}), ...(action.width !== undefined ? { width: action.width } : {}), ...(action.length !== undefined ? { length: action.length } : {}), ...(action.color ? { color: action.color } : {}) } : candidate)
       }
+      appliedCount += 1
+      continue
+    }
+
+    if ((action.type === 'add_opening' || action.type === 'add_furniture') && action.building) {
+      const building = resolveBuilding(buildings, action.building)
+      if (!building) { errors.push(`I couldn't identify one building matching “${action.building}”. Use its exact name or ID.`); break }
+      const floorLevel = action.floor ?? 1
+      const floor = building.floors.find((candidate) => candidate.level === floorLevel)
+      if (!floor) { errors.push(`${building.name} has no recorded floor ${floorLevel}.`); break }
+      const room = resolveRoom(floor.rooms, action.room)
+      if (!room) { errors.push(`I couldn't identify a unique room matching “${action.room}” in ${building.name}, floor ${floorLevel}.`); break }
+      let nextRooms = floor.rooms
+      if (action.type === 'add_opening') {
+        const width = action.width ?? (units === 'ft' ? (action.kind === 'door' ? 3 : 4) : (action.kind === 'door' ? 0.9 : 1.2))
+        const height = action.height ?? (units === 'ft' ? (action.kind === 'door' ? 7 : 4) : (action.kind === 'door' ? 2.1 : 1.2))
+        const currentWalls = getFloorArchitecturalModel(floor.rooms, floor.walls, floor.openings, wallThicknesses).walls
+        const requestedWall = action.wall ? resolveHostWall(currentWalls, room, action.wall) : undefined
+        if (action.wall && !requestedWall) { errors.push(`Could not identify host wall “${action.wall}” in ${room.name}.`); break }
+        const placement = requestedWall
+          ? { wallId: requestedWall.id, offset: action.offset ?? Math.max(0, (Math.hypot(requestedWall.end.x - requestedWall.start.x, requestedWall.end.y - requestedWall.start.y) - width) / 2) }
+          : findAvailableOpeningPosition(floor.rooms, room.id, action.kind, width)
+        if (!placement) { errors.push(`No free wall segment in ${room.name} fits a ${width} ${units} ${action.kind}.`); break }
+        const element: Element = {
+          id: `ai-${crypto.randomUUID()}`,
+          type: action.kind,
+          label: action.label ?? (action.kind === 'door' ? 'Door' : 'Window'),
+          width, height, wallId: placement.wallId, offset: placement.offset,
+          position: { x: 0, y: 0 },
+          doorStyle: action.kind === 'door' ? normalizeDoorStyle(action.style) : undefined,
+          windowStyle: action.kind === 'window' ? normalizeWindowStyle(action.style) : undefined,
+          openingDirection: action.direction ?? 'inward', hingeSide: action.hingeSide ?? 'left',
+          sillHeight: action.kind === 'door' ? 0 : Math.max(0, action.sillHeight ?? (units === 'ft' ? 3 : 0.9)),
+          color: action.color ?? (action.kind === 'door' ? '#8a6a48' : '#9fd4ee'),
+        }
+        nextRooms = floor.rooms.map((candidate) => candidate.id === room.id ? { ...candidate, elements: [...candidate.elements, element] } : candidate)
+        const candidateModel = getFloorArchitecturalModel(nextRooms, undefined, undefined, wallThicknesses)
+        const issue = validateOpenings(candidateModel.walls, candidateModel.openings).find((item) => item.severity === 'error' && item.openingId === element.id)
+        if (issue) { errors.push(issue.message); break }
+      } else {
+        const asset = action.assetId ? REAL_MODELS.find((candidate) => candidate.id === action.assetId && candidate.category === 'interior') : null
+        if (!asset?.itemKey || !asset.dimensionsM) { errors.push(`No imported GLTF model is registered for ${action.item}; the assistant will not substitute procedural furniture.`); break }
+        const unitFactor = room.units === 'ft' ? 3.28084 : 1
+        const defaults = { width: asset.dimensionsM[0] * unitFactor, depth: asset.dimensionsM[1] * unitFactor, height: asset.dimensionsM[2] * unitFactor }
+        const dimensions = { width: action.width ?? defaults.width, depth: action.depth ?? defaults.depth, height: action.height ?? defaults.height }
+        const current = room.items ?? []
+        const position = findFurniturePosition(room, current, dimensions)
+        if (!position) { errors.push(`No clear floor area in ${room.name} can fit ${action.item}.`); break }
+        const item: PlacedItem = { id: `ai-${crypto.randomUUID()}`, assetId: asset.id, item: canonicalFurnitureKey(asset.itemKey), x: position.x, z: position.y, rotation: 0, scale: 1, ...dimensions, color: furnitureColor(asset.itemKey) }
+        nextRooms = floor.rooms.map((candidate) => candidate.id === room.id ? { ...candidate, items: [...current, item] } : candidate)
+        const model = getFloorArchitecturalModel(nextRooms, undefined, undefined, wallThicknesses)
+        const issue = validateFurniture({ ...room, items: [...current, item] }, [...current, item], model.openings, model.walls).find((candidate) => candidate.severity === 'error')
+        if (issue) { errors.push(issue.message); break }
+      }
+      buildings = buildings.map((candidate) => candidate.id === building.id ? { ...candidate, floors: candidate.floors.map((item) => item.level === floorLevel ? { ...item, rooms: nextRooms } : item) } : candidate)
+      buildingsChanged = true
       appliedCount += 1
       continue
     }
@@ -398,7 +468,7 @@ export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssista
   }
   const baselineWarnings = new Set(beforeIssues.filter((issue) => issue.severity === 'warning').map(issueKey))
   let warnings = [...new Set([...afterIssues.filter((issue) => issue.severity === 'warning' && !baselineWarnings.has(issueKey(issue))).map((issue) => issue.message), ...operationWarnings])]
-  const createdOrRemovedRoom = plan.actions.some((action) => action.type === 'create_house' || action.type === 'add_room' || action.type === 'remove_room')
+  const createdOrRemovedRoom = plan.actions.some((action) => action.type === 'create_house' || (action.type === 'add_room' && !action.building) || action.type === 'remove_room')
   if (createdOrRemovedRoom && !plan.project?.bedrooms && !(plan.project && 'bedrooms' in plan.project)) projectPatch.bedrooms = rooms.filter((room) => room.category === 'bedroom').length
   if (createdOrRemovedRoom && !plan.project?.bathrooms && !(plan.project && 'bathrooms' in plan.project)) projectPatch.bathrooms = rooms.filter((room) => room.category === 'bathroom').length
   if (buildingsChanged || plotFactor !== 1) {
@@ -467,6 +537,38 @@ function makeRoom(spec: AssistantRoomSpec, existing: Room[], plotWidth: number, 
   }
 }
 
+function makeRoomInsideFootprint(spec: AssistantRoomSpec, existing: Room[], footprint: SiteBoundary, units: Units, floorLevel: number): Room | null {
+  const width = round1(spec.width), length = round1(spec.length)
+  const bounds = polygonBounds(footprint.vertices)
+  if (!bounds || footprint.vertices.length < 3 || !(width > 0 && length > 0) || width > bounds.maxX - bounds.minX || length > bounds.maxY - bounds.minY) return null
+  const fits = (x: number, y: number) => {
+    const corners = [{ x, y }, { x: x + width, y }, { x: x + width, y: y + length }, { x, y: y + length }]
+    if (!corners.every((point) => pointInPolygon(point, footprint.vertices))) return false
+    return !existing.some((room) => x < room.rect.x + room.rect.w - 0.01 && x + width > room.rect.x + 0.01 && y < room.rect.y + room.rect.h - 0.01 && y + length > room.rect.y + 0.01)
+  }
+  let position: Vec2 | null = null
+  if (spec.x !== undefined || spec.y !== undefined) {
+    if (spec.x === undefined || spec.y === undefined || !fits(spec.x, spec.y)) return null
+    position = { x: spec.x, y: spec.y }
+  } else {
+    const columns = 24, rows = 24
+    for (let row = 0; row <= rows && !position; row += 1) {
+      const y = round1(bounds.minY + (bounds.maxY - bounds.minY - length) * row / rows)
+      for (let column = 0; column <= columns; column += 1) {
+        const x = round1(bounds.minX + (bounds.maxX - bounds.minX - width) * column / columns)
+        if (fits(x, y)) { position = { x, y }; break }
+      }
+    }
+  }
+  if (!position) return null
+  return {
+    id: `ai-room-${crypto.randomUUID()}`, name: spec.name, category: spec.category, width, length, units,
+    rect: { x: round1(position.x), y: round1(position.y), w: width, h: length },
+    shape: 'rectangle', outline: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }],
+    level: floorLevel, furniture: [], elements: [], items: [],
+  }
+}
+
 function outlineForShape(shape: 'rectangle' | 'L' | 'T' | 'U'): Vec2[] {
   const presets: Record<typeof shape, Vec2[]> = {
     rectangle: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }],
@@ -488,6 +590,15 @@ function findRoomPosition(width: number, length: number, rooms: Room[], plotWidt
     }
   }
   return null
+}
+
+function resolveBuilding(buildings: Building[], query: string): Building | null {
+  const key = normalize(query)
+  const exact = buildings.filter((building) => normalize(building.id) === key || normalize(building.name) === key)
+  if (exact.length === 1) return exact[0]
+  if (exact.length > 1) return null
+  const matches = buildings.filter((building) => normalize(building.name).includes(key) || key.includes(normalize(building.name)))
+  return matches.length === 1 ? matches[0] : null
 }
 
 function resolveRoom(rooms: Room[], query: string): Room | null {
@@ -537,12 +648,26 @@ function convertBuildingUnits(building: Building, factor: number, units: Units):
   if (factor === 1) return building
   return {
     ...building,
-    floors: building.floors.map((floor) => ({ ...floor, rooms: floor.rooms.map((room) => convertRoomUnits(room, units)) })),
+    floors: building.floors.map((floor) => ({
+      ...floor,
+      rooms: floor.rooms.map((room) => convertRoomUnits(room, units)),
+      ...(floor.walls ? { walls: floor.walls.map((wall) => ({
+        ...wall,
+        start: { x: round4(wall.start.x * factor), y: round4(wall.start.y * factor) },
+        end: { x: round4(wall.end.x * factor), y: round4(wall.end.y * factor) },
+        thickness: round4(wall.thickness * factor), height: round4(wall.height * factor),
+      })) } : {}),
+      ...(floor.openings ? { openings: floor.openings.map((opening) => ({
+        ...opening, offset: round4(opening.offset * factor), width: round4(opening.width * factor),
+        height: round4(opening.height * factor), sillHeight: round4(opening.sillHeight * factor),
+      })) } : {}),
+    })),
     ...(building.footprint ? { footprint: {
       ...building.footprint,
       units,
       vertices: building.footprint.vertices.map((vertex) => ({ ...vertex, x: round4(vertex.x * factor), y: round4(vertex.y * factor) })),
       ...(building.footprint.area !== undefined ? { area: round4(building.footprint.area * factor * factor) } : {}),
+      ...(building.footprint.edgeLabels ? { edgeLabels: building.footprint.edgeLabels.map((edge) => ({ ...edge, ...(edge.setback !== undefined ? { setback: round4(edge.setback * factor) } : {}) })) } : {}),
     } } : {}),
   }
 }

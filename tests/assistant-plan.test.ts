@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createProjectFromForm } from '@/lib/projectFactory'
 import { defaultNewProjectForm } from '@/lib/defaultForm'
 import { applyAssistantPlan } from '@/lib/applyAssistantPlan'
+import { pointInPolygon } from '@/lib/siteGeometry'
 import type { AssistantPlan } from '@/services/groqAssistant'
 import type { Room } from '@/types'
 
@@ -55,6 +56,37 @@ describe('AI design-plan application', () => {
     expect(block?.footprint).toMatchObject({ shape: 'polygon', source: 'ai-recommended', units: 'ft' })
     expect(block?.footprint?.vertices).toHaveLength(4)
     expect(result.projectPatch.buildings?.filter((building) => building.role === 'primary')).toHaveLength(1)
+  })
+
+  it('adds rooms, doors, and approved catalog furniture to the selected block floor', () => {
+    const project = blankProject()
+    const plan: AssistantPlan = {
+      reply: 'I furnished the block floor concept.',
+      actions: [
+        { type: 'add_building', name: 'Mansion Block', purpose: { category: 'residential', use: 'mansion' }, role: 'secondary', width: 20, length: 20, floorCount: 3 },
+        { type: 'add_room', building: 'Mansion Block', floor: 2, room: { name: 'Grand Living Room', category: 'living', width: 10, length: 8 } },
+        { type: 'add_opening', building: 'Mansion Block', floor: 2, room: 'Grand Living Room', kind: 'door', label: 'Main door' },
+        { type: 'add_furniture', building: 'Mansion Block', floor: 2, room: 'Grand Living Room', item: 'sofa', assetId: 'ph_model_sofa_02' },
+      ],
+    }
+    const result = applyAssistantPlan({ plan, project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 } })
+    expect(result.ok).toBe(true)
+    const block = result.projectPatch.buildings?.find((building) => building.name === 'Mansion Block')
+    expect(block?.floors).toHaveLength(3)
+    expect(block?.floors[0].rooms).toHaveLength(0)
+    const living = block?.floors[1].rooms[0]
+    expect(living).toMatchObject({ name: 'Grand Living Room', category: 'living', level: 2 })
+    expect(living?.elements).toHaveLength(1)
+    expect(living?.elements[0]).toMatchObject({ type: 'door', label: 'Main door' })
+    expect(living?.items).toHaveLength(1)
+    expect(living?.items?.[0].assetId).toBe('ph_model_sofa_02')
+    const roomCorners = [
+      { x: living!.rect.x, y: living!.rect.y },
+      { x: living!.rect.x + living!.rect.w, y: living!.rect.y },
+      { x: living!.rect.x + living!.rect.w, y: living!.rect.y + living!.rect.h },
+      { x: living!.rect.x, y: living!.rect.y + living!.rect.h },
+    ]
+    expect(roomCorners.every((point) => pointInPolygon(point, block!.footprint!.vertices))).toBe(true)
   })
 
   it('respects user-defined edge setbacks when siting separate buildings', () => {

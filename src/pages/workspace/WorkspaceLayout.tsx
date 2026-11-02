@@ -18,12 +18,14 @@ import { ROOM_FURNITURE } from '@/data/catalog'
 import { canonicalFurnitureKey, findFurniturePosition, getFurnitureDimensions, validateFurniture } from '@/lib/furniture'
 import { findAvailableOpeningPosition, getFloorArchitecturalModel, validateOpenings } from '@/lib/architecturalModel'
 import { applyAssistantPlan as applyAssistantPlanChanges, type ApplyAssistantPlanResult } from '@/lib/applyAssistantPlan'
-import { conversionFactor, convertOrnaments, convertPlacedItem, convertRoomUnits, convertWallThicknesses } from '@/lib/unitConversion'
+import { conversionFactor, convertBuildingLayoutUnits, convertOrnaments, convertPlacedItem, convertRoomUnits, convertWallThicknesses } from '@/lib/unitConversion'
 import { pointInPolygon } from '@/lib/siteGeometry'
+import { translateBuildingFootprint } from '@/lib/projectModel'
 import type { AssistantPlan } from '@/services/groqAssistant'
 import type { PendingPlacement, ToolVariant } from '@/data/toolLibrary'
 import { variantFromAsset, ASSET_LOOKUP } from '@/data/toolLibrary'
 import { REAL_MODELS } from '@/data/realAssets'
+import { pbrIdForRoof } from '@/components/3d-viewer/PbrSurfaceMaterial'
 import { Logo } from '@/components/layout/Logo'
 import { Button } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/FormControls'
@@ -93,6 +95,7 @@ export interface WorkspaceContext {
   setPlotDimensions: (width: number, length: number) => void
   updateSiteBoundary: (boundary: SiteBoundary, plotShape: PlotShape, accessPoints?: SiteAccessPoint[]) => void
   updateBuildingEntrances: (buildingId: string, entrances: BuildingEntrance[]) => void
+  moveBuildingFootprint: (buildingId: string, deltaX: number, deltaY: number) => void
   updateSiteRoutes: (routes: SiteRoute[]) => void
   setNorthDirection: (degrees: number | null) => void
   assistantOpen: boolean
@@ -129,6 +132,8 @@ export interface WorkspaceContext {
   /* Preview overrides */
   previewRoof: string
   setPreviewRoof: (roof: string) => void
+  previewRoofMaterial: string
+  setPreviewRoofMaterial: (materialId: string) => void
   previewExt: FinishOption
   setPreviewExt: (finish: FinishOption) => void
   previewExtColor: string
@@ -173,6 +178,11 @@ export function WorkspaceLayout() {
   const [pending, setPending] = useState<PendingPlacement | null>(null)
   const [placementWarning, setPlacementWarning] = useState<string | null>(null)
   const [previewRoof, setPreviewRoof] = useState('flat')
+  const [previewRoofMaterial, setPreviewRoofMaterial] = useState('ph_material_brushed_concrete')
+  const setPreviewRoofForm = useCallback((roof: string) => {
+    setPreviewRoof(roof)
+    setPreviewRoofMaterial(pbrIdForRoof(roof))
+  }, [])
   const [previewExt, setPreviewExt] = useState<FinishOption>('render')
   const [previewExtColor, setPreviewExtColor] = useState('#e9e4d8')
   const [previewRoofColor, setPreviewRoofColor] = useState('#33415c')
@@ -203,10 +213,17 @@ export function WorkspaceLayout() {
     ]))
     const convertedOrnaments = convertOrnaments(editor.ornaments, units, next)
     const convertedThicknesses = convertWallThicknesses(editor.wallThicknesses, units, next)
-    const convertedFloors = project.floors.map((floor) => ({
+    const convertedBuildingLayouts = (project.buildings ?? []).map((building) => convertBuildingLayoutUnits(building, next, project.plot.units))
+    const convertedPrimary = convertedBuildingLayouts.find((building) => building.role === 'primary')
+    const sourcePrimaryFloors = convertedPrimary?.floors ?? project.floors.map((floor) => ({
       ...floor,
-      rooms: floor.level === 1 ? convertedRooms : floor.rooms.map((room) => convertRoomUnits(room, next)),
+      rooms: floor.rooms.map((room) => convertRoomUnits(room, next)),
     }))
+    const convertedFloors = sourcePrimaryFloors.map((floor) => ({
+      ...floor,
+      rooms: floor.level === 1 ? convertedRooms : floor.rooms,
+    }))
+    const convertedBuildings = convertedBuildingLayouts.map((building) => building.role === 'primary' ? { ...building, floors: convertedFloors } : building)
     const plotFactor = conversionFactor(project.plot.units, next)
     const landscape = convertOrnaments(project.landscape ?? [], project.plot.units, next)
     const preferences = {
@@ -225,6 +242,7 @@ export function WorkspaceLayout() {
     void updateProject(project.id, {
       plot: { ...project.plot, width: round4(project.plot.width * plotFactor), length: round4(project.plot.length * plotFactor), units: next },
       floors: convertedFloors,
+      buildings: convertedBuildings,
       landscape,
       preferences,
     })
@@ -315,6 +333,7 @@ export function WorkspaceLayout() {
     setSelectedItemId(null)
     setSelectedSiteId(null)
     setPreviewRoof(project.roof)
+    setPreviewRoofMaterial(project.preferences.roofMaterial ?? pbrIdForRoof(project.roof))
     setPreviewExt(project.preferences.exteriorFinish)
     setPreviewExtColor(project.preferences.exteriorColor ?? defaultExteriorColor(project.preferences.exteriorFinish))
     setPreviewRoofColor(project.preferences.roofColor ?? '#33415c')
@@ -738,6 +757,16 @@ export function WorkspaceLayout() {
     window.setTimeout(() => setSaved(false), 1800)
   }, [project, updateProject])
 
+  const moveBuildingFootprint = useCallback((buildingId: string, deltaX: number, deltaY: number) => {
+    if (!project || !Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return
+    const buildings = (project.buildings ?? []).map((building) => building.id === buildingId
+      ? translateBuildingFootprint(building, deltaX, deltaY)
+      : building)
+    void updateProject(project.id, { buildings })
+    setSaved(true)
+    window.setTimeout(() => setSaved(false), 1800)
+  }, [project, updateProject])
+
   const updateSiteRoutes = useCallback((routes: SiteRoute[]) => {
     if (!project) return
     const previousSite = project.site ?? { northDirectionDegrees: null, orientationSource: 'unknown' as const, assumptions: [] }
@@ -798,10 +827,10 @@ export function WorkspaceLayout() {
     const floors = project.floors.map((floor) =>
       floor.level === 1 ? { ...floor, rooms: editor.rooms } : floor,
     )
-    void updateProject(project.id, { roof: previewRoof, floors, landscape: editor.ornaments, preferences: { ...project.preferences, roof: previewRoof, exteriorFinish: previewExt, interiorFinish: previewInt, exteriorColor: previewExtColor, roofColor: previewRoofColor, exteriorWallThickness: editor.wallThicknesses.exterior, interiorWallThickness: editor.wallThicknesses.interior } })
+    void updateProject(project.id, { roof: previewRoof, floors, landscape: editor.ornaments, preferences: { ...project.preferences, roof: previewRoof, exteriorFinish: previewExt, interiorFinish: previewInt, exteriorColor: previewExtColor, roofColor: previewRoofColor, roofMaterial: previewRoofMaterial, exteriorWallThickness: editor.wallThicknesses.exterior, interiorWallThickness: editor.wallThicknesses.interior } })
     setSaved(true)
     window.setTimeout(() => setSaved(false), 1800)
-  }, [project, editor.rooms, editor.ornaments, editor.wallThicknesses, previewRoof, previewExt, previewInt, previewExtColor, previewRoofColor, updateProject])
+  }, [project, editor.rooms, editor.ornaments, editor.wallThicknesses, previewRoof, previewRoofMaterial, previewExt, previewInt, previewExtColor, previewRoofColor, updateProject])
 
   const applyAssistantPlan = useCallback(async (
     plan: AssistantPlan,
@@ -819,6 +848,7 @@ export function WorkspaceLayout() {
         interiorFinish: previewInt,
         exteriorColor: previewExtColor,
         roofColor: previewRoofColor,
+        roofMaterial: previewRoofMaterial,
         exteriorWallThickness: editor.wallThicknesses.exterior,
         interiorWallThickness: editor.wallThicknesses.interior,
       },
@@ -952,6 +982,7 @@ export function WorkspaceLayout() {
       setPreviewInt(preferences.interiorFinish)
       setPreviewExtColor(preferences.exteriorColor ?? defaultExteriorColor(preferences.exteriorFinish))
       setPreviewRoofColor(preferences.roofColor ?? '#33415c')
+      setPreviewRoofMaterial(result.projectPatch.preferences?.roofMaterial ?? (result.projectPatch.roof ? pbrIdForRoof(result.projectPatch.roof) : preferences.roofMaterial ?? pbrIdForRoof(nextProjectPatch.roof ?? previewRoof)))
       setSelectedItemId(null)
       setSelectedSiteId(null)
       setPlacementWarning(null)
@@ -963,7 +994,7 @@ export function WorkspaceLayout() {
       setEditor(originalEditor)
       return { ...result, ok: false, errors: ['The project could not be saved. The preview was rolled back; check local storage and try again.'] }
     }
-  }, [project, editor, units, previewRoof, previewExt, previewInt, previewExtColor, previewRoofColor, updateProject])
+  }, [project, editor, units, previewRoof, previewRoofMaterial, previewExt, previewInt, previewExtColor, previewRoofColor, updateProject])
 
   const selectedRoom = useMemo(
     () => editor.rooms.find((room) => room.id === selectedRoomId) ?? null,
@@ -1001,13 +1032,14 @@ export function WorkspaceLayout() {
               exteriorFinish: previewExt,
               exteriorColor: previewExtColor,
               roofColor: previewRoofColor,
+              roofMaterial: previewRoofMaterial,
               exteriorWallThickness: editor.wallThicknesses.exterior,
               interiorWallThickness: editor.wallThicknesses.interior,
               interiorFinish: previewInt,
             },
           }
         : null,
-    [project, previewRoof, previewExt, previewExtColor, previewRoofColor, previewInt, editor.rooms, editor.wallThicknesses],
+    [project, previewRoof, previewRoofMaterial, previewExt, previewExtColor, previewRoofColor, previewInt, editor.rooms, editor.wallThicknesses],
   )
 
   if (loading) {
@@ -1068,6 +1100,7 @@ export function WorkspaceLayout() {
     setPlotDimensions,
     updateSiteBoundary,
     updateBuildingEntrances,
+    moveBuildingFootprint,
     updateSiteRoutes,
     setNorthDirection,
     assistantOpen,
@@ -1100,7 +1133,9 @@ export function WorkspaceLayout() {
     canUndo: past.current.length > 0,
     canRedo: future.current.length > 0,
     previewRoof,
-    setPreviewRoof,
+    setPreviewRoof: setPreviewRoofForm,
+    previewRoofMaterial,
+    setPreviewRoofMaterial,
     previewExt,
     setPreviewExt,
     previewExtColor,

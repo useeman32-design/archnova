@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-31T09:22:42Z",
+  "generatedAt": "2026-11-02T22:43:44Z",
   "source": "Poly Haven API",
   "sourceApi": "https://api.polyhaven.com/our-api",
   "licenseNotice": "All listed assets are CC0 1.0. Attribution is not required; ArchNova includes Powered by Poly Haven credit as courtesy.",
@@ -2027,6 +2027,173 @@
       ],
       "downloadBytes": 6325139,
       "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "shrub_02",
+      "name": "Shrub 02",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/shrub_02",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Rico Cilliers",
+      "polycount": 52317,
+      "dimensionsMm": [
+        5340.904712677002,
+        2060.703456401825,
+        2070.5229938030243
+      ],
+      "dimensionsM": [
+        5.340905,
+        2.060703,
+        2.070523
+      ],
+      "tags": [
+        "sapling",
+        "vegetation",
+        "environment",
+        "ground cover",
+        "foliage",
+        "forest",
+        "leaves",
+        "bush",
+        "jungle",
+        "nature",
+        "leaf",
+        "plant",
+        "green"
+      ],
+      "categories": [
+        "nature",
+        "plants",
+        "ground cover",
+        "collection: verdant_trail"
+      ],
+      "modelUrl": "/assets/polyhaven/models/shrub_02/shrub_02_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/shrub_02/shrub_02_1k.gltf",
+      "fileMd5": "8f7254d279c0c49c0b3edfe260aa5c86",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/shrub_02/shrub_02_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/shrub_02/shrub_02_1k.gltf",
+          "md5": "8f7254d279c0c49c0b3edfe260aa5c86",
+          "size": 8083,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/shrub_02/textures/shrub_02_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/shrub_02/shrub_02_arm_1k.jpg",
+          "md5": "28c218aeb7cab930d99ee16578984241",
+          "size": 313715,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/shrub_02/textures/shrub_02_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/shrub_02/shrub_02_nor_gl_1k.jpg",
+          "md5": "51a7f2db7e06a207171fd725585241d5",
+          "size": 490815,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/shrub_02/shrub_02.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/shrub_02/shrub_02.bin",
+          "md5": "683b5475238310899eac1458520903e6",
+          "size": 758692,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/shrub_02/textures/shrub_02_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/shrub_02/shrub_02_diff_1k.jpg",
+          "md5": "3f4ae281928de030c7d4e41ad5b88a8b",
+          "size": 395120,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 1966425,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "calathea_orbifolia_01",
+      "name": "Calathea Orbifolia 01",
+      "type": "model",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/calathea_orbifolia_01",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Rob Tuytel, Rico Cilliers",
+      "polycount": 16688,
+      "dimensionsMm": [
+        2491.507411003113,
+        1193.592220544815,
+        424.2942640557885
+      ],
+      "dimensionsM": [
+        2.491507,
+        1.193592,
+        0.424294
+      ],
+      "tags": [
+        "nature",
+        "bush",
+        "leaf",
+        "shrub",
+        "green",
+        "leaves",
+        "forest",
+        "plant",
+        "jungle",
+        "outdoor",
+        "botany",
+        "decorative"
+      ],
+      "categories": [
+        "plants",
+        "nature",
+        "ground cover",
+        "collection: smugglers_cove"
+      ],
+      "modelUrl": "/assets/polyhaven/models/calathea_orbifolia_01/calathea_orbifolia_01_1k.gltf",
+      "modelFile": "public/assets/polyhaven/models/calathea_orbifolia_01/calathea_orbifolia_01_1k.gltf",
+      "fileMd5": "7ff4de041509fbaa45f8f3dd52b3113d",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/models/calathea_orbifolia_01/calathea_orbifolia_01_1k.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/calathea_orbifolia_01/calathea_orbifolia_01_1k.gltf",
+          "md5": "7ff4de041509fbaa45f8f3dd52b3113d",
+          "size": 9309,
+          "role": "gltf"
+        },
+        {
+          "path": "public/assets/polyhaven/models/calathea_orbifolia_01/textures/calathea_orbifolia_01_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/calathea_orbifolia_01/calathea_orbifolia_01_arm_1k.jpg",
+          "md5": "195b131e3812528555d2f8c18e148910",
+          "size": 421555,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/calathea_orbifolia_01/textures/calathea_orbifolia_01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/calathea_orbifolia_01/calathea_orbifolia_01_diff_1k.jpg",
+          "md5": "a84ed342fdc66b44ddebdb1fd9bee1d5",
+          "size": 455819,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/calathea_orbifolia_01/calathea_orbifolia_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/calathea_orbifolia_01/calathea_orbifolia_01.bin",
+          "md5": "71dd2ea7aaba98bbd675db12ae382bbd",
+          "size": 407968,
+          "role": "dependency"
+        },
+        {
+          "path": "public/assets/polyhaven/models/calathea_orbifolia_01/textures/calathea_orbifolia_01_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/calathea_orbifolia_01/calathea_orbifolia_01_nor_gl_1k.jpg",
+          "md5": "93ff03e73a6483a29c272f8704f9d8dd",
+          "size": 581558,
+          "role": "dependency"
+        }
+      ],
+      "downloadBytes": 1876209,
+      "polyhavenCredit": "Powered by Poly Haven"
     }
   ],
   "materials": [
@@ -2376,6 +2543,478 @@
         }
       ],
       "downloadBytes": 3382000,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "roof_tiles",
+      "name": "Roof Tiles",
+      "type": "material",
+      "category": "roofing-terracotta",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/roof_tiles",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Stephan Seeliger",
+      "maps": {
+        "color": "/assets/polyhaven/textures/roof_tiles/roof_tiles_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/roof_tiles/roof_tiles_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/roof_tiles/roof_tiles_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/roof_tiles/roof_tiles_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/roof_tiles/roof_tiles_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/roof_tiles/roof_tiles_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_tiles/roof_tiles_diff_1k.jpg",
+          "md5": "525e8cac13027e36f47844f3240fdde8",
+          "size": 1105673,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/roof_tiles/roof_tiles_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_tiles/roof_tiles_nor_gl_1k.jpg",
+          "md5": "4123966e766370bd7d4b107c97a2ed97",
+          "size": 883229,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/roof_tiles/roof_tiles_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_tiles/roof_tiles_rough_1k.jpg",
+          "md5": "e51bb9f619ec07ea6a38b2daab56cbb8",
+          "size": 919232,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/roof_tiles/roof_tiles_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_tiles/roof_tiles_arm_1k.jpg",
+          "md5": "c79de39188a60e9acbdd787a1d56fdcc",
+          "size": 1079696,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/roof_tiles/roof_tiles_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_tiles/roof_tiles_disp_1k.jpg",
+          "md5": "c8a15342ca14cbe50de3e3c0406f9ab4",
+          "size": 358330,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 4346160,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "grey_roof_tiles",
+      "name": "Grey Roof Tiles",
+      "type": "material",
+      "category": "roofing-grey-tile",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/grey_roof_tiles",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Rob Tuytel",
+      "maps": {
+        "color": "/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grey_roof_tiles/grey_roof_tiles_diff_1k.jpg",
+          "md5": "9a0d2c1ca66e79972c7c35cefa238cf7",
+          "size": 596156,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grey_roof_tiles/grey_roof_tiles_nor_gl_1k.jpg",
+          "md5": "95003919cdb2fcb2f499594bdf0ee827",
+          "size": 522186,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grey_roof_tiles/grey_roof_tiles_rough_1k.jpg",
+          "md5": "19961a96ab55dfe97dd76981c59ccb1a",
+          "size": 260780,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grey_roof_tiles/grey_roof_tiles_arm_1k.jpg",
+          "md5": "9c7eefaca8e99854cb1a3dc2d999ee9b",
+          "size": 138201,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grey_roof_tiles/grey_roof_tiles_disp_1k.jpg",
+          "md5": "4e4dc34829ed9900133c9eddb034e37e",
+          "size": 168472,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 1685795,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "corrugated_iron",
+      "name": "Corrugated Iron",
+      "type": "material",
+      "category": "roofing-metal",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/corrugated_iron",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Jenelle van Heerden, Dimitrios Savva",
+      "maps": {
+        "color": "/assets/polyhaven/textures/corrugated_iron/corrugated_iron_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/corrugated_iron/corrugated_iron_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/corrugated_iron/corrugated_iron_rough_1k.jpg",
+        "metalness": "/assets/polyhaven/textures/corrugated_iron/corrugated_iron_metal_1k.jpg",
+        "arm": "/assets/polyhaven/textures/corrugated_iron/corrugated_iron_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/corrugated_iron/corrugated_iron_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/corrugated_iron/corrugated_iron_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/corrugated_iron/corrugated_iron_diff_1k.jpg",
+          "md5": "fabb629c5ad6f427e6862bb4043564bd",
+          "size": 719557,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/corrugated_iron/corrugated_iron_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/corrugated_iron/corrugated_iron_nor_gl_1k.jpg",
+          "md5": "02249d61a2b1839552938f35a20d075a",
+          "size": 755185,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/corrugated_iron/corrugated_iron_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/corrugated_iron/corrugated_iron_rough_1k.jpg",
+          "md5": "7c14b728587586e74be45a67cfe44160",
+          "size": 455677,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/corrugated_iron/corrugated_iron_metal_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/corrugated_iron/corrugated_iron_metal_1k.jpg",
+          "md5": "578870fd91dca17034b46d54e6389edd",
+          "size": 251113,
+          "role": "metalness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/corrugated_iron/corrugated_iron_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/corrugated_iron/corrugated_iron_arm_1k.jpg",
+          "md5": "1aa3a922ef522a8b98e6d38a810d8a3e",
+          "size": 513485,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/corrugated_iron/corrugated_iron_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/corrugated_iron/corrugated_iron_disp_1k.jpg",
+          "md5": "2cfb965b43fdd3a726bbab662dbcf5ca",
+          "size": 239558,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 2934575,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "grass_ground",
+      "name": "Grass Ground",
+      "type": "material",
+      "category": "grass-ground",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/grass_ground",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Charlotte Baglioni",
+      "maps": {
+        "color": "/assets/polyhaven/textures/grass_ground/grass_ground_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/grass_ground/grass_ground_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/grass_ground/grass_ground_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/grass_ground/grass_ground_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/grass_ground/grass_ground_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/grass_ground/grass_ground_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_ground/grass_ground_diff_1k.jpg",
+          "md5": "299047258586c762735b7284d3c662c3",
+          "size": 876584,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/grass_ground/grass_ground_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_ground/grass_ground_nor_gl_1k.jpg",
+          "md5": "d518c5b2af6f2c0297bc807b351f511f",
+          "size": 1310516,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/grass_ground/grass_ground_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_ground/grass_ground_rough_1k.jpg",
+          "md5": "2e6afca246cf6b80bdb53f46fe7e5ce5",
+          "size": 328190,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/grass_ground/grass_ground_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_ground/grass_ground_arm_1k.jpg",
+          "md5": "e0499d084eaddc110671ebfee26bd941",
+          "size": 896135,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/grass_ground/grass_ground_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_ground/grass_ground_disp_1k.jpg",
+          "md5": "589346708685113d6b3be91ed444c3dc",
+          "size": 732755,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 4144180,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "leafy_grass",
+      "name": "Leafy Grass",
+      "type": "material",
+      "category": "grass-leafy",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/leafy_grass",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Charlotte Baglioni",
+      "maps": {
+        "color": "/assets/polyhaven/textures/leafy_grass/leafy_grass_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/leafy_grass/leafy_grass_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/leafy_grass/leafy_grass_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/leafy_grass/leafy_grass_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/leafy_grass/leafy_grass_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/leafy_grass/leafy_grass_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_diff_1k.jpg",
+          "md5": "0dbc071e91d6905edfcfbe8eb785a1ab",
+          "size": 1195394,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/leafy_grass/leafy_grass_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_nor_gl_1k.jpg",
+          "md5": "8279e096e204ea326d57a318869f99df",
+          "size": 1466049,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/leafy_grass/leafy_grass_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_rough_1k.jpg",
+          "md5": "05f6bb1383e12b327727d313c5899cf2",
+          "size": 511385,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/leafy_grass/leafy_grass_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_arm_1k.jpg",
+          "md5": "44fb4e40ef0f3425a7d1a14bc328e4d8",
+          "size": 1010081,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/leafy_grass/leafy_grass_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_disp_1k.jpg",
+          "md5": "df6cb89fb7072d00f2de804bf9e4584d",
+          "size": 742755,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 4925664,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "grass_concrete_pavement",
+      "name": "Grass Concrete Pavement",
+      "type": "material",
+      "category": "grass-paver-mix",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/grass_concrete_pavement",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Charlotte Baglioni",
+      "maps": {
+        "color": "/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_concrete_pavement/grass_concrete_pavement_diff_1k.jpg",
+          "md5": "946e79a9df8c6f379bdee2bbd5c8f60f",
+          "size": 1061418,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_concrete_pavement/grass_concrete_pavement_nor_gl_1k.jpg",
+          "md5": "d13fe6369e599a2afed87b445cb9a84d",
+          "size": 1339885,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_concrete_pavement/grass_concrete_pavement_rough_1k.jpg",
+          "md5": "3835380590c2be58eba254a11a01d072",
+          "size": 514880,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_concrete_pavement/grass_concrete_pavement_arm_1k.jpg",
+          "md5": "0531e6f5c6d30aa72c9b8e6ba2121aff",
+          "size": 912203,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_concrete_pavement/grass_concrete_pavement_disp_1k.jpg",
+          "md5": "b3999e92db192502ba8f4e1bcaf95413",
+          "size": 668517,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 4496903,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "plaster_grey_04",
+      "name": "Plaster Grey 04",
+      "type": "material",
+      "category": "plaster-render",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/plaster_grey_04",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Rob Tuytel",
+      "maps": {
+        "color": "/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/plaster_grey_04/plaster_grey_04_diff_1k.jpg",
+          "md5": "bc8a1530a637d36865f90c86391c75c4",
+          "size": 456938,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/plaster_grey_04/plaster_grey_04_nor_gl_1k.jpg",
+          "md5": "d1ada132c3eea7bee3abe7624c592391",
+          "size": 983244,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/plaster_grey_04/plaster_grey_04_rough_1k.jpg",
+          "md5": "ef0f4120c0b1085db4f6a08f7a0b197d",
+          "size": 370366,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/plaster_grey_04/plaster_grey_04_arm_1k.jpg",
+          "md5": "e58082a93ecd66ba5601b181bfa9e98d",
+          "size": 178374,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/plaster_grey_04/plaster_grey_04_disp_1k.jpg",
+          "md5": "b24986d0797355935554018327353011",
+          "size": 207014,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 2195936,
+      "polyhavenCredit": "Powered by Poly Haven"
+    },
+    {
+      "id": "red_brick",
+      "name": "Red Brick",
+      "type": "material",
+      "category": "brick-wall",
+      "source": "Poly Haven",
+      "sourceUrl": "https://polyhaven.com/a/red_brick",
+      "license": "CC0 1.0 Universal",
+      "licenseUrl": "https://polyhaven.com/license",
+      "author": "Rob Tuytel",
+      "maps": {
+        "color": "/assets/polyhaven/textures/red_brick/red_brick_diff_1k.jpg",
+        "normal": "/assets/polyhaven/textures/red_brick/red_brick_nor_gl_1k.jpg",
+        "roughness": "/assets/polyhaven/textures/red_brick/red_brick_rough_1k.jpg",
+        "arm": "/assets/polyhaven/textures/red_brick/red_brick_arm_1k.jpg",
+        "displacement": "/assets/polyhaven/textures/red_brick/red_brick_disp_1k.jpg"
+      },
+      "resolution": "1k",
+      "files": [
+        {
+          "path": "public/assets/polyhaven/textures/red_brick/red_brick_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_brick/red_brick_diff_1k.jpg",
+          "md5": "269e69449755abd1ede473e634b670e7",
+          "size": 766044,
+          "role": "color"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/red_brick/red_brick_nor_gl_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_brick/red_brick_nor_gl_1k.jpg",
+          "md5": "3a49f27fb909b2db794f60bf1ce6659f",
+          "size": 1052038,
+          "role": "normal"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/red_brick/red_brick_rough_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_brick/red_brick_rough_1k.jpg",
+          "md5": "7ffbf7a7d2e0cff0a9c5f8848f9fada2",
+          "size": 178614,
+          "role": "roughness"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/red_brick/red_brick_arm_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_brick/red_brick_arm_1k.jpg",
+          "md5": "677d7938c3b7fdb1973af527ecce2077",
+          "size": 701031,
+          "role": "arm"
+        },
+        {
+          "path": "public/assets/polyhaven/textures/red_brick/red_brick_disp_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_brick/red_brick_disp_1k.jpg",
+          "md5": "e4fd91074fd09f92529b28cfad60468b",
+          "size": 325000,
+          "role": "displacement"
+        }
+      ],
+      "downloadBytes": 3022727,
       "polyhavenCredit": "Powered by Poly Haven"
     }
   ]

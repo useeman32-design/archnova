@@ -1,14 +1,14 @@
 # ArchNova — First Real Asset Milestone
 
-**Status date:** 2026-10-31
+**Status date:** 2026-11-02 (site-materials and environment expansion)
 **Scope:** small, quality-screened acquisition and end-to-end renderer/catalog/project integration. This is not the full target collection.
-**Repository:** the asset milestone is included in the previously verified remote `main` ref `04e946703a71e4187647aae474909f875b65f644` and published Pages ref `c34753fa58038a010d55d15b5e966375a4dc373e`. The current Phase 2 north/setback edits are in local commit `9c83325`, saved-footprint validation is in `78dac02`, access-point markers are in `aac4d06`, conceptual building entrances are in `eaec41f`, and editable site routes/parking are in `4fb643c`. None is included in those published refs.
+**Repository:** the asset milestone is included in the previously verified remote `main` ref `04e946703a71e4187647aae474909f875b65f644` and published Pages ref `c34753fa58038a010d55d15b5e966375a4dc373e`. The current Phase 2 north/setback edits are in local commit `9c83325`, saved-footprint validation is in `78dac02`, access-point markers are in `aac4d06`, conceptual building entrances are in `eaec41f`, editable site routes/parking are in `4fb643c`, and movable building footprints are in `25b43fe`. None is included in those published refs.
 
 ## Result
 
-ArchNova now has **24 locally bundled, real Poly Haven GLTF models** and **6 locally bundled PBR material sets**, all identified as **CC0 1.0 Universal**. A modest follow-up batch adds dining/coffee tables, a vintage day bed, wheelchair and school furniture, a planter, a potted plant and a second street lamp. The model browser renders each real local GLTF in a consistent neutral architectural product-preview scene; the same stable catalog ID follows placements through the shared 2D/3D project model and local save/reload. No asset is counted here solely for a catalog row or thumbnail.
+ArchNova now has **26 locally bundled, real Poly Haven GLTF models** and **14 locally bundled PBR material sets**, all identified as **CC0 1.0 Universal**. The exterior collection includes two additional low-maintenance/tropical-leaning plant models; the material collection adds terracotta/grey roof tile, corrugated metal, grass/soil, grass-paver, plaster and red brick surfaces. The model browser renders each real local GLTF in a consistent neutral architectural product-preview scene; the same stable catalog ID follows placements through the shared 2D/3D project model and local save/reload. No asset is counted here solely for a catalog row or thumbnail.
 
-Downloaded payload is approximately **74.4 MB** (1K glTF/map packages). The asset folder includes the original source glTF, buffers and dependencies; official URLs, MD5 hashes, dimensions, author/source IDs and license records are in `public/assets/archnova-asset-manifest.json`.
+Downloaded payload is approximately **106.0 MB** (1K glTF/map packages). The asset folder includes the original source glTF, buffers and dependencies; official URLs, MD5 hashes, dimensions, author/source IDs and license records are in `public/assets/archnova-asset-manifest.json`.
 
 ## Imported models (loader-verified)
 
@@ -40,12 +40,14 @@ Dimensions are Poly Haven's approximate source dimensions in **width × depth ×
 | `ph_model_street_lamp_02` — [Street Lamp 02](https://polyhaven.com/a/street_lamp_02) | 0.386 × 0.807 × 1.675 | 20,338 | Compact urban site light. |
 | `ph_model_planter_box_01` — [Planter Box 01](https://polyhaven.com/a/planter_box_01) | 0.913 × 0.414 × 0.425 | 8,094 | Exterior garden planter. |
 | `ph_model_potted_plant_01` — [Potted Plant 01](https://polyhaven.com/a/potted_plant_01) | 0.589 × 0.637 × 1.351 | 176,226 | Potted foliage; relatively high geometry for repeated placement, not a mature site tree. |
+| `ph_model_shrub_02` — [Shrub 02](https://polyhaven.com/a/shrub_02) | 5.341 × 2.061 × 2.071 | 27,254 | Broad imported shrub; reduce scale for compact beds. |
+| `ph_model_calathea_orbifolia_01` — [Calathea Orbifolia 01](https://polyhaven.com/a/calathea_orbifolia_01) | 2.492 × 1.194 × 0.424 | 16,688 | Tropical foliage accent; use as a planted site accent, not a tree. |
 
 The file manifest preserves the exact downloading URLs and MD5 checksums for each main glTF and dependency. All models use Poly Haven's official CC0 asset records. Courtesy credit shown in ArchNova: **Powered by Poly Haven**.
 
 ## Imported PBR materials
 
-All six material sets are Poly Haven CC0 and bundled at **1K** resolution. Each has color, OpenGL normal, roughness, ARM and displacement files where provided. The viewer uses color/normal/roughness maps for renderable surfaces; extra maps remain in the source manifest.
+All fourteen material sets are Poly Haven CC0 and bundled at **1K** resolution. Each has color, OpenGL normal, roughness, ARM and displacement files where provided. The viewer uses color/normal/roughness maps for renderable surfaces; extra maps remain in the source manifest.
 
 | Material category | Source asset | ArchNova application |
 |---|---|---|
@@ -55,6 +57,14 @@ All six material sets are Poly Haven CC0 and bundled at **1K** resolution. Each 
 | Stone | [stone_pavers](https://polyhaven.com/a/stone_pavers) | Real stone room/exterior finish selection. |
 | Asphalt | [asphalt_01](https://polyhaven.com/a/asphalt_01) | Automatically mapped onto dimension-driven road segments. |
 | Interlocking paving | [interlocking_concrete_pavers](https://polyhaven.com/a/interlocking_concrete_pavers) | Automatically mapped onto dimension-driven path segments. |
+| Terracotta roof tiles | [roof_tiles](https://polyhaven.com/a/roof_tiles) | Mapped to pitched, hip and mansard roof forms. |
+| Grey roof tiles | [grey_roof_tiles](https://polyhaven.com/a/grey_roof_tiles) | Available as a CC0 roof-covering choice in the 3D workspace. |
+| Corrugated metal | [corrugated_iron](https://polyhaven.com/a/corrugated_iron) | Used for shed roofs and metal exterior finishes. |
+| Grass ground | [grass_ground](https://polyhaven.com/a/grass_ground) | Mapped onto known plot ground in the exterior scene. |
+| Leafy grass | [leafy_grass](https://polyhaven.com/a/leafy_grass) | Available as an imported site/landscape material. |
+| Grass concrete pavement | [grass_concrete_pavement](https://polyhaven.com/a/grass_concrete_pavement) | CC0 landscape surface for mixed green/paver site zones. |
+| Plaster | [plaster_grey_04](https://polyhaven.com/a/plaster_grey_04) | Mapped to render and paint exterior finishes. |
+| Red brick wall | [red_brick](https://polyhaven.com/a/red_brick) | Mapped to brick exterior finishes. |
 
 ## Workflow implemented
 
@@ -64,7 +74,10 @@ All six material sets are Poly Haven CC0 and bundled at **1K** resolution. Each 
 - **Placement/editing:** manual catalog/tool placement carries the stable `assetId`. The interior room-view renderer now loads the GLTF for placed room assets instead of falling back to primitive furniture; the exterior GLTF path was already active. Imported model variants in the left tool drawer now show the same lazy live product preview as the Assets catalog. The room Properties panel's compact placed-item row and selected-item detail now both receive `assetId` and show the real model preview. Existing shared transform/property flows provide move, rotation, scale, dimensions, delete and interior duplicate. Site-instance duplicate was added; site assets retain their source ID. The existing editable road/path/fence/gate and roof systems remain parametric and dimension-controlled.
 - **2D/3D synchronization:** interior assets use the same placed records in the floor plan and Three.js view. Site models carry the same project landscape record; 2D footprints use source dimensions and new top-down symbols for bench/outdoor set/decor where applicable.
 - **Save/reload:** `assetId`, transforms, dimensions and site identity remain on the serialized room/landscape records. A UI-level workflow test starts in Assets, arms a real catalog chair, places it into a room, uses Save, and reloads the project to assert the exact asset ID. A separate project-service test preserves interior and site model IDs. Legacy records without `assetId` continue through the existing compatibility rendering path.
-- **PBR integration:** actual local maps are used on material-controlled floors/walls and on parametric road/path surfaces; materials are not decorative placeholder swatches.
+- **PBR integration:** actual local maps are used on material-controlled floors/walls, textured roof forms and parametric road/path surfaces; CC0 grass is mapped only on a defined/assumed plot outline so an unknown site boundary is not visually replaced with a fabricated rectangle.
+- **Exterior environment:** the 3D exterior now uses a procedural sky dome and directional sun; locations identified as Lagos/Nigeria and nearby West African countries receive a high-sun tropical visual preset. This is a visualization hint, not geospatial or weather analysis.
+- **Windows/doors:** openings remain dimension-driven parametric architecture rather than one fixed-size imported window mesh; exterior windows now show glass, frame jambs, head/sill trims and style-specific mullions/handles so they adapt to each opening.
+- **Climate-aware assistant context:** the assistant receives a bounded climate hint from the saved location and the exact roof/ground/site-object catalog. It is instructed to propose climate-conscious exterior materials, shade/planting and permeable paths as reviewable edits, keep access clear and never invent asset IDs.
 - **AI catalog guard/selection:** the assistant sees stable model IDs, names, dimensions and concise style tags. It resolves an exact model name before a generic family match (so a request for Wheelchair 01 cannot silently become a dining chair), validates IDs/categories, and still rejects unknown models and paths. All assistant edits remain proposals behind “Apply and save.”
 
 ## Verification performed

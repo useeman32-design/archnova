@@ -11,6 +11,13 @@ import { Badge } from '@/components/ui/Badge'
 import { EXTERIOR_FINISHES, INTERIOR_FINISHES, ROOF_TYPES } from '@/data/catalog'
 import type { PendingPlacement } from '@/data/toolLibrary'
 
+const ROOF_COVERINGS = [
+  { id: 'ph_material_roof_tiles', label: 'Terracotta tile', swatch: 'linear-gradient(135deg,#a9573c,#d17b54 48%,#823c2d)' },
+  { id: 'ph_material_grey_roof_tiles', label: 'Grey roof tile', swatch: 'linear-gradient(135deg,#747775,#a3a59e 48%,#555a5c)' },
+  { id: 'ph_material_corrugated_iron', label: 'Corrugated metal', swatch: 'repeating-linear-gradient(90deg,#67757a 0 5px,#aeb5b5 6px 8px)' },
+  { id: 'ph_material_brushed_concrete', label: 'Concrete', swatch: 'linear-gradient(135deg,#b9b8b3,#e0dfda 48%,#9e9e99)' },
+]
+
 const FINISH_ICONS: Record<FinishOption, React.ReactNode> = {
   render: <Layers className="h-4 w-4" />,
   paint: <Brush className="h-4 w-4" />,
@@ -47,6 +54,8 @@ export function ThreeDPage() {
     previewProject,
     previewRoof: roof,
     setPreviewRoof: setRoof,
+    previewRoofMaterial: roofMaterial,
+    setPreviewRoofMaterial: setRoofMaterial,
     previewExt: finish,
     setPreviewExt: setFinish,
     previewInt: interior,
@@ -260,6 +269,10 @@ export function ThreeDPage() {
               ))}
             </div>
             <label className="mt-2 flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[11px] font-medium text-muted">Roof color<input type="color" value={ctx.previewRoofColor} onChange={(event) => ctx.setPreviewRoofColor(event.target.value)} className="h-7 w-10 cursor-pointer rounded border-0 bg-transparent p-0" /></label>
+            <p className="mb-2 mt-4 text-[12px] font-medium text-ink-text">Roof covering · Poly Haven CC0</p>
+            <div className="grid grid-cols-2 gap-2">
+              {ROOF_COVERINGS.map((covering) => <button key={covering.id} onClick={() => setRoofMaterial(covering.id)} className={`rounded-lg border p-2 text-left text-[10.5px] font-medium ${roofMaterial === covering.id ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-line text-muted hover:bg-canvas-soft'}`}><span className="mb-1.5 block h-8 rounded-md border border-black/10" style={{ background: covering.swatch }} />{covering.label}</button>)}
+            </div>
           </div>
 
           <div>

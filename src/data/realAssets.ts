@@ -630,6 +630,22 @@ export const REAL_MODELS: AssetItem[] = [
     "polycount": 96030,
     "itemKey": "tree"
   },
+  {
+    id: "ph_model_shrub_02", name: "Shrub 02", category: "trees", icon: "Sprout",
+    tags: ["sapling", "vegetation", "environment", "ground cover", "foliage", "landscape", "Poly Haven", "CC0"], assetKind: "model", sourceAssetId: "shrub_02",
+    modelUrl: "/assets/polyhaven/models/shrub_02/shrub_02_1k.gltf", dimensionsM: [5.340905, 2.060703, 2.070523], placement: "site",
+    orientation: { upAxis: "Y", forwardAxis: "+Z", pivot: "bottom-center", defaultRotationDegrees: 0 },
+    source: "Poly Haven", sourceUrl: "https://polyhaven.com/a/shrub_02", license: "CC0 1.0 Universal", licenseUrl: "https://polyhaven.com/license",
+    author: "Rico Cilliers", polycount: 52317, itemKey: "shrub",
+  },
+  {
+    id: "ph_model_calathea_orbifolia_01", name: "Calathea Orbifolia 01", category: "trees", icon: "Sprout",
+    tags: ["nature", "bush", "leaf", "shrub", "green", "landscape", "Poly Haven", "CC0"], assetKind: "model", sourceAssetId: "calathea_orbifolia_01",
+    modelUrl: "/assets/polyhaven/models/calathea_orbifolia_01/calathea_orbifolia_01_1k.gltf", dimensionsM: [2.491507, 1.193592, 0.424294], placement: "site",
+    orientation: { upAxis: "Y", forwardAxis: "+Z", pivot: "bottom-center", defaultRotationDegrees: 0 },
+    source: "Poly Haven", sourceUrl: "https://polyhaven.com/a/calathea_orbifolia_01", license: "CC0 1.0 Universal", licenseUrl: "https://polyhaven.com/license",
+    author: "Rob Tuytel, Rico Cilliers", polycount: 16688, itemKey: "flower",
+  },
 ];
 
 export const REAL_MATERIALS: AssetItem[] = [
@@ -722,6 +738,60 @@ export const REAL_MATERIALS: AssetItem[] = [
     license: "CC0 1.0 Universal",
     licenseUrl: "https://polyhaven.com/license",
     author: "Amal Kumar",
+  },
+  {
+    id: "ph_material_roof_tiles", name: "Roof Tiles", category: "textures", icon: "Home",
+    tags: ["roofing-terracotta", "PBR", "Poly Haven", "CC0"], assetKind: "material", sourceAssetId: "roof_tiles",
+    materialMaps: {"color": "/assets/polyhaven/textures/roof_tiles/roof_tiles_diff_1k.jpg", "normal": "/assets/polyhaven/textures/roof_tiles/roof_tiles_nor_gl_1k.jpg", "roughness": "/assets/polyhaven/textures/roof_tiles/roof_tiles_rough_1k.jpg", "arm": "/assets/polyhaven/textures/roof_tiles/roof_tiles_arm_1k.jpg", "displacement": "/assets/polyhaven/textures/roof_tiles/roof_tiles_disp_1k.jpg"}, source: "Poly Haven", sourceUrl: "https://polyhaven.com/a/roof_tiles",
+    license: "CC0 1.0 Universal", licenseUrl: "https://polyhaven.com/license",
+    author: "Stephan Seeliger",
+  },
+  {
+    id: "ph_material_grey_roof_tiles", name: "Grey Roof Tiles", category: "textures", icon: "Home",
+    tags: ["roofing-grey-tile", "PBR", "Poly Haven", "CC0"], assetKind: "material", sourceAssetId: "grey_roof_tiles",
+    materialMaps: {"color": "/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_diff_1k.jpg", "normal": "/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_nor_gl_1k.jpg", "roughness": "/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_rough_1k.jpg", "arm": "/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_arm_1k.jpg", "displacement": "/assets/polyhaven/textures/grey_roof_tiles/grey_roof_tiles_disp_1k.jpg"}, source: "Poly Haven", sourceUrl: "https://polyhaven.com/a/grey_roof_tiles",
+    license: "CC0 1.0 Universal", licenseUrl: "https://polyhaven.com/license",
+    author: "Rob Tuytel",
+  },
+  {
+    id: "ph_material_corrugated_iron", name: "Corrugated Iron", category: "textures", icon: "PanelTop",
+    tags: ["roofing-metal", "PBR", "Poly Haven", "CC0"], assetKind: "material", sourceAssetId: "corrugated_iron",
+    materialMaps: {"color": "/assets/polyhaven/textures/corrugated_iron/corrugated_iron_diff_1k.jpg", "normal": "/assets/polyhaven/textures/corrugated_iron/corrugated_iron_nor_gl_1k.jpg", "roughness": "/assets/polyhaven/textures/corrugated_iron/corrugated_iron_rough_1k.jpg", "metalness": "/assets/polyhaven/textures/corrugated_iron/corrugated_iron_metal_1k.jpg", "arm": "/assets/polyhaven/textures/corrugated_iron/corrugated_iron_arm_1k.jpg", "displacement": "/assets/polyhaven/textures/corrugated_iron/corrugated_iron_disp_1k.jpg"}, source: "Poly Haven", sourceUrl: "https://polyhaven.com/a/corrugated_iron",
+    license: "CC0 1.0 Universal", licenseUrl: "https://polyhaven.com/license",
+    author: "Jenelle van Heerden, Dimitrios Savva",
+  },
+  {
+    id: "ph_material_grass_ground", name: "Grass Ground", category: "textures", icon: "Sprout",
+    tags: ["grass-ground", "PBR", "Poly Haven", "CC0"], assetKind: "material", sourceAssetId: "grass_ground",
+    materialMaps: {"color": "/assets/polyhaven/textures/grass_ground/grass_ground_diff_1k.jpg", "normal": "/assets/polyhaven/textures/grass_ground/grass_ground_nor_gl_1k.jpg", "roughness": "/assets/polyhaven/textures/grass_ground/grass_ground_rough_1k.jpg", "arm": "/assets/polyhaven/textures/grass_ground/grass_ground_arm_1k.jpg", "displacement": "/assets/polyhaven/textures/grass_ground/grass_ground_disp_1k.jpg"}, source: "Poly Haven", sourceUrl: "https://polyhaven.com/a/grass_ground",
+    license: "CC0 1.0 Universal", licenseUrl: "https://polyhaven.com/license",
+    author: "Charlotte Baglioni",
+  },
+  {
+    id: "ph_material_leafy_grass", name: "Leafy Grass", category: "textures", icon: "Sprout",
+    tags: ["grass-leafy", "PBR", "Poly Haven", "CC0"], assetKind: "material", sourceAssetId: "leafy_grass",
+    materialMaps: {"color": "/assets/polyhaven/textures/leafy_grass/leafy_grass_diff_1k.jpg", "normal": "/assets/polyhaven/textures/leafy_grass/leafy_grass_nor_gl_1k.jpg", "roughness": "/assets/polyhaven/textures/leafy_grass/leafy_grass_rough_1k.jpg", "arm": "/assets/polyhaven/textures/leafy_grass/leafy_grass_arm_1k.jpg", "displacement": "/assets/polyhaven/textures/leafy_grass/leafy_grass_disp_1k.jpg"}, source: "Poly Haven", sourceUrl: "https://polyhaven.com/a/leafy_grass",
+    license: "CC0 1.0 Universal", licenseUrl: "https://polyhaven.com/license",
+    author: "Charlotte Baglioni",
+  },
+  {
+    id: "ph_material_grass_concrete_pavement", name: "Grass Concrete Pavement", category: "textures", icon: "Grid",
+    tags: ["grass-paver-mix", "PBR", "Poly Haven", "CC0"], assetKind: "material", sourceAssetId: "grass_concrete_pavement",
+    materialMaps: {"color": "/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_diff_1k.jpg", "normal": "/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_nor_gl_1k.jpg", "roughness": "/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_rough_1k.jpg", "arm": "/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_arm_1k.jpg", "displacement": "/assets/polyhaven/textures/grass_concrete_pavement/grass_concrete_pavement_disp_1k.jpg"}, source: "Poly Haven", sourceUrl: "https://polyhaven.com/a/grass_concrete_pavement",
+    license: "CC0 1.0 Universal", licenseUrl: "https://polyhaven.com/license",
+    author: "Charlotte Baglioni",
+  },
+  {
+    id: "ph_material_plaster_grey_04", name: "Plaster Grey 04", category: "textures", icon: "Layers",
+    tags: ["plaster-render", "PBR", "Poly Haven", "CC0"], assetKind: "material", sourceAssetId: "plaster_grey_04",
+    materialMaps: {"color": "/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_diff_1k.jpg", "normal": "/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_nor_gl_1k.jpg", "roughness": "/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_rough_1k.jpg", "arm": "/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_arm_1k.jpg", "displacement": "/assets/polyhaven/textures/plaster_grey_04/plaster_grey_04_disp_1k.jpg"}, source: "Poly Haven", sourceUrl: "https://polyhaven.com/a/plaster_grey_04",
+    license: "CC0 1.0 Universal", licenseUrl: "https://polyhaven.com/license", author: "Rob Tuytel",
+  },
+  {
+    id: "ph_material_red_brick", name: "Red Brick", category: "textures", icon: "Square",
+    tags: ["brick-wall", "PBR", "Poly Haven", "CC0"], assetKind: "material", sourceAssetId: "red_brick",
+    materialMaps: {"color": "/assets/polyhaven/textures/red_brick/red_brick_diff_1k.jpg", "normal": "/assets/polyhaven/textures/red_brick/red_brick_nor_gl_1k.jpg", "roughness": "/assets/polyhaven/textures/red_brick/red_brick_rough_1k.jpg", "arm": "/assets/polyhaven/textures/red_brick/red_brick_arm_1k.jpg", "displacement": "/assets/polyhaven/textures/red_brick/red_brick_disp_1k.jpg"}, source: "Poly Haven", sourceUrl: "https://polyhaven.com/a/red_brick",
+    license: "CC0 1.0 Universal", licenseUrl: "https://polyhaven.com/license", author: "Rob Tuytel",
   },
 ];
 

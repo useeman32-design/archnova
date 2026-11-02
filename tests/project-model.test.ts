@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { Building, Project } from '@/types'
 import { defaultNewProjectForm } from '@/lib/defaultForm'
 import { createProjectFromForm } from '@/lib/projectFactory'
-import { mergeProjectModelUpdate, normalizeProjectModel } from '@/lib/projectModel'
+import { mergeProjectModelUpdate, normalizeProjectModel, translateBuildingFootprint } from '@/lib/projectModel'
+import { convertBuildingLayoutUnits } from '@/lib/unitConversion'
 
 function projectFixture() {
   return createProjectFromForm({ ...defaultNewProjectForm(), name: 'Model test' }, 9401)
@@ -61,6 +62,42 @@ describe('generalized architectural project model', () => {
     expect(project.floors).toHaveLength(1)
     expect(project.floors[0].rooms).toEqual([])
     expect(project.brief?.assumptions.join(' ')).toContain('have not been generated yet')
+  })
+
+  it('translates an explicit building footprint without changing edge IDs or entrance anchors', () => {
+    const building: Building = {
+      id: 'building:block-a',
+      name: 'Block A',
+      purpose: { category: 'residential', use: 'bungalow' },
+      role: 'secondary',
+      floors: [{ id: 'floor-ground', name: 'Ground Floor', level: 1, rooms: [{
+        id: 'room-living', name: 'Living Room', category: 'living', width: 10, length: 8, units: 'ft',
+        rect: { x: 15, y: 12, w: 10, h: 8 }, level: 1, furniture: [], elements: [],
+      }] }],
+      footprint: {
+        id: 'footprint:block-a', shape: 'rectangle', units: 'ft', status: 'defined', source: 'user-drawn', assumptions: [],
+        vertices: [
+          { id: 'a1', x: 10, y: 10 }, { id: 'a2', x: 30, y: 10 },
+          { id: 'a3', x: 30, y: 24 }, { id: 'a4', x: 10, y: 24 },
+        ],
+      },
+      entrances: [{ id: 'main-entry', fromVertexId: 'a1', toVertexId: 'a2', fraction: 0.4, type: 'main' }],
+      assumptions: [],
+    }
+    const moved = translateBuildingFootprint(building, 5.25, -2)
+
+    expect(moved.footprint?.vertices).toEqual([
+      { id: 'a1', x: 15.25, y: 8 }, { id: 'a2', x: 35.25, y: 8 },
+      { id: 'a3', x: 35.25, y: 22 }, { id: 'a4', x: 15.25, y: 22 },
+    ])
+    expect(moved.entrances).toEqual(building.entrances)
+    expect(moved.floors[0].rooms[0].rect).toMatchObject({ x: 20.25, y: 10, w: 10, h: 8 })
+    expect(moved.footprint?.units).toBe('ft')
+    const metric = convertBuildingLayoutUnits(moved, 'm')
+    expect(metric.footprint?.units).toBe('m')
+    expect(metric.footprint?.vertices[0].x).toBeCloseTo(15.25 * 0.3048)
+    expect(metric.floors[0].rooms[0].rect.x).toBeCloseTo(20.25 * 0.3048)
+    expect(metric.floors[0].rooms[0].units).toBe('m')
   })
 
   it('keeps primary floors and multi-building data synchronized through project updates', () => {

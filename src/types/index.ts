@@ -347,6 +347,8 @@ export interface DesignPreferences {
   interiorFinish: FinishOption
   exteriorColor?: string
   roofColor?: string
+  /** Exact imported PBR material ID used as the roof covering. */
+  roofMaterial?: string
   exteriorWallThickness?: number
   interiorWallThickness?: number
   outdoor: OutdoorFeature[]

@@ -20,6 +20,8 @@ MODELS = [
     'dining_table', 'modern_coffee_table_02', 'wooden_table_02', 'vintage_day_bed',
     'wheelchair_01', 'SchoolDesk_01', 'SchoolChair_01', 'street_lamp_02',
     'planter_box_01', 'potted_plant_01',
+    # Tropical-friendly site planting and exterior decor.
+    'shrub_02', 'calathea_orbifolia_01',
 ]
 TEXTURES = {
     'brushed_concrete': 'concrete',
@@ -28,6 +30,14 @@ TEXTURES = {
     'stone_pavers': 'stone',
     'asphalt_01': 'asphalt',
     'interlocking_concrete_pavers': 'interlocking-pavement',
+    'roof_tiles': 'roofing-terracotta',
+    'grey_roof_tiles': 'roofing-grey-tile',
+    'corrugated_iron': 'roofing-metal',
+    'grass_ground': 'grass-ground',
+    'leafy_grass': 'grass-leafy',
+    'grass_concrete_pavement': 'grass-paver-mix',
+    'plaster_grey_04': 'plaster-render',
+    'red_brick': 'brick-wall',
 }
 
 def get_json(url):

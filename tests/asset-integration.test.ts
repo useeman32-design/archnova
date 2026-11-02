@@ -4,15 +4,15 @@ import { REAL_MODELS, REAL_MATERIALS } from '@/data/realAssets'
 import { variantFromAsset } from '@/data/toolLibrary'
 import { createLocalProjectService } from '@/services/projectService'
 import { defaultNewProjectForm } from '@/lib/defaultForm'
-import { SITE_PBR_ID, pbrIdForFinish } from '@/components/3d-viewer/PbrSurfaceMaterial'
+import { SITE_PBR_ID, pbrIdForFinish, pbrIdForRoof } from '@/components/3d-viewer/PbrSurfaceMaterial'
 import { threeModelService } from '@/services/threeModelService'
 
 beforeEach(() => localStorage.clear())
 
 describe('real asset starter collection', () => {
   it('registers only downloaded Poly Haven models/materials as imported assets with stable source identity', () => {
-    expect(REAL_MODELS).toHaveLength(24)
-    expect(REAL_MATERIALS).toHaveLength(6)
+    expect(REAL_MODELS).toHaveLength(26)
+    expect(REAL_MATERIALS).toHaveLength(14)
     for (const asset of [...REAL_MODELS, ...REAL_MATERIALS]) {
       expect(asset.id).toMatch(/^ph_(model|material)_/)
       expect(asset.source).toBe('Poly Haven')
@@ -25,7 +25,7 @@ describe('real asset starter collection', () => {
 
   it('includes the screened follow-up collection in real catalogs with authored source dimensions', () => {
     const ids = new Set(REAL_MODELS.map((asset) => asset.id))
-    for (const id of ['ph_model_dining_table', 'ph_model_modern_coffee_table_02', 'ph_model_wooden_table_02', 'ph_model_vintage_day_bed', 'ph_model_wheelchair_01', 'ph_model_schooldesk_01', 'ph_model_schoolchair_01', 'ph_model_street_lamp_02', 'ph_model_planter_box_01', 'ph_model_potted_plant_01']) expect(ids.has(id)).toBe(true)
+    for (const id of ['ph_model_dining_table', 'ph_model_modern_coffee_table_02', 'ph_model_wooden_table_02', 'ph_model_vintage_day_bed', 'ph_model_wheelchair_01', 'ph_model_schooldesk_01', 'ph_model_schoolchair_01', 'ph_model_street_lamp_02', 'ph_model_planter_box_01', 'ph_model_potted_plant_01', 'ph_model_shrub_02', 'ph_model_calathea_orbifolia_01']) expect(ids.has(id)).toBe(true)
     for (const asset of REAL_MODELS) {
       expect(asset.modelUrl).toMatch(/^\/assets\/polyhaven\/models\//)
       expect(asset.dimensionsM?.every((dimension) => dimension > 0)).toBe(true)
@@ -40,10 +40,16 @@ describe('real asset starter collection', () => {
   })
 
   it('uses downloaded PBR maps for real finishes and parametric site surfaces', () => {
+    expect(pbrIdForFinish('render')).toBe('ph_material_plaster_grey_04')
+    expect(pbrIdForFinish('brick')).toBe('ph_material_red_brick')
     expect(pbrIdForFinish('concrete')).toBe('ph_material_brushed_concrete')
     expect(pbrIdForFinish('wood')).toBe('ph_material_american_walnut_veneer')
     expect(pbrIdForFinish('stone')).toBe('ph_material_stone_pavers')
-    expect(SITE_PBR_ID).toEqual({ asphalt: 'ph_material_asphalt_01', paving: 'ph_material_interlocking_concrete_pavers' })
+    expect(pbrIdForFinish('metal')).toBe('ph_material_corrugated_iron')
+    expect(pbrIdForRoof('pitched-gable')).toBe('ph_material_roof_tiles')
+    expect(pbrIdForRoof('shed')).toBe('ph_material_corrugated_iron')
+    expect(pbrIdForRoof('flat')).toBe('ph_material_brushed_concrete')
+    expect(SITE_PBR_ID).toEqual({ asphalt: 'ph_material_asphalt_01', paving: 'ph_material_interlocking_concrete_pavers', grass: 'ph_material_grass_ground', grassPavers: 'ph_material_grass_concrete_pavement' })
   })
 
   it('retains model identity through local project save and reload', async () => {
@@ -54,10 +60,11 @@ describe('real asset starter collection', () => {
     const placed = { id: 'placed-real-sofa', assetId: 'ph_model_sofa_02', item: 'sofa', x: 0, z: 0, rotation: 0, scale: 1, width: 5.9, depth: 2.3, height: 2.3, color: '#79584d' }
     room.items = [...(room.items ?? []), placed]
     const landscape = [{ id: 'site-real-tree', assetId: 'ph_model_quiver_tree_02', kind: 'tree', x: 8, y: 7, rotation: 0, scale: 1, color: '#4f8a3f', width: 2.86, length: 2.89 }]
-    await service.update(project.id, { floors, landscape })
+    await service.update(project.id, { floors, landscape, preferences: { ...project.preferences, roofMaterial: 'ph_material_roof_tiles' } })
     const reloaded = await createLocalProjectService().get(project.id)
     expect(reloaded?.floors[0].rooms[0].items?.at(-1)?.assetId).toBe('ph_model_sofa_02')
     expect(reloaded?.landscape?.[0].assetId).toBe('ph_model_quiver_tree_02')
+    expect(reloaded?.preferences.roofMaterial).toBe('ph_material_roof_tiles')
   })
 
   it('reports the local Three.js GLTF loader as operational', () => {

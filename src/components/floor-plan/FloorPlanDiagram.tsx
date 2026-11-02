@@ -47,6 +47,10 @@ export interface FloorPlanDiagramProps {
   siteAccessPoints?: SiteAccessPoint[]
   siteRoutes?: { id: string; kind: SiteRouteKind; width: number; points: Vec2[] }[]
   buildingFootprints?: { id: string; name: string; role: string; footprint: SiteBoundary; entrances?: BuildingEntrance[] }[]
+  buildingInterior?: { buildingId: string; buildingName: string; floorLevel: number; floorName: string; rooms: Room[] } | null
+  selectedBuildingId?: string | null
+  onSelectBuilding?: (id: string | null) => void
+  onMoveBuilding?: (id: string, deltaX: number, deltaY: number) => void
   boundaryEditMode?: boolean
   boundaryDraft?: SiteVertex[]
   boundaryDraftEdgeLabels?: SiteEdgeLabel[]
@@ -95,6 +99,10 @@ export function FloorPlanDiagram({
   siteAccessPoints = [],
   siteRoutes = [],
   buildingFootprints = [],
+  buildingInterior = null,
+  selectedBuildingId = null,
+  onSelectBuilding,
+  onMoveBuilding,
   boundaryEditMode = false,
   boundaryDraft = [],
   boundaryDraftEdgeLabels = [],
@@ -131,6 +139,7 @@ export function FloorPlanDiagram({
   const svgRef = useRef<SVGSVGElement>(null)
   const [scale, setScale] = useState<number | null>(null)
   const [measurePts, setMeasurePts] = useState<Vec2[]>([])
+  const [buildingDragPreview, setBuildingDragPreview] = useState<{ id: string; dx: number; dy: number } | null>(null)
 
   const hasRooms = rooms.length > 0
   const hasContent = hasRooms || Boolean(plot)
@@ -188,6 +197,7 @@ export function FloorPlanDiagram({
   const edgeLabelRecords = boundaryEditMode ? boundaryDraftEdgeLabels : siteBoundary?.edgeLabels
   const canRenderEdgeLabels = showBoundary && edgeLabelVertices.length >= 3
     && (boundaryEditMode || siteBoundary?.status === 'defined' || siteBoundary?.status === 'assumed')
+  const buildingInteriorModel = buildingInterior ? getFloorArchitecturalModel(buildingInterior.rooms, undefined, undefined, wallThicknesses) : null
 
   const toPlanPoint = (event: ReactMouseEvent<SVGSVGElement>): Vec2 | null => {
     const svg = svgRef.current
@@ -224,6 +234,34 @@ export function FloorPlanDiagram({
   const treeDrag = useRef<{ mode: 'move' | 'resize'; id: string; startX: number; startY: number; x: number; y: number; scale: number } | null>(null)
   const itemDrag = useRef<{ roomId: string; item: PlacedItem } | null>(null)
   const boundaryDrag = useRef<number | null>(null)
+  const buildingDrag = useRef<{ id: string; startX: number; startY: number; dx: number; dy: number } | null>(null)
+
+  const startBuildingDrag = (event: ReactPointerEvent<SVGGElement>, buildingId: string) => {
+    if (!dragEnabled) return
+    event.stopPropagation()
+    buildingDrag.current = { id: buildingId, startX: event.clientX, startY: event.clientY, dx: 0, dy: 0 }
+    onSelectBuilding?.(buildingId)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  const moveBuildingDrag = (event: ReactPointerEvent<SVGGElement>) => {
+    const state = buildingDrag.current
+    if (!state) return
+    const dx = round1((event.clientX - state.startX) / s)
+    const dy = round1((event.clientY - state.startY) / s)
+    state.dx = dx
+    state.dy = dy
+    setBuildingDragPreview({ id: state.id, dx, dy })
+  }
+
+  const endBuildingDrag = (event: ReactPointerEvent<SVGGElement>) => {
+    const state = buildingDrag.current
+    if (!state) return
+    buildingDrag.current = null
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    setBuildingDragPreview(null)
+    if (state.dx !== 0 || state.dy !== 0) onMoveBuilding?.(state.id, state.dx, state.dy)
+  }
 
   /* Early return AFTER every hook — changing hook order between renders
      crashes React ("Rendered more hooks than during the previous render"). */
@@ -418,8 +456,35 @@ export function FloorPlanDiagram({
         const center = { x: vertices.reduce((sum, point) => sum + point.x, 0) / vertices.length, y: vertices.reduce((sum, point) => sum + point.y, 0) / vertices.length }
         const fill = overflow ? 'rgba(220,38,38,0.12)' : building.role === 'service' ? 'rgba(245,158,11,0.13)' : 'rgba(37,99,235,0.12)'
         const stroke = overflow ? '#dc2626' : building.role === 'service' ? '#b45309' : '#2563eb'
-        return <g key={building.id} aria-label={`${building.name} separate building footprint`}>
-          <polygon points={vertices.map((point) => `${point.x},${point.y}`).join(' ')} fill={fill} stroke={stroke} strokeWidth={u(1.25)} strokeDasharray={overflow ? `${u(2.5)} ${u(1.5)}` : undefined} strokeLinejoin="round">
+        const selected = selectedBuildingId === building.id
+        const preview = buildingDragPreview?.id === building.id ? buildingDragPreview : null
+        return <g
+          key={building.id}
+          role={dragEnabled ? 'button' : undefined}
+          tabIndex={dragEnabled ? 0 : undefined}
+          aria-label={`${building.name} conceptual building footprint${dragEnabled ? ', drag to move' : ''}`}
+          style={{ cursor: dragEnabled ? (buildingDrag.current?.id === building.id ? 'grabbing' : 'grab') : 'default', touchAction: dragEnabled ? 'none' : undefined }}
+          onClick={(event) => { if (dragEnabled) event.stopPropagation() }}
+          onPointerDown={(event) => startBuildingDrag(event, building.id)}
+          onPointerMove={moveBuildingDrag}
+          onPointerUp={endBuildingDrag}
+          onPointerCancel={endBuildingDrag}
+          onKeyDown={(event) => {
+            if (!dragEnabled) return
+            const step = event.shiftKey ? 5 : 1
+            const delta = event.key === 'ArrowLeft' ? { x: -step, y: 0 }
+              : event.key === 'ArrowRight' ? { x: step, y: 0 }
+                : event.key === 'ArrowUp' ? { x: 0, y: -step }
+                  : event.key === 'ArrowDown' ? { x: 0, y: step } : null
+            if (!delta) return
+            event.preventDefault()
+            event.stopPropagation()
+            onSelectBuilding?.(building.id)
+            onMoveBuilding?.(building.id, delta.x, delta.y)
+          }}
+        >
+          <g transform={preview ? `translate(${preview.dx} ${preview.dy})` : undefined}>
+          <polygon points={vertices.map((point) => `${point.x},${point.y}`).join(' ')} fill={fill} stroke={selected ? '#1d4ed8' : stroke} strokeWidth={u(selected ? 2 : 1.25)} strokeDasharray={overflow ? `${u(2.5)} ${u(1.5)}` : undefined} strokeLinejoin="round">
             <title>{`${building.name} · ${building.role} building${overflow ? ' · outside plot boundary' : ''}`}</title>
           </polygon>
           <text x={center.x} y={center.y} textAnchor="middle" dominantBaseline="middle" fontSize={u(7)} fontWeight={700} fill={overflow ? '#b91c1c' : stroke} stroke="white" strokeWidth={u(2.5)} paintOrder="stroke" pointerEvents="none">{building.name}{overflow ? ' · OUTSIDE' : ''}</text>
@@ -436,8 +501,30 @@ export function FloorPlanDiagram({
               <text x={0} y={u(0.3)} textAnchor="middle" dominantBaseline="middle" fontSize={u(2.6)} fontWeight={700} fill="white">E</text>
             </g>
           })}
+          </g>
         </g>
       })}
+      {buildingInterior?.rooms.length ? <g aria-label={`${buildingInterior.buildingName} · ${buildingInterior.floorName} interior rooms`} pointerEvents="none">
+        {buildingInterior.rooms.map((room) => {
+          const colors = ROOM_COLORS[room.category] ?? ROOM_COLORS.other
+          return <g key={`building-room-${buildingInterior.buildingId}-${room.id}`}>
+            <rect x={room.rect.x} y={room.rect.y} width={room.rect.w} height={room.rect.h} fill={colors.fill} fillOpacity="0.88" stroke={colors.stroke} strokeWidth={u(0.7)}>
+              <title>{`${buildingInterior.buildingName} · ${buildingInterior.floorName} · ${room.name}`}</title>
+            </rect>
+            {room.rect.w * s > 35 && room.rect.h * s > 18 ? <text x={room.rect.x + room.rect.w / 2} y={room.rect.y + room.rect.h / 2} textAnchor="middle" dominantBaseline="middle" fontSize={u(5)} fontWeight={600} fill={colors.text} pointerEvents="none">{room.name}</text> : null}
+          </g>
+        })}
+        {(buildingInteriorModel?.openings ?? []).map((opening) => {
+          const wall = buildingInteriorModel?.walls.find((candidate) => candidate.id === opening.wallId)
+          if (!wall) return null
+          const length = wallLength(wall)
+          if (length <= 0) return null
+          const from = opening.offset / length, to = Math.min(1, (opening.offset + opening.width) / length)
+          return <line key={`block-opening-${opening.id}`} x1={wall.start.x + (wall.end.x - wall.start.x) * from} y1={wall.start.y + (wall.end.y - wall.start.y) * from} x2={wall.start.x + (wall.end.x - wall.start.x) * to} y2={wall.start.y + (wall.end.y - wall.start.y) * to} stroke={opening.type === 'door' ? '#c2410c' : '#0284c7'} strokeWidth={u(1.6)} strokeLinecap="round">
+            <title>{`${opening.type === 'door' ? 'Door' : 'Window'} in ${buildingInterior.buildingName} · ${buildingInterior.floorName}`}</title>
+          </line>
+        })}
+      </g> : null}
       {canRenderEdgeLabels ? (
         <g aria-label="Plot edge labels" pointerEvents="none">
           {edgeLabelVertices.map((vertex, index) => {

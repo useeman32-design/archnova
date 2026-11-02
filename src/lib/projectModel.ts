@@ -8,6 +8,33 @@ import type { Building, Project, ProjectPurpose, SiteBoundary, SiteModel, SiteVe
  * without breaking older workspace code. Project-service mutations must use
  * mergeProjectModelUpdate so the two representations cannot drift.
  */
+export function translateBuildingFootprint(building: Building, deltaX: number, deltaY: number): Building {
+  if (!building.footprint || !Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return building
+  return {
+    ...building,
+    footprint: {
+      ...building.footprint,
+      vertices: building.footprint.vertices.map((vertex) => ({
+        ...vertex,
+        x: round4(vertex.x + deltaX),
+        y: round4(vertex.y + deltaY),
+      })),
+    },
+    floors: building.floors.map((floor) => ({
+      ...floor,
+      rooms: floor.rooms.map((room) => ({
+        ...room,
+        rect: { ...room.rect, x: round4(room.rect.x + deltaX), y: round4(room.rect.y + deltaY) },
+      })),
+      ...(floor.walls ? { walls: floor.walls.map((wall) => ({
+        ...wall,
+        start: { x: round4(wall.start.x + deltaX), y: round4(wall.start.y + deltaY) },
+        end: { x: round4(wall.end.x + deltaX), y: round4(wall.end.y + deltaY) },
+      })) } : {}),
+    })),
+  }
+}
+
 export function normalizeProjectModel(project: Project): Project {
   const purpose = project.purpose ?? purposeFromLegacyType(project.buildingType)
   const site = project.site ?? createSiteModel(project)
@@ -200,6 +227,10 @@ function createSiteModel(project: Project): SiteModel {
 function lengthUnitScale(from: Project['plot']['units'], to: Project['plot']['units']): number {
   if (from === to) return 1
   return from === 'ft' ? 0.3048 : 1 / 0.3048
+}
+
+function round4(value: number): number {
+  return Math.round(value * 10_000) / 10_000
 }
 
 function purposeFromLegacyType(buildingType: Project['buildingType']): ProjectPurpose {

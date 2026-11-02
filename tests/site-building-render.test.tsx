@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
 import { TOOL_GROUPS } from '@/data/toolLibrary'
 import type { SiteBoundary } from '@/types'
+
+if (!globalThis.ResizeObserver) globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
 
 describe('separate site building footprints', () => {
   it('offers a unit-aware conceptual parking bay in the site palette', () => {
@@ -65,5 +68,52 @@ describe('separate site building footprints', () => {
     expect(markup).toContain('OUTSIDE PLOT')
     expect(markup).toContain('stroke="#dc2626"')
     expect(markup).toContain('viewBox="-12 -20 86 90"')
+  })
+
+  it('renders the selected block floor rooms as a site-plan overlay', () => {
+    const markup = renderToStaticMarkup(<FloorPlanDiagram
+      rooms={[]}
+      units="ft"
+      plot={{ width: 40, length: 30 }}
+      buildingInterior={{
+        buildingId: 'block-a', buildingName: 'Block A', floorLevel: 2, floorName: 'Level 2',
+        rooms: [{
+          id: 'bedroom-2', name: 'Bedroom 2', category: 'bedroom', width: 10, length: 10, units: 'ft',
+          rect: { x: 8, y: 8, w: 10, h: 10 }, level: 2, furniture: [], elements: [],
+        }],
+      }}
+    />)
+    expect(markup).toContain('Block A · Level 2 interior rooms')
+    expect(markup).toContain('Block A · Level 2 · Bedroom 2')
+    expect(markup).toContain('fill="#e9eef9"')
+  })
+
+  it('lets the select tool drag a conceptual building footprint and reports its plan-unit offset', () => {
+    const onMoveBuilding = vi.fn()
+    const onSelectBuilding = vi.fn()
+    const boundary: SiteBoundary = {
+      id: 'plot-boundary', shape: 'rectangle', units: 'ft', status: 'defined', source: 'user-drawn',
+      vertices: [
+        { id: 'v1', x: 0, y: 0 }, { id: 'v2', x: 50, y: 0 },
+        { id: 'v3', x: 50, y: 50 }, { id: 'v4', x: 0, y: 50 },
+      ], assumptions: [],
+    }
+    const { getByRole } = render(<FloorPlanDiagram
+      rooms={[]}
+      units="ft"
+      plot={{ width: 50, length: 50 }}
+      dragEnabled
+      onMoveBuilding={onMoveBuilding}
+      onSelectBuilding={onSelectBuilding}
+      buildingFootprints={[{ id: 'building-a', name: 'Block A', role: 'secondary', footprint: { ...boundary, id: 'footprint-a', vertices: [
+        { id: 'a1', x: 6, y: 6 }, { id: 'a2', x: 26, y: 6 }, { id: 'a3', x: 26, y: 20 }, { id: 'a4', x: 6, y: 20 },
+      ] }, entrances: [{ id: 'entry-a', fromVertexId: 'a1', toVertexId: 'a2', fraction: 0.5, type: 'main' }] }]}
+    />)
+    const block = getByRole('button', { name: 'Block A conceptual building footprint, drag to move' })
+    fireEvent.pointerDown(block, { pointerId: 1, clientX: 10, clientY: 20 })
+    fireEvent.pointerMove(block, { pointerId: 1, clientX: 22, clientY: 26 })
+    fireEvent.pointerUp(block, { pointerId: 1, clientX: 22, clientY: 26 })
+    expect(onSelectBuilding).toHaveBeenCalledWith('building-a')
+    expect(onMoveBuilding).toHaveBeenCalledWith('building-a', 2, 1)
   })
 })

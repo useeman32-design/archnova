@@ -23,6 +23,7 @@ describe('Groq assistant client', () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(`${chunks}${completion}data: [DONE]\n`, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
     vi.stubGlobal('fetch', fetchMock)
     const project = createProjectFromForm(defaultNewProjectForm())
+    project.location = 'Lagos, Nigeria'
     const boundary = project.site?.boundary
     if (boundary) project.site = {
       ...project.site!,
@@ -49,6 +50,9 @@ describe('Groq assistant client', () => {
     expect(body.messages[1].content).toContain('furnitureItems')
     expect(body.messages[1].content).toContain('single-hinged')
     expect(body.messages[1].content).toContain('roofForms')
+    expect(body.messages[1].content).toContain('roofMaterialAssets')
+    expect(body.messages[1].content).toContain('climateHint')
+    expect(body.messages[1].content).toContain('Tropical humid West African')
     expect(body.messages[1].content).toContain('accessPoints')
     expect(body.messages[1].content).toContain('pedestrian')
     expect(body.messages[1].content).toContain('setback')
@@ -59,6 +63,42 @@ describe('Groq assistant client', () => {
       stage: 'initial.completion-metadata', status: 'success',
       details: expect.objectContaining({ responseId: 'req-test', model: DEFAULT_GROQ_MODEL, finishReason: 'stop', receivedDoneMarker: true, contentCharacters: streamedPlan.length, usage: { prompt_tokens: 22, completion_tokens: 10, total_tokens: 32 } }),
     }))
+  })
+
+  it('normalizes room, opening, and furniture operations targeted to a building floor', async () => {
+    const project = createProjectFromForm(defaultNewProjectForm())
+    const primary = project.buildings?.[0]
+    if (!primary) throw new Error('Project factory should create a primary building.')
+    project.buildings = [primary, {
+      ...primary, id: 'block-a', name: 'Block A', role: 'secondary',
+      floors: [{ id: 'block-ground', name: 'Ground Floor', level: 1, rooms: [] }, { id: 'block-upper', name: 'Level 2', level: 2, rooms: [] }],
+      footprint: { id: 'block-outline', shape: 'rectangle', units: project.plot.units, status: 'defined', source: 'user-drawn', assumptions: [], vertices: [
+        { id: 'a', x: 5, y: 5 }, { id: 'b', x: 25, y: 5 }, { id: 'c', x: 25, y: 25 }, { id: 'd', x: 5, y: 25 },
+      ] },
+    }]
+    const content = JSON.stringify({ reply: 'I prepared the second-floor interior.', actions: [
+      { type: 'add_room', building: 'Block A', floor: 2, room: { name: 'Bedroom', category: 'bedroom', width: 10, length: 10 } },
+      { type: 'add_opening', building: 'Block A', floor: 2, room: 'Bedroom', kind: 'window', wall: 'north' },
+      { type: 'add_furniture', building: 'block-a', floor: 2, room: 'Bedroom', item: 'bed', assetId: 'ph_model_vintage_day_bed' },
+      { type: 'add_room', room: { name: 'Unassigned Room', category: 'study', width: 9, length: 9 } },
+    ] })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const plan = await requestAssistantPlan({
+      apiKey: 'key', model: DEFAULT_GROQ_MODEL,
+      context: { project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 }, walls: [], units: project.plot.units },
+      history: [], prompt: 'Add a bedroom, window, and bed to Block A level 2.',
+    })
+    const blockRequestBody = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))
+    expect(blockRequestBody.max_completion_tokens).toBe(2200)
+    expect(blockRequestBody.messages[1].content).toContain('Block A')
+    expect(plan.actions).toEqual([
+      { type: 'add_room', building: 'Block A', floor: 2, room: { name: 'Bedroom', category: 'bedroom', width: 10, length: 10 } },
+      { type: 'add_opening', room: 'Bedroom', building: 'Block A', floor: 2, kind: 'window', wall: 'north' },
+      { type: 'add_furniture', room: 'Bedroom', building: 'block-a', floor: 2, item: 'bed', assetId: 'ph_model_vintage_day_bed' },
+    ])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(plan.unsupported?.join(' ')).toMatch(/must name the target building and floor/i)
   })
 
   it('retries a direct edit once when Groq replies conversationally without an operation', async () => {
@@ -406,7 +446,7 @@ describe('Groq assistant client', () => {
     const planText = JSON.stringify({
       reply: 'I updated the site and project finishes.',
       assumptions: ['The selected wall finish is a visual preview only.'],
-      project: { location: 'Lagos', budget: { amount: 60000000, currency: 'NGN' }, preferences: { exteriorFinish: 'paint', outdoor: ['garden'], roofColor: '#33415c' } },
+      project: { location: 'Lagos', budget: { amount: 60000000, currency: 'NGN' }, preferences: { exteriorFinish: 'paint', outdoor: ['garden'], roofColor: '#33415c', roofMaterial: 'ph_material_roof_tiles' } },
       plot: { shape: 'rectangle', units: 'ft' },
       wallThicknesses: { exterior: 0.75 },
       actions: [
@@ -430,6 +470,7 @@ describe('Groq assistant client', () => {
     ])
     expect(plan.project?.location).toBe('Lagos')
     expect(plan.project?.preferences?.outdoor).toEqual(['garden'])
+    expect(plan.project?.preferences?.roofMaterial).toBe('ph_material_roof_tiles')
     expect(plan.plot?.units).toBe('ft')
     expect(plan.assumptions).toContain('The selected wall finish is a visual preview only.')
     expect(plan.unsupported?.[0]).toContain('did not match a supported')

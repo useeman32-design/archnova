@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
-import { OrbitControls, TransformControls, Edges } from '@react-three/drei'
-import { CanvasTexture, DoubleSide, ExtrudeGeometry, RepeatWrapping, SRGBColorSpace, Shape, type Mesh, type Object3D } from 'three'
+import { OrbitControls, TransformControls, Edges, Sky } from '@react-three/drei'
+import { CanvasTexture, ExtrudeGeometry, RepeatWrapping, SRGBColorSpace, Shape, type Mesh, type Object3D } from 'three'
 import type { ArchitecturalWall, Building, FinishOption, LandscapeItem, PlacedItem, Project, Room, SiteBoundary, SiteVertex, WallOpening } from '@/types'
 import { getFloorArchitecturalModel, wallLength, wallSolidSections, type WallThicknessSettings } from '@/lib/architecturalModel'
 import { canonicalFurnitureKey, getFurnitureDimensions } from '@/lib/furniture'
 import { pointInPolygon, resolveSiteRoutePoints } from '@/lib/siteGeometry'
 import { conversionFactor } from '@/lib/unitConversion'
 import { RealAssetModel } from '@/components/assets/RealAssetModel'
-import { PbrSurfaceMaterial, pbrIdForFinish, SITE_PBR_ID } from '@/components/3d-viewer/PbrSurfaceMaterial'
+import { PbrSurfaceMaterial, pbrIdForFinish, pbrIdForRoof, SITE_PBR_ID } from '@/components/3d-viewer/PbrSurfaceMaterial'
 import { REAL_MODELS } from '@/data/realAssets'
 
 /**
@@ -349,7 +349,10 @@ function ExteriorScene({
     const vertices = project.site?.boundary?.vertices ?? []
     return project.site?.boundary?.status !== 'unknown' && vertices.length >= 3 ? makeSiteShape(vertices, plotW, plotL, S) : null
   }, [project.site?.boundary?.vertices, project.site?.boundary?.status, plotW, plotL])
+  const rectangularGroundKnown = (project.plot.shape === 'square' || project.plot.shape === 'rectangle') && project.site?.boundary?.status !== 'unknown'
   useEffect(() => () => wallTexture.dispose(), [wallTexture])
+  const tropicalLocation = /\b(lagos|nigeria|ghana|benin|togo|cameroon|senegal|ivory coast)\b/i.test(project.location)
+  const sunPosition: [number, number, number] = tropicalLocation ? [5.8, 12, 4.2] : [6.4, 10.5, 5.2]
   const topLevel = Math.max(...project.floors.map((f) => f.level), 1)
   const buildingRooms = project.floors.flatMap((floor) => floor.rooms.filter((room) => !FLAT_CATEGORIES.has(room.category)))
   const buildingBounds = buildingRooms.length ? {
@@ -366,22 +369,20 @@ function ExteriorScene({
 
   return (
     <>
-      <color attach="background" args={['#e8edf2']} />
-      <hemisphereLight args={['#ffffff', '#b9c2cc', 1.05]} />
-      <directionalLight position={[6, 9, 4]} intensity={1.35} castShadow />
-      <directionalLight position={[-5, 4, -6]} intensity={0.35} />
+      <Sky distance={450000} sunPosition={sunPosition} turbidity={tropicalLocation ? 7 : 5} rayleigh={1.8} mieCoefficient={0.004} mieDirectionalG={0.82} />
+      <hemisphereLight args={['#f5fbff', tropicalLocation ? '#758361' : '#a7afb8', 1.0]} />
+      <directionalLight position={sunPosition} intensity={1.45} castShadow />
+      <directionalLight position={[-5, 4, -6]} intensity={0.3} />
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
         <planeGeometry args={[plotW * S + 8, plotL * S + 8]} />
         <meshStandardMaterial color="#dfe4e8" />
       </mesh>
-      {boundaryShape ? (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]} receiveShadow>
-          <shapeGeometry args={[boundaryShape]} />
-          <meshStandardMaterial color="#e8efd9" roughness={0.98} side={DoubleSide} />
-          <Edges color="#0f766e" threshold={1} />
-        </mesh>
-      ) : null}
+      {boundaryShape || rectangularGroundKnown ? <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]} receiveShadow>
+        {boundaryShape ? <shapeGeometry args={[boundaryShape]} /> : <planeGeometry args={[plotW * S, plotL * S]} />}
+        <PbrSurfaceMaterial materialId={SITE_PBR_ID.grass} repeat={Math.max(2, Math.min(16, Math.max(plotW, plotL) / 7))} roughness={0.96} color="#ffffff" />
+        {boundaryShape ? <Edges color="#0f766e" threshold={1} /> : null}
+      </mesh> : null}
       {(project.site?.routes ?? []).map((route) => {
         const points = resolveSiteRoutePoints(route, project.site, project.buildings ?? [], project.plot.units)
         if (!points || points.length < 2) return null
@@ -395,7 +396,7 @@ function ExteriorScene({
             const midX = (start.x + end.x) / 2, midY = (start.y + end.y) / 2
             const angle = Math.atan2(dx, dy)
             return <group key={`${route.id}:${index}`} position={[(midX - plotW / 2) * S, 0, (midY - plotL / 2) * S]} rotation={[0, angle, 0]}>
-              <mesh position={[0, 0.015, 0]} receiveShadow><boxGeometry args={[width * S, 0.025, length * S]} /><meshStandardMaterial color={route.kind === 'road' ? '#4b5563' : '#b8a98a'} roughness={0.96} /></mesh>
+              <mesh position={[0, 0.015, 0]} receiveShadow><boxGeometry args={[width * S, 0.025, length * S]} /><PbrSurfaceMaterial materialId={route.kind === 'road' ? SITE_PBR_ID.asphalt : SITE_PBR_ID.paving} repeat={Math.max(1, length / 3)} roughness={0.93} color={route.kind === 'road' ? '#ffffff' : '#e7e4dd'} /></mesh>
               {route.kind === 'road' ? <mesh position={[0, 0.03, 0]}><boxGeometry args={[0.025, 0.006, length * S * 0.72]} /><meshStandardMaterial color="#e6d89e" /></mesh> : null}
             </group>
           })}
@@ -416,7 +417,7 @@ function ExteriorScene({
           <mesh position={[0, 0.08, 0]}><cylinderGeometry args={[0.045, 0.045, 0.16, 8]} /><meshStandardMaterial color={color} /></mesh>
         </group>
       })}
-      {(project.buildings ?? []).filter((building) => building.role !== 'primary' && (building.footprint?.vertices.length ?? 0) >= 3).map((building) => <SiteBuildingMass key={building.id} building={building} plotWidth={plotW} plotLength={plotL} siteBoundary={project.site?.boundary} defaultRoof={project.roof} roofColor={project.preferences.roofColor} />)}
+      {(project.buildings ?? []).filter((building) => building.role !== 'primary' && (building.footprint?.vertices.length ?? 0) >= 3).map((building) => <SiteBuildingMass key={building.id} building={building} plotWidth={plotW} plotLength={plotL} siteBoundary={project.site?.boundary} defaultRoof={project.roof} roofColor={project.preferences.roofColor} roofMaterialId={project.preferences.roofMaterial ?? pbrIdForRoof(building.roof ?? project.roof)} roofVisible={roofVisible} wallTexture={wallTexture} wallColor={project.preferences.exteriorColor ?? '#ffffff'} exteriorFinish={project.preferences.exteriorFinish} wallThicknesses={wallThicknesses} />)}
 
       {project.floors.flatMap((floor) =>
         floor.rooms.map((room) => {
@@ -509,14 +510,14 @@ function ExteriorScene({
 
       {buildingBounds && roofVisible ? (
         <group position={[(buildingBounds.minX + buildingBounds.maxX - plotW) * S / 2, 0, (buildingBounds.minY + buildingBounds.maxY - plotL) * S / 2]}>
-          <Roof form={project.roof} y={topLevel * (WALL_H + SLAB) + 0.08} width={(buildingBounds.maxX - buildingBounds.minX) * S * 1.08} length={(buildingBounds.maxY - buildingBounds.minY) * S * 1.08} color={project.preferences.roofColor} />
+          <Roof form={project.roof} y={topLevel * (WALL_H + SLAB) + 0.08} width={(buildingBounds.maxX - buildingBounds.minX) * S * 1.08} length={(buildingBounds.maxY - buildingBounds.minY) * S * 1.08} color={project.preferences.roofColor} materialId={project.preferences.roofMaterial ?? pbrIdForRoof(project.roof)} />
         </group>
       ) : null}
     </>
   )
 }
 
-function SiteBuildingMass({ building, plotWidth, plotLength, siteBoundary, defaultRoof, roofColor }: { building: Building; plotWidth: number; plotLength: number; siteBoundary?: SiteBoundary; defaultRoof: string; roofColor?: string }) {
+function SiteBuildingMass({ building, plotWidth, plotLength, siteBoundary, defaultRoof, roofColor, roofMaterialId, roofVisible, wallTexture, wallColor, exteriorFinish, wallThicknesses }: { building: Building; plotWidth: number; plotLength: number; siteBoundary?: SiteBoundary; defaultRoof: string; roofColor?: string; roofMaterialId: string; roofVisible: boolean; wallTexture: CanvasTexture; wallColor: string; exteriorFinish: FinishOption; wallThicknesses: WallThicknessSettings }) {
   const footprint = building.footprint
   const height = Math.max(1, building.floors.length) * (WALL_H + SLAB)
   const geometry = useMemo(() => {
@@ -543,11 +544,52 @@ function SiteBuildingMass({ building, plotWidth, plotLength, siteBoundary, defau
   const minX = Math.min(...vertices.map((point) => point.x)), maxX = Math.max(...vertices.map((point) => point.x))
   const minY = Math.min(...vertices.map((point) => point.y)), maxY = Math.max(...vertices.map((point) => point.y))
   const centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2
+  const hasInteriorRooms = building.floors.some((floor) => floor.rooms.some((room) => !FLAT_CATEGORIES.has(room.category)))
   return <>
-    <mesh geometry={geometry} position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
-      <meshStandardMaterial color={color} roughness={0.82} />
+    {geometry ? <mesh geometry={geometry} position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
+      <meshStandardMaterial color={color} roughness={0.82} transparent={hasInteriorRooms} opacity={hasInteriorRooms ? 0.13 : 1} depthWrite={!hasInteriorRooms} />
       <Edges color={edgeColor} threshold={8} />
-    </mesh>
+    </mesh> : null}
+    {building.floors.flatMap((floor) => floor.rooms.filter((room) => !FLAT_CATEGORIES.has(room.category)).map((room) => {
+      const cx = (room.rect.x + room.rect.w / 2 - plotWidth / 2) * S
+      const cz = (room.rect.y + room.rect.h / 2 - plotLength / 2) * S
+      const floorY = (floor.level - 1) * (WALL_H + SLAB) + 0.014
+      const floorColor = room.finishColor ?? '#d8d5cd'
+      return <mesh key={`site-room-floor-${building.id}-${floor.level}-${room.id}`} position={[cx, floorY, cz]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <shapeGeometry args={[makeRoomShape(room, S)]} />
+        <meshStandardMaterial color={floorColor} roughness={0.82} />
+      </mesh>
+    }))}
+    {building.floors.flatMap((floor) => floor.rooms.filter((room) => !FLAT_CATEGORIES.has(room.category) && (room.items?.length ?? 0) > 0).map((room) => {
+      const cx = (room.rect.x + room.rect.w / 2 - plotWidth / 2) * S
+      const cz = (room.rect.y + room.rect.h / 2 - plotLength / 2) * S
+      const floorY = (floor.level - 1) * (WALL_H + SLAB) + 0.03
+      return <group key={`site-room-items-${building.id}-${floor.level}-${room.id}`} position={[cx, floorY, cz]}>
+        {(room.items ?? []).map((item) => {
+          const defaults = getFurnitureDimensions(item.item, room.units)
+          const width = item.width ?? defaults.width, depth = item.depth ?? defaults.depth, height = item.height ?? defaults.height
+          const ceilingMounted = REAL_MODELS.some((asset) => asset.id === item.assetId && asset.placement === 'ceiling')
+          return <group key={item.id} position={[item.x * room.rect.w * S, ceilingMounted ? WALL_H - height * S : 0, item.z * room.rect.h * S]} rotation={[0, item.rotation, 0]} scale={item.scale}>
+            {item.assetId
+              ? <RealAssetModel assetId={item.assetId} targetWorldSize={[width * S, height * S, depth * S]} />
+              : <FurniturePiece item={item.item} width={width} depth={depth} height={height} color={item.color} />}
+          </group>
+        })}
+      </group>
+    }))}
+    {building.floors.flatMap((floor) => {
+      const model = getFloorArchitecturalModel(floor.rooms, floor.walls, floor.openings, wallThicknesses)
+      return model.walls.map((wall) => <ExteriorWall
+        key={`site-wall-${building.id}-${floor.level}-${wall.id}`}
+        wall={{ ...wall, level: floor.level }}
+        openings={model.openings.filter((opening) => opening.wallId === wall.id)}
+        plotWidth={plotWidth}
+        plotLength={plotLength}
+        wallTexture={wallTexture}
+        wallColor={wallColor}
+        exteriorFinish={exteriorFinish}
+      />)
+    })}
     {(building.entrances ?? []).map((entrance) => {
       const start = vertices.find((point) => point.id === entrance.fromVertexId)
       const end = vertices.find((point) => point.id === entrance.toVertexId)
@@ -561,9 +603,9 @@ function SiteBuildingMass({ building, plotWidth, plotLength, siteBoundary, defau
         <meshStandardMaterial color={color} />
       </mesh>
     })}
-    <group position={[(centerX - plotWidth / 2) * S, 0, (centerY - plotLength / 2) * S]}>
-      <Roof form={building.roof ?? defaultRoof} y={height + 0.08} width={(maxX - minX) * S * 1.08} length={(maxY - minY) * S * 1.08} color={roofColor} />
-    </group>
+    {roofVisible ? <group position={[(centerX - plotWidth / 2) * S, 0, (centerY - plotLength / 2) * S]}>
+      <Roof form={building.roof ?? defaultRoof} y={height + 0.08} width={(maxX - minX) * S * 1.08} length={(maxY - minY) * S * 1.08} color={roofColor} materialId={roofMaterialId} />
+    </group> : null}
   </>
 }
 
@@ -691,9 +733,13 @@ function OpeningFixture({ opening, wallThickness, wallLength }: { opening: WallO
   return (
     <group position={[(opening.offset + opening.width / 2 - wallLength / 2) * scale, sill + height / 2, 0]}>
       <mesh><boxGeometry args={[width, height, Math.max(0.025, wallThickness * 0.45)]} />{glass}</mesh>
-      <mesh position={[0, height / 2, wallThickness * 0.32]}><boxGeometry args={[width, 0.018, 0.012]} />{frame}</mesh>
-      <mesh position={[0, -height / 2, wallThickness * 0.32]}><boxGeometry args={[width, 0.018, 0.012]} />{frame}</mesh>
-      {opening.style === 'casement' || opening.style === 'sliding' ? <mesh position={[0, 0, wallThickness * 0.32]}><boxGeometry args={[0.018, height, 0.012]} />{frame}</mesh> : null}
+      {[-1, 1].map((side) => <mesh key={`jamb-${side}`} position={[side * (width / 2 - 0.009), 0, wallThickness * 0.32]}><boxGeometry args={[0.018, height + 0.018, 0.016]} />{frame}</mesh>)}
+      <mesh position={[0, height / 2 - 0.009, wallThickness * 0.32]}><boxGeometry args={[width, 0.018, 0.016]} />{frame}</mesh>
+      <mesh position={[0, -height / 2 + 0.009, wallThickness * 0.32]}><boxGeometry args={[width, 0.018, 0.016]} />{frame}</mesh>
+      <mesh position={[0, -height / 2 - 0.024, wallThickness * 0.42]} castShadow><boxGeometry args={[width + 0.09, 0.045, wallThickness * 0.8]} />{frame}</mesh>
+      {opening.style === 'casement' || opening.style === 'sliding' ? <mesh position={[0, 0, wallThickness * 0.34]}><boxGeometry args={[0.018, height - 0.02, 0.016]} />{frame}</mesh> : null}
+      {opening.style === 'sliding' ? <mesh position={[width * 0.24, 0, wallThickness * 0.31]}><boxGeometry args={[0.012, height - 0.04, 0.012]} /><meshStandardMaterial color="#bdc5c7" metalness={0.55} roughness={0.34} /></mesh> : null}
+      {opening.style === 'casement' ? <mesh position={[width * 0.37, 0, wallThickness * 0.43]}><boxGeometry args={[0.016, 0.04, 0.018]} /><meshStandardMaterial color="#a6a9a5" metalness={0.65} roughness={0.32} /></mesh> : null}
     </group>
   )
 }
@@ -811,8 +857,9 @@ function Tree({ position, kind = 'palm', color = '#4f8a3f' }: { position: [numbe
   )
 }
 
-function Roof({ form, y, width, length, color = '#33415c' }: { form: string; y: number; width: number; length: number; color?: string }) {
+function Roof({ form, y, width, length, color = '#33415c', materialId }: { form: string; y: number; width: number; length: number; color?: string; materialId?: string }) {
   const rise = Math.min(width, length) * 0.32
+  const roofMaterialId = materialId ?? pbrIdForRoof(form)
 
   if (form === 'pitched-gable') {
     const slope = Math.atan2(rise, length / 2)
@@ -821,11 +868,11 @@ function Roof({ form, y, width, length, color = '#33415c' }: { form: string; y: 
       <group position={[0, y, 0]}>
         <mesh position={[0, rise / 2, -length / 4]} rotation={[slope, 0, 0]} castShadow>
           <boxGeometry args={[width + 0.24, 0.05, panel]} />
-          <meshStandardMaterial color={color} roughness={0.7} />
+          <PbrSurfaceMaterial materialId={roofMaterialId} repeat={3} color={color} roughness={0.78} />
         </mesh>
         <mesh position={[0, rise / 2, length / 4]} rotation={[-slope, 0, 0]} castShadow>
           <boxGeometry args={[width + 0.24, 0.05, panel]} />
-          <meshStandardMaterial color={color} roughness={0.7} />
+          <PbrSurfaceMaterial materialId={roofMaterialId} repeat={3} color={color} roughness={0.78} />
         </mesh>
       </group>
     )
@@ -834,7 +881,7 @@ function Roof({ form, y, width, length, color = '#33415c' }: { form: string; y: 
     return (
       <mesh position={[0, y + rise / 2 + 0.08, 0]} rotation={[0, Math.PI / 4, 0]} scale={[width * 0.72, 1, length * 0.72]} castShadow>
         <coneGeometry args={[1, rise, 4]} />
-        <meshStandardMaterial color={color} roughness={0.7} />
+        <PbrSurfaceMaterial materialId={roofMaterialId} repeat={3} color={color} roughness={0.78} />
       </mesh>
     )
   }
@@ -842,7 +889,7 @@ function Roof({ form, y, width, length, color = '#33415c' }: { form: string; y: 
     return (
       <mesh position={[0, y + Math.sin(0.28) * length / 2 + 0.08, 0]} rotation={[0.28, 0, 0]} castShadow>
         <boxGeometry args={[width + 0.24, 0.06, length + 0.3]} />
-        <meshStandardMaterial color={color} roughness={0.7} />
+        <PbrSurfaceMaterial materialId={roofMaterialId} repeat={3} color={color} roughness={0.78} />
       </mesh>
     )
   }
@@ -850,14 +897,14 @@ function Roof({ form, y, width, length, color = '#33415c' }: { form: string; y: 
     return (
       <mesh position={[0, y, 0]} scale={[width * 0.55, rise * 1.1, length * 0.55]} castShadow>
         <sphereGeometry args={[1, 28, 18, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={color} roughness={0.6} />
+        <PbrSurfaceMaterial materialId={roofMaterialId} repeat={3} color={color} roughness={0.72} />
       </mesh>
     )
   }
   return (
     <mesh position={[0, y + 0.04, 0]} castShadow>
       <boxGeometry args={[width + 0.3, 0.09, length + 0.3]} />
-      <meshStandardMaterial color="#42506b" roughness={0.75} />
+      <PbrSurfaceMaterial materialId={roofMaterialId} repeat={3} color={color} roughness={0.82} />
     </mesh>
   )
 }

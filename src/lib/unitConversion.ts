@@ -1,4 +1,4 @@
-import type { PlacedItem, Room, Units } from '@/types'
+import type { Building, PlacedItem, Room, Units } from '@/types'
 import type { Ornament } from '@/pages/workspace/WorkspaceLayout'
 
 export function conversionFactor(from: Units, to: Units): number {
@@ -23,6 +23,41 @@ export function convertRoomUnits(room: Room, to: Units): Room {
       ...(element.sillHeight !== undefined ? { sillHeight: round(element.sillHeight * factor) } : {}),
     })),
     items: room.items?.map((item) => convertPlacedItem(item, room.units, to)),
+  }
+}
+
+export function convertBuildingLayoutUnits(building: Building, to: Units, fromUnits?: Units): Building {
+  const sourceUnits = building.footprint?.units ?? building.floors.flatMap((floor) => floor.rooms).find((room) => room.units)?.units ?? fromUnits ?? to
+  if (sourceUnits === to) return building
+  const factor = conversionFactor(sourceUnits, to)
+  const scale = (value: number) => round(value * factor)
+  return {
+    ...building,
+    floors: building.floors.map((floor) => ({
+      ...floor,
+      rooms: floor.rooms.map((room) => convertRoomUnits(room, to)),
+      ...(floor.walls ? { walls: floor.walls.map((wall) => ({
+        ...wall,
+        start: { x: scale(wall.start.x), y: scale(wall.start.y) },
+        end: { x: scale(wall.end.x), y: scale(wall.end.y) },
+        thickness: scale(wall.thickness),
+        height: scale(wall.height),
+      })) } : {}),
+      ...(floor.openings ? { openings: floor.openings.map((opening) => ({
+        ...opening,
+        offset: scale(opening.offset),
+        width: scale(opening.width),
+        height: scale(opening.height),
+        sillHeight: scale(opening.sillHeight),
+      })) } : {}),
+    })),
+    ...(building.footprint ? { footprint: {
+      ...building.footprint,
+      units: to,
+      vertices: building.footprint.vertices.map((vertex) => ({ ...vertex, x: scale(vertex.x), y: scale(vertex.y) })),
+      ...(building.footprint.area !== undefined ? { area: round(building.footprint.area * factor * factor) } : {}),
+      ...(building.footprint.edgeLabels ? { edgeLabels: building.footprint.edgeLabels.map((edge) => ({ ...edge, ...(edge.setback !== undefined ? { setback: scale(edge.setback) } : {}) })) } : {}),
+    } } : {}),
   }
 }
 
