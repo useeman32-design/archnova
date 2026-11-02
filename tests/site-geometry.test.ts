@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import type { SiteVertex } from '@/types'
-import { classifyBoundaryShape, describeSiteEdgeLabel, findSiteEdgeLabel, pointInPolygon, polygonArea, siteEdgeLength, validateSiteBoundary } from '@/lib/siteGeometry'
+import type { Building, LandscapeItem, SiteBoundary, SiteRoute, SiteVertex } from '@/types'
+import { classifyBoundaryShape, describeSiteEdgeLabel, findSiteEdgeLabel, pointInPolygon, polygonArea, resolveSiteRoutePoints, siteEdgeLength, validateSiteBoundary, validateSiteBuildingPlacement, validateSiteParkingBays, validateSiteRoutes } from '@/lib/siteGeometry'
 
 const polygon = (...points: [number, number][]): SiteVertex[] => points.map(([x, y], index) => ({ id: `v${index + 1}`, x, y }))
+const siteBuilding = (id: string, x: number, y: number, width: number, length: number, units: 'ft' | 'm' = 'ft'): Building => ({
+  id, name: id, purpose: { category: 'commercial', use: 'test' }, role: 'secondary', floors: [], assumptions: [],
+  footprint: {
+    id: `footprint:${id}`, shape: 'rectangle', vertices: polygon([x, y], [x + width, y], [x + width, y + length], [x, y + length]),
+    units, status: 'defined', source: 'user-drawn', assumptions: [],
+  },
+})
+const rectangularBoundary = (width: number, length: number, units: 'ft' | 'm' = 'ft', setback = 0): SiteBoundary => ({
+  id: 'site-boundary', shape: 'rectangle', vertices: polygon([0, 0], [width, 0], [width, length], [0, length]), units,
+  status: 'defined', source: 'user-drawn', assumptions: [],
+  edgeLabels: setback > 0 ? [{ fromVertexId: 'v1', toVertexId: 'v2', type: 'front', setback }] : [],
+})
 
 describe('site boundary geometry', () => {
   it('calculates polygon area for a concave L-shaped site', () => {
@@ -36,6 +48,52 @@ describe('site boundary geometry', () => {
     const rect = polygon([0, 0], [10, 0], [10, 8], [0, 8])
     expect(pointInPolygon({ x: 10, y: 3 }, rect)).toBe(true)
     expect(validateSiteBoundary(rect, { width: 10, length: 8 })).toEqual([])
+  })
+
+  it('reports deterministic building overlap, boundary overflow, setbacks, and unit-normalized clear placement', () => {
+    const boundary = rectangularBoundary(40, 30, 'ft', 5)
+    const validA = siteBuilding('A', 8, 6, 8, 8)
+    const validB = siteBuilding('B', 20, 6, 8, 8)
+    expect(validateSiteBuildingPlacement([validA, validB], boundary, 'ft')).toEqual([])
+
+    const overlapping = siteBuilding('Overlap', 12, 8, 8, 8)
+    const setbackViolation = siteBuilding('Near front', 4, 1, 6, 6)
+    const outside = siteBuilding('Outside', 37, 8, 6, 6)
+    const issues = validateSiteBuildingPlacement([validA, overlapping, setbackViolation, outside], boundary, 'ft')
+    expect(issues.map((issue) => issue.code)).toContain('overlapping-site-buildings')
+    expect(issues.map((issue) => issue.code)).toContain('site-building-violates-setback')
+    expect(issues.map((issue) => issue.code)).toContain('site-building-outside-boundary')
+
+    const meterBuilding = siteBuilding('Metric', 3, 3, 3, 3, 'm')
+    expect(validateSiteBuildingPlacement([meterBuilding], rectangularBoundary(100, 100, 'ft'), 'ft')).toEqual([])
+  })
+
+  it('checks conceptual parking bays against the plot, buildings, and other bays', () => {
+    const boundary = rectangularBoundary(40, 30)
+    const bay = (id: string, x: number, y: number): LandscapeItem => ({ id, kind: 'parking-bay', x, y, rotation: 0, scale: 1, color: '#59616a', width: 9, length: 18 })
+    const clearBay = bay('clear', 10, 15)
+    expect(validateSiteParkingBays([clearBay], [], boundary, { width: 40, length: 30 }, 'ft')).toEqual([])
+    const building = siteBuilding('Block', 8, 10, 6, 8)
+    const issues = validateSiteParkingBays([clearBay, bay('overlap', 11, 16), bay('outside', 39, 28)], [building], boundary, { width: 40, length: 30 }, 'ft')
+    expect(issues.map((issue) => issue.code)).toContain('parking-bay-overlaps-building')
+    expect(issues.map((issue) => issue.code)).toContain('overlapping-parking-bays')
+    expect(issues.map((issue) => issue.code)).toContain('parking-bay-outside-boundary')
+  })
+
+  it('resolves user-drawn routes between explicit boundary access and building entrance anchors', () => {
+    const boundary = rectangularBoundary(40, 30)
+    const access = { id: 'gate', fromVertexId: 'v1', toVertexId: 'v2', fraction: 0.25, type: 'vehicle' as const }
+    const building = siteBuilding('Block', 20, 15, 8, 8)
+    building.entrances = [{ id: 'main-door', fromVertexId: 'v1', toVertexId: 'v2', fraction: 0.5, type: 'main' }]
+    const route: SiteRoute = { id: 'drive', kind: 'road', fromAccessPointId: access.id, toBuildingId: building.id, toEntranceId: 'main-door', width: 12, units: 'ft', waypoints: [{ x: 16, y: 8 }] }
+    const site = { boundary, accessPoints: [access], routes: [route], assumptions: [] }
+    expect(resolveSiteRoutePoints(route, site, [building], 'ft')).toEqual([{ x: 10, y: 0 }, { x: 16, y: 8 }, { x: 24, y: 15 }])
+    expect(validateSiteRoutes([route], site, [building], { width: 40, length: 30 }, 'ft')).toEqual([])
+    const obstruction = siteBuilding('Generator', 14, 5, 4, 4)
+    expect(validateSiteRoutes([route], site, [building, obstruction], { width: 40, length: 30 }, 'ft').map((issue) => issue.code)).toContain('site-route-crosses-building')
+    expect(validateSiteRoutes([route], { ...site, accessPoints: [] }, [building], { width: 40, length: 30 }, 'ft').map((issue) => issue.code)).toContain('site-route-disconnected')
+    const outside = { ...route, waypoints: [{ x: 45, y: 35 }] }
+    expect(validateSiteRoutes([outside], site, [building], { width: 40, length: 30 }, 'ft').map((issue) => issue.code)).toContain('site-route-outside-boundary')
   })
 
   it('derives edge lengths from vertices and resolves only explicit directional or custom labels', () => {

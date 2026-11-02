@@ -50,7 +50,7 @@ const PALETTE: { id: ToolId; icon: LucideIcon; label: string; hint: string; plan
   { id: 'door', icon: DoorOpen, label: 'Doors & gates', hint: 'Place on a selected room in 2D or 3D', group: true },
   { id: 'window', icon: AppWindow, label: 'Windows', hint: 'Place on a selected room in 2D or 3D', group: true },
   { id: 'interior', icon: Sofa, label: 'Interior', hint: 'Click a room in 2D, or drop items into the 3D view', group: true },
-  { id: 'trees', icon: TreePine, label: 'Site objects', hint: 'Planting, cars and scale figures', group: true },
+  { id: 'trees', icon: TreePine, label: 'Site objects', hint: 'Planting, parking, roads, paths and other site objects', group: true },
   { id: 'roof', icon: Home, label: 'Roof', hint: 'Roof forms for the 3D preview', group: true },
   { id: 'finish', icon: Paintbrush, label: 'Finishes', hint: 'Exterior & interior materials', group: true },
   { id: 'measure', icon: Crosshair, label: 'Measure', hint: 'Click two points to read a distance', planOnly: true },

@@ -181,7 +181,8 @@ export function applyAssistantPlan(input: ApplyAssistantPlanInput): ApplyAssista
       }
       if (!center || (!overflowPlacement && !placementFits)) {
         siteFitConflicts.push(action.name)
-        errors.push(`No clear plot area could fit ${action.name} (${width} × ${length} ${units}); choose skip, add anyway, or shrink to fit.`)
+        const hasSetbacks = (project.site?.boundary?.edgeLabels ?? []).some((edge) => (edge.setback ?? 0) > 0)
+        errors.push(`No clear plot area could fit ${action.name} (${width} × ${length} ${units})${hasSetbacks ? ' while respecting the configured edge setbacks' : ''}; choose skip, add anyway, or shrink to fit.`)
         break
       }
       const footprint = makeBuildingFootprint(action.name, center, width, length, rotation, units)
@@ -528,7 +529,7 @@ function resolveHostWall(walls: ArchitecturalWall[], room: Room, query: string):
 }
 function defaultSiteDimensions(kind: string, units: Units): { width: number; length: number } {
   const f = units === 'ft' ? 1 : 0.3048
-  const sizes: Record<string, [number, number]> = { car: [7, 14], fence: [0.35, 10], gate: [12, 0.5], road: [16, 60], path: [4, 24], 'street-light': [0.5, 0.5], palm: [3, 3], conifer: [3, 3], shrub: [2, 2], flower: [2, 2], hedge: [2, 8], person: [1, 1] }
+  const sizes: Record<string, [number, number]> = { car: [7, 14], fence: [0.35, 10], gate: [12, 0.5], road: [16, 60], path: [4, 24], 'parking-bay': [9, 18], 'street-light': [0.5, 0.5], palm: [3, 3], conifer: [3, 3], shrub: [2, 2], flower: [2, 2], hedge: [2, 8], person: [1, 1] }
   const [width, length] = sizes[kind] ?? [2, 2]
   return { width: round4(width * f), length: round4(length * f) }
 }
@@ -601,13 +602,32 @@ function buildingFootprintInsideSite(corners: Vec2[], plotWidth: number, plotLen
   if (corners.some((point) => point.x < 0 || point.y < 0 || point.x > plotWidth || point.y > plotLength)) return false
   if (!boundary || boundary.status === 'unknown' || boundary.vertices.length < 3) return true
   const polygon = boundary.vertices.map((point) => ({ x: point.x * boundaryScale, y: point.y * boundaryScale }))
-  const samples = [...corners]
+  const perimeterSamples = [...corners]
   for (let i = 0; i < corners.length; i += 1) {
     const a = corners[i], b = corners[(i + 1) % corners.length]
-    for (const t of [0.25, 0.5, 0.75]) samples.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
+    for (const t of [0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]) perimeterSamples.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
   }
-  samples.push({ x: corners.reduce((sum, point) => sum + point.x, 0) / corners.length, y: corners.reduce((sum, point) => sum + point.y, 0) / corners.length })
-  return samples.every((point) => pointInPolygon(point, polygon))
+  const samples = [...perimeterSamples, { x: corners.reduce((sum, point) => sum + point.x, 0) / corners.length, y: corners.reduce((sum, point) => sum + point.y, 0) / corners.length }]
+  if (!samples.every((point) => pointInPolygon(point, polygon))) return false
+  const setbackEdges = (boundary.edgeLabels ?? []).filter((edge) => Number.isFinite(edge.setback) && (edge.setback ?? 0) > 0)
+  for (const edge of setbackEdges) {
+    const rawStart = boundary.vertices.find((point) => point.id === edge.fromVertexId)
+    const rawEnd = boundary.vertices.find((point) => point.id === edge.toVertexId)
+    if (!rawStart || !rawEnd) continue
+    const start = { x: rawStart.x * boundaryScale, y: rawStart.y * boundaryScale }
+    const end = { x: rawEnd.x * boundaryScale, y: rawEnd.y * boundaryScale }
+    const minimum = (edge.setback ?? 0) * boundaryScale
+    if (perimeterSamples.some((point) => pointSegmentDistance(point, start, end) < minimum - 1e-6)) return false
+  }
+  return true
+}
+
+function pointSegmentDistance(point: Vec2, start: Vec2, end: Vec2): number {
+  const dx = end.x - start.x, dy = end.y - start.y
+  const lengthSquared = dx * dx + dy * dy
+  if (lengthSquared <= 1e-12) return Math.hypot(point.x - start.x, point.y - start.y)
+  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared))
+  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy))
 }
 
 function boundsOverlap(a: { minX: number; minY: number; maxX: number; maxY: number }, b: { minX: number; minY: number; maxX: number; maxY: number }, gap: number): boolean {
@@ -692,7 +712,7 @@ function findSiteItemPosition(
   }
   return null
 }
-function siteColor(kind: string): string { return kind === 'car' ? '#53677e' : kind === 'person' ? '#455f87' : kind === 'road' ? '#555b62' : kind === 'path' ? '#c9c4b9' : kind === 'fence' || kind === 'gate' ? '#6c6254' : '#4f8a3f' }
+function siteColor(kind: string): string { return kind === 'car' ? '#53677e' : kind === 'person' ? '#455f87' : kind === 'road' || kind === 'parking-bay' ? '#555b62' : kind === 'path' ? '#c9c4b9' : kind === 'fence' || kind === 'gate' ? '#6c6254' : '#4f8a3f' }
 function issueKey(issue: PlanIssue) { return `${issue.code}|${issue.roomId ?? ''}|${issue.message}` }
 function round1(value: number) { return Math.round(value * 10) / 10 }
 function round4(value: number) { return Math.round(value * 10000) / 10000 }

@@ -48,10 +48,17 @@ export function mergeProjectModelUpdate(project: Project, patch: Partial<Project
     const boundary = previousSite?.boundary
     if (boundary?.source === 'dimension-derived') {
       const derived = createSiteModel(merged)
+      const derivedBoundary = derived.boundary
+      const validEdges = new Set((derivedBoundary?.vertices ?? []).map((vertex, index, vertices) => `${vertex.id}:${vertices[(index + 1) % vertices.length]?.id ?? ''}`))
+      const scale = lengthUnitScale(previous.plot.units, merged.plot.units)
+      const edgeLabels = boundary.edgeLabels?.filter((edge) => validEdges.has(`${edge.fromVertexId}:${edge.toVertexId}`)).map((edge) => ({ ...edge, ...(edge.setback !== undefined ? { setback: edge.setback * scale } : {}) }))
+      const accessPoints = previousSite?.accessPoints?.filter((point) => validEdges.has(`${point.fromVertexId}:${point.toVertexId}`))
       merged.site = {
         ...derived,
         northDirectionDegrees: previousSite?.northDirectionDegrees ?? null,
         orientationSource: previousSite?.orientationSource ?? 'unknown',
+        ...(accessPoints ? { accessPoints } : {}),
+        ...(derivedBoundary ? { boundary: { ...derivedBoundary, ...(edgeLabels ? { edgeLabels } : {}) } } : {}),
       }
     } else if (boundary) {
       const scale = lengthUnitScale(previous.plot.units, merged.plot.units)
@@ -65,8 +72,21 @@ export function mergeProjectModelUpdate(project: Project, patch: Partial<Project
           vertices,
           units: merged.plot.units,
           ...(boundary.area !== undefined ? { area: boundary.area * scale * scale } : {}),
+          ...(boundary.edgeLabels ? { edgeLabels: boundary.edgeLabels.map((edge) => ({ ...edge, ...(edge.setback !== undefined ? { setback: edge.setback * scale } : {}) })) } : {}),
           ...(isKnownPolygon ? {} : { status: 'unknown' as const }),
         },
+      }
+    }
+    if (previousSite?.routes?.length) {
+      const scale = lengthUnitScale(previous.plot.units, merged.plot.units)
+      merged.site = {
+        ...(merged.site ?? previousSite),
+        routes: previousSite.routes.map((route) => ({
+          ...route,
+          units: merged.plot.units,
+          width: route.width * scale,
+          waypoints: route.waypoints.map((point) => ({ x: point.x * scale, y: point.y * scale })),
+        })),
       }
     }
   }

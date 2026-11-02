@@ -63,6 +63,8 @@ export interface SiteEdgeLabel {
   toVertexId: string
   type: SiteEdgeLabelType
   customName?: string
+  /** Minimum conceptual building clearance from this edge, in plot units. */
+  setback?: number
 }
 
 /** An actual polygon when vertices are present; unknown geometry stays empty, never rectangularized. */
@@ -79,8 +81,38 @@ export interface SiteBoundary {
   assumptions: string[]
 }
 
+export type SiteAccessKind = 'vehicle' | 'pedestrian' | 'service'
+
+/** A user-designated access point along a specific recorded site-boundary edge. */
+export interface SiteAccessPoint {
+  id: string
+  fromVertexId: string
+  toVertexId: string
+  /** Fraction along the directed edge, from 0 to 1. */
+  fraction: number
+  type: SiteAccessKind
+  label?: string
+}
+
+export type SiteRouteKind = 'road' | 'path'
+
+/** User-drawn conceptual route between an explicit site access point and a building entrance. */
+export interface SiteRoute {
+  id: string
+  kind: SiteRouteKind
+  fromAccessPointId: string
+  toBuildingId: string
+  toEntranceId: string
+  width: number
+  units: Units
+  /** Optional user-added bends between the anchored endpoints, in route units. */
+  waypoints: Vec2[]
+}
+
 export interface SiteModel {
   boundary?: SiteBoundary
+  accessPoints?: SiteAccessPoint[]
+  routes?: SiteRoute[]
   /** Degrees clockwise from drawing +Y; null means the direction is not known. */
   northDirectionDegrees?: number | null
   orientationSource?: 'user-specified' | 'survey-import' | 'assumed' | 'unknown'
@@ -161,7 +193,7 @@ export type OutdoorFeature =
 
 export type FinishOption = 'render' | 'paint' | 'brick' | 'stone' | 'wood' | 'glass' | 'tile' | 'marble' | 'concrete' | 'carpet' | 'terrazzo' | 'metal'
 
-export type SiteElementKind = 'palm' | 'conifer' | 'shrub' | 'flower' | 'hedge' | 'car' | 'person' | 'fence' | 'gate' | 'street-light' | 'path' | 'road' | 'tree' | 'bench' | 'outdoor-set' | 'decor'
+export type SiteElementKind = 'palm' | 'conifer' | 'shrub' | 'flower' | 'hedge' | 'car' | 'person' | 'fence' | 'gate' | 'street-light' | 'path' | 'road' | 'parking-bay' | 'tree' | 'bench' | 'outdoor-set' | 'decor'
 
 export interface LandscapeItem extends Vec2 {
   id: string
@@ -272,6 +304,19 @@ export interface Floor {
   openings?: WallOpening[]
 }
 
+export type BuildingEntranceKind = 'main' | 'pedestrian' | 'service'
+
+/** A user-designated entrance on a specific edge of an explicit building footprint. */
+export interface BuildingEntrance {
+  id: string
+  fromVertexId: string
+  toVertexId: string
+  /** Fraction along the directed footprint edge, from 0 to 1. */
+  fraction: number
+  type: BuildingEntranceKind
+  label?: string
+}
+
 /** One independently identifiable structure within a shared project/site. */
 export interface Building {
   id: string
@@ -282,6 +327,7 @@ export interface Building {
   /** Visual roof form for this building; falls back to the project roof when absent. */
   roof?: string
   footprint?: SiteBoundary
+  entrances?: BuildingEntrance[]
   assumptions: string[]
 }
 

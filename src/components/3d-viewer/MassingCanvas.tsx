@@ -5,7 +5,8 @@ import { CanvasTexture, DoubleSide, ExtrudeGeometry, RepeatWrapping, SRGBColorSp
 import type { ArchitecturalWall, Building, FinishOption, LandscapeItem, PlacedItem, Project, Room, SiteBoundary, SiteVertex, WallOpening } from '@/types'
 import { getFloorArchitecturalModel, wallLength, wallSolidSections, type WallThicknessSettings } from '@/lib/architecturalModel'
 import { canonicalFurnitureKey, getFurnitureDimensions } from '@/lib/furniture'
-import { pointInPolygon } from '@/lib/siteGeometry'
+import { pointInPolygon, resolveSiteRoutePoints } from '@/lib/siteGeometry'
+import { conversionFactor } from '@/lib/unitConversion'
 import { RealAssetModel } from '@/components/assets/RealAssetModel'
 import { PbrSurfaceMaterial, pbrIdForFinish, SITE_PBR_ID } from '@/components/3d-viewer/PbrSurfaceMaterial'
 import { REAL_MODELS } from '@/data/realAssets'
@@ -381,6 +382,40 @@ function ExteriorScene({
           <Edges color="#0f766e" threshold={1} />
         </mesh>
       ) : null}
+      {(project.site?.routes ?? []).map((route) => {
+        const points = resolveSiteRoutePoints(route, project.site, project.buildings ?? [], project.plot.units)
+        if (!points || points.length < 2) return null
+        const width = Math.max(0.1, route.width * conversionFactor(route.units, project.plot.units))
+        return <group key={route.id}>
+          {points.slice(0, -1).map((start, index) => {
+            const end = points[index + 1]
+            const dx = end.x - start.x, dy = end.y - start.y
+            const length = Math.hypot(dx, dy)
+            if (length <= 1e-6) return null
+            const midX = (start.x + end.x) / 2, midY = (start.y + end.y) / 2
+            const angle = Math.atan2(dx, dy)
+            return <group key={`${route.id}:${index}`} position={[(midX - plotW / 2) * S, 0, (midY - plotL / 2) * S]} rotation={[0, angle, 0]}>
+              <mesh position={[0, 0.015, 0]} receiveShadow><boxGeometry args={[width * S, 0.025, length * S]} /><meshStandardMaterial color={route.kind === 'road' ? '#4b5563' : '#b8a98a'} roughness={0.96} /></mesh>
+              {route.kind === 'road' ? <mesh position={[0, 0.03, 0]}><boxGeometry args={[0.025, 0.006, length * S * 0.72]} /><meshStandardMaterial color="#e6d89e" /></mesh> : null}
+            </group>
+          })}
+        </group>
+      })}
+      {(project.site?.accessPoints ?? []).map((accessPoint) => {
+        const boundary = project.site?.boundary
+        const start = boundary?.vertices.find((vertex) => vertex.id === accessPoint.fromVertexId)
+        const end = boundary?.vertices.find((vertex) => vertex.id === accessPoint.toVertexId)
+        if (!boundary || boundary.status === 'unknown' || !start || !end) return null
+        const fraction = Math.max(0, Math.min(1, accessPoint.fraction))
+        const x = start.x + (end.x - start.x) * fraction
+        const y = start.y + (end.y - start.y) * fraction
+        const [worldX, worldZ] = toWorld(x, y)
+        const color = accessPoint.type === 'vehicle' ? '#1d4ed8' : accessPoint.type === 'pedestrian' ? '#15803d' : '#c2410c'
+        return <group key={accessPoint.id} position={[worldX, 0.06, worldZ]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[0.18, 20]} /><meshBasicMaterial color={color} /></mesh>
+          <mesh position={[0, 0.08, 0]}><cylinderGeometry args={[0.045, 0.045, 0.16, 8]} /><meshStandardMaterial color={color} /></mesh>
+        </group>
+      })}
       {(project.buildings ?? []).filter((building) => building.role !== 'primary' && (building.footprint?.vertices.length ?? 0) >= 3).map((building) => <SiteBuildingMass key={building.id} building={building} plotWidth={plotW} plotLength={plotL} siteBoundary={project.site?.boundary} defaultRoof={project.roof} roofColor={project.preferences.roofColor} />)}
 
       {project.floors.flatMap((floor) =>
@@ -513,6 +548,19 @@ function SiteBuildingMass({ building, plotWidth, plotLength, siteBoundary, defau
       <meshStandardMaterial color={color} roughness={0.82} />
       <Edges color={edgeColor} threshold={8} />
     </mesh>
+    {(building.entrances ?? []).map((entrance) => {
+      const start = vertices.find((point) => point.id === entrance.fromVertexId)
+      const end = vertices.find((point) => point.id === entrance.toVertexId)
+      if (!start || !end) return null
+      const fraction = Math.max(0, Math.min(1, entrance.fraction))
+      const x = start.x + (end.x - start.x) * fraction
+      const y = start.y + (end.y - start.y) * fraction
+      const color = entrance.type === 'service' ? '#c2410c' : entrance.type === 'pedestrian' ? '#15803d' : '#1d4ed8'
+      return <mesh key={entrance.id} position={[(x - plotWidth / 2) * S, 0.11, (y - plotLength / 2) * S]}>
+        <boxGeometry args={[0.22, 0.12, 0.22]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
+    })}
     <group position={[(centerX - plotWidth / 2) * S, 0, (centerY - plotLength / 2) * S]}>
       <Roof form={building.roof ?? defaultRoof} y={height + 0.08} width={(maxX - minX) * S * 1.08} length={(maxY - minY) * S * 1.08} color={roofColor} />
     </group>
@@ -679,6 +727,10 @@ function makeRoomShape(room: Room, scale: number): Shape {
 
 function SiteObject({ kind = 'palm', assetId, sourceWorldScale = 1, color, width, length }: { kind?: string; assetId?: string; sourceWorldScale?: number; color: string; width: number; length: number }) {
   if (assetId) return <RealAssetModel assetId={assetId} sourceWorldScale={sourceWorldScale} />
+  if (kind === 'parking-bay') return <group>
+    <mesh position={[0, 0.012, 0]} receiveShadow><boxGeometry args={[width, 0.022, length]} /><meshStandardMaterial color="#59616a" roughness={0.95} /></mesh>
+    {[-1, 1].map((side) => <mesh key={side} position={[side * width * 0.44, 0.026, 0]}><boxGeometry args={[0.025, 0.004, length * 0.94]} /><meshStandardMaterial color="#f1f1e9" /></mesh>)}
+  </group>
   if (kind === 'road' || kind === 'path') return <group>
     <mesh position={[0, 0.012, 0]} receiveShadow><boxGeometry args={[width, 0.022, length]} /><PbrSurfaceMaterial materialId={kind === 'road' ? SITE_PBR_ID.asphalt : SITE_PBR_ID.paving} repeat={4} roughness={0.92} color={kind === 'road' ? '#ffffff' : '#e7e4dd'} /></mesh>
     {kind === 'road' ? <mesh position={[0, 0.025, 0]}><boxGeometry args={[0.025, 0.004, length * 0.78]} /><meshStandardMaterial color="#e6d89e" /></mesh> : null}

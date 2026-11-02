@@ -23,6 +23,12 @@ describe('Groq assistant client', () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(`${chunks}${completion}data: [DONE]\n`, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
     vi.stubGlobal('fetch', fetchMock)
     const project = createProjectFromForm(defaultNewProjectForm())
+    const boundary = project.site?.boundary
+    if (boundary) project.site = {
+      ...project.site!,
+      accessPoints: [{ id: 'entry', fromVertexId: boundary.vertices[0].id, toVertexId: boundary.vertices[1].id, fraction: 0.4, type: 'pedestrian' }],
+      boundary: { ...boundary, edgeLabels: [{ fromVertexId: boundary.vertices[0].id, toVertexId: boundary.vertices[1].id, type: 'front', setback: 8 }] },
+    }
     const progress = vi.fn()
     const debug = vi.fn()
     const plan = await requestAssistantPlan({
@@ -43,6 +49,9 @@ describe('Groq assistant client', () => {
     expect(body.messages[1].content).toContain('furnitureItems')
     expect(body.messages[1].content).toContain('single-hinged')
     expect(body.messages[1].content).toContain('roofForms')
+    expect(body.messages[1].content).toContain('accessPoints')
+    expect(body.messages[1].content).toContain('pedestrian')
+    expect(body.messages[1].content).toContain('setback')
     expect(plan.actions).toEqual([{ type: 'add_room', room: { name: 'Study', category: 'study', width: 10, length: 9, x: 2, y: 3 } }])
     expect(plan.unsupported).toEqual(['An upper floor needs a separate design workflow.'])
     expect(progress).toHaveBeenCalledWith(expect.stringContaining('Groq is'))
@@ -95,13 +104,13 @@ describe('Groq assistant client', () => {
   it('normalizes alternate siteItems output and aligns a requested gate with its fence', async () => {
     const project = createProjectFromForm(defaultNewProjectForm())
     const content = JSON.stringify({
-      reply: 'I added the fence, gate, path, and parked car.',
+      reply: 'I added the fence, gate, path, parking bay, and parked car.',
       actions: [
         { type: 'create_house', rooms: [{ name: 'Living Room', category: 'living', width: 16, length: 14 }] },
         'add_site_item',
       ],
       siteItems: [
-        { kind: 'fence' }, { kind: 'gate', x: 25, y: 25 }, { kind: 'path' }, { kind: 'car' },
+        { kind: 'fence' }, { kind: 'gate', x: 25, y: 25 }, { kind: 'path' }, { kind: 'parking-bay' }, { kind: 'car' },
       ],
     })
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
@@ -112,10 +121,13 @@ describe('Groq assistant client', () => {
     })
     const siteActions = plan.actions.filter((action) => action.type === 'add_site_item')
     expect(plan.actions.some((action) => action.type === 'create_house')).toBe(true)
-    expect(siteActions.map((action) => action.type === 'add_site_item' && action.kind)).toEqual(['fence', 'gate', 'path', 'car'])
+    expect(siteActions.map((action) => action.type === 'add_site_item' && action.kind)).toEqual(['fence', 'gate', 'path', 'parking-bay', 'car'])
     const fence = siteActions.find((action) => action.type === 'add_site_item' && action.kind === 'fence')
     const gate = siteActions.find((action) => action.type === 'add_site_item' && action.kind === 'gate')
+    const parkingBay = siteActions.find((action) => action.type === 'add_site_item' && action.kind === 'parking-bay')
     expect(gate).toMatchObject({ x: fence?.type === 'add_site_item' ? fence.x : -1, y: fence?.type === 'add_site_item' ? fence.y : -1 })
+    const unitFactor = project.plot.units === 'ft' ? 1 : 0.3048
+    expect(parkingBay).toMatchObject({ width: 9 * unitFactor, length: 18 * unitFactor })
     expect(plan.assumptions?.join(' ')).toMatch(/aligned with the proposed fence/i)
     expect(plan.unsupported).toBeUndefined()
     expect(plan.reply).toMatch(/proposal for review/i)

@@ -57,6 +57,43 @@ describe('AI design-plan application', () => {
     expect(result.projectPatch.buildings?.filter((building) => building.role === 'primary')).toHaveLength(1)
   })
 
+  it('respects user-defined edge setbacks when siting separate buildings', () => {
+    const project = blankProject()
+    const boundary = project.site?.boundary
+    expect(boundary).toBeTruthy()
+    project.site = {
+      ...project.site!,
+      boundary: {
+        ...boundary!,
+        edgeLabels: [{ fromVertexId: boundary!.vertices[0].id, toVertexId: boundary!.vertices[1].id, type: 'front', setback: 10 }],
+      },
+    }
+    const plan: AssistantPlan = {
+      reply: 'Add a separate block.',
+      actions: [{ type: 'add_building', name: 'Studio Block', purpose: { category: 'commercial', use: 'studio' }, role: 'secondary', width: 20, length: 16, floorCount: 1 }],
+    }
+    const result = applyAssistantPlan({ plan, project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 } })
+    expect(result.ok).toBe(true)
+    const footprint = result.projectPatch.buildings?.find((building) => building.name === 'Studio Block')?.footprint
+    expect(footprint?.vertices.every((point) => point.y >= 10 - 1e-6)).toBe(true)
+  })
+
+  it('rejects an explicitly sited building that violates an edge setback', () => {
+    const project = blankProject()
+    const boundary = project.site?.boundary!
+    project.site = {
+      ...project.site!,
+      boundary: { ...boundary, edgeLabels: [{ fromVertexId: boundary.vertices[0].id, toVertexId: boundary.vertices[1].id, type: 'front', setback: 12 }] },
+    }
+    const plan: AssistantPlan = {
+      reply: 'Add a separate block.',
+      actions: [{ type: 'add_building', name: 'Studio Block', purpose: { category: 'commercial', use: 'studio' }, role: 'secondary', width: 16, length: 12, floorCount: 1, x: 25, y: 6 }],
+    }
+    const result = applyAssistantPlan({ plan, project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 } })
+    expect(result.ok).toBe(false)
+    expect(result.errors.join(' ')).toMatch(/configured edge setbacks/i)
+  })
+
   it('rejects a generated plan with overlapping rooms without partially applying it', () => {
     const project = blankProject()
     const plan: AssistantPlan = {
@@ -156,6 +193,14 @@ describe('AI design-plan application', () => {
     expect(result.ok).toBe(true)
     expect(result.rooms[0].shape).toBe('L')
     expect(result.rooms[0].elements).toEqual([])
+  })
+
+  it('places a conceptual parking bay with editable initial dimensions', () => {
+    const project = blankProject()
+    const plan: AssistantPlan = { reply: 'I placed one conceptual parking bay.', actions: [{ type: 'add_site_item', kind: 'parking-bay', x: 20, y: 20 }] }
+    const result = applyAssistantPlan({ plan, project, rooms: [], placed: {}, ornaments: [], wallThicknesses: { exterior: 0.75, interior: 0.375 } })
+    expect(result.ok).toBe(true)
+    expect(result.ornaments[0]).toMatchObject({ kind: 'parking-bay', width: 9, length: 18 })
   })
 
   it('applies site objects, wall thickness, a custom room outline, and project preferences together', () => {

@@ -134,6 +134,15 @@ describe('workspace opens', () => {
     cleanup()
   })
 
+  it('shows unknown north honestly and rotates the compass when north is specified', () => {
+    const { container, rerender } = render(<FloorPlanDiagram rooms={[]} units="ft" plot={{ width: 30, length: 20 }} showCompass northDirectionDegrees={90} />)
+    expect(container.querySelector('g[transform="rotate(90)"]')).toBeTruthy()
+    rerender(<FloorPlanDiagram rooms={[]} units="ft" plot={{ width: 30, length: 20 }} showCompass northDirectionDegrees={null} />)
+    expect(container.textContent).toContain('?')
+    expect(container.querySelector('g[transform="rotate(90)"]')).toBeNull()
+    cleanup()
+  })
+
   it('home seeds projects, then /workspace/:id renders without the crash fallback', async () => {
     // Pass 1: home page — seeds localStorage via projectService.list()
     render(

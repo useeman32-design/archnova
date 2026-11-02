@@ -73,6 +73,7 @@ describe('generalized architectural project model', () => {
       purpose: { category: 'industrial', use: 'generator-house' },
       role: 'service',
       floors: [{ id: 'floor:service', name: 'Ground floor', level: 1, rooms: [] }],
+      entrances: [{ id: 'service-entry', fromVertexId: 'service-v1', toVertexId: 'service-v2', fraction: 0.6, type: 'service' }],
       assumptions: [],
     }
     const multiBuilding = mergeProjectModelUpdate(project, { buildings: [primary, secondary] })
@@ -81,12 +82,47 @@ describe('generalized architectural project model', () => {
 
     expect(legacyEdit.buildings?.find((building) => building.role === 'primary')?.floors).toEqual(changedFloors)
     expect(legacyEdit.buildings?.find((building) => building.id === secondary.id)?.floors).toEqual(secondary.floors)
+    expect(legacyEdit.buildings?.find((building) => building.id === secondary.id)?.entrances).toEqual(secondary.entrances)
     expect(legacyEdit.floors).toEqual(changedFloors)
 
     const updatedPrimary = { ...legacyEdit.buildings![0], name: 'Main hospital block' }
     const buildingEdit = mergeProjectModelUpdate(legacyEdit, { buildings: [updatedPrimary, secondary] })
     expect(buildingEdit.floors).toEqual(updatedPrimary.floors)
     expect(buildingEdit.brief?.purpose).toEqual(buildingEdit.purpose)
+  })
+
+  it('converts explicit per-edge setbacks with the boundary units', () => {
+    const project = projectFixture()
+    const boundary = project.site?.boundary
+    if (!boundary) throw new Error('Factory should create a dimension-derived boundary.')
+    const updated = mergeProjectModelUpdate({
+      ...project,
+      site: { ...project.site!, accessPoints: [{ id: 'gate-entry', fromVertexId: boundary.vertices[0].id, toVertexId: boundary.vertices[1].id, fraction: 0.35, type: 'vehicle' }], boundary: { ...boundary, source: 'user-drawn', status: 'defined', edgeLabels: [
+        { fromVertexId: boundary.vertices[0].id, toVertexId: boundary.vertices[1].id, type: 'front', setback: 8 },
+      ] } },
+    }, { plot: { ...project.plot, units: 'm' } })
+    expect(updated.site?.boundary?.edgeLabels?.[0].setback).toBeCloseTo(8 * 0.3048)
+    expect(updated.site?.accessPoints?.[0]).toMatchObject({ id: 'gate-entry', fraction: 0.35, type: 'vehicle' })
+  })
+
+  it('converts saved route widths and waypoints when plot units change', () => {
+    const project = projectFixture()
+    const route = { id: 'walk', kind: 'path' as const, fromAccessPointId: 'edge-access', toBuildingId: 'block', toEntranceId: 'door', width: 4, units: 'ft' as const, waypoints: [{ x: 10, y: 20 }] }
+    const withRoute = { ...project, site: { ...project.site!, routes: [route] } }
+    const updated = mergeProjectModelUpdate(withRoute, { plot: { ...project.plot, units: 'm' } })
+    expect(updated.site?.routes?.[0]).toMatchObject({ units: 'm', width: 4 * 0.3048, waypoints: [{ x: 10 * 0.3048, y: 20 * 0.3048 }] })
+  })
+
+  it('preserves an edge-referenced access point when a dimension-derived plot changes units', () => {
+    const project = projectFixture()
+    const boundary = project.site?.boundary!
+    const withAccess = {
+      ...project,
+      site: { ...project.site!, accessPoints: [{ id: 'front-walk', fromVertexId: boundary.vertices[0].id, toVertexId: boundary.vertices[1].id, fraction: 0.7, type: 'pedestrian' as const }] },
+    }
+    const updated = mergeProjectModelUpdate(withAccess, { plot: { ...project.plot, units: 'm' } })
+    expect(updated.site?.accessPoints).toEqual(withAccess.site.accessPoints)
+    expect(updated.site?.boundary?.units).toBe('m')
   })
 
   it('updates dimension-derived boundary geometry when plot dimensions or units change', () => {

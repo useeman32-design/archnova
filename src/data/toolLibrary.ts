@@ -152,7 +152,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
   {
     tool: 'trees',
     title: 'Site & landscape',
-    blurb: 'Use imported catalog models for detailed objects and editable parametric systems for roads, paths, gates and fences.',
+    blurb: 'Use imported catalog models for detailed objects and editable parametric systems for roads, paths, gates, fences and conceptual parking bays.',
     categories: [{
       id: 'site-models-and-systems',
       label: 'Site assets',
@@ -168,6 +168,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
         { id: 'site_gate', name: 'Dimension-driven Compound Gate', icon: 'DoorClosed', kind: 'gate', w: 12, h: 0.5 },
         { id: 'site_path', name: 'Dimension-driven Footpath Segment', icon: 'Box', kind: 'path', w: 4, h: 24, previewImage: `${import.meta.env.BASE_URL}previews/site-path.jpg` },
         { id: 'site_road', name: 'Dimension-driven Road Segment', icon: 'Box', kind: 'road', w: 16, h: 60, previewImage: `${import.meta.env.BASE_URL}previews/site-road.jpg` },
+        { id: 'site_parking_bay', name: 'Conceptual Parking Bay', icon: 'Car', kind: 'parking-bay' },
       ],
     }],
   },

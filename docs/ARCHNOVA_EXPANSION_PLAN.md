@@ -2,8 +2,8 @@
 
 **Product:** ArchNova by Pixel Studios  
 **Tagline:** Design Your Vision. Build Your Future.  
-**Status:** Phase 3 asset follow-up implemented locally — 24 CC0 models and 6 PBR sets are bundled; interior GLTF rendering, left-drawer/Properties previews, and exact-name AI asset selection are updated. Browser/WebGL visual acceptance and GitHub publication remain pending.
-**Last updated:** 2026-10-31
+**Status:** Phase 2 site planning is progressing locally: user-set north, per-edge setbacks, boundary access points, building entrances, user-drawn road/path links, conceptual parking bays, 2D/3D display, unit conversion, setback-aware siting, and deterministic boundary/setback/overlap/route/parking checks are implemented with regression coverage. More complete adjacent-road context, circulation networks, and turning/parking manoeuvre geometry remain. Earlier slices are committed locally (`9c83325`, `78dac02`, `aac4d06`, `eaec41f`); editable route/parking work is in local commit `4fb643c` and is not published. The previous remote `main` ref (`04e946703a71e4187647aae474909f875b65f644`) and Pages ref (`c34753fa58038a010d55d15b5e966375a4dc373e`) were verified; the hosted site served `assets/index-CDiS3FAz.js` and `assets/index-Bnp7tBGl.css`.
+**Last updated:** 2026-11-02
 
 This is the durable project log. Read it before starting each follow-up task, update the milestone status after meaningful work, and keep the application buildable. This plan is based on the user's expansion brief and the existing repository audit; it is not a claim of professional or regulatory approval.
 
@@ -11,11 +11,11 @@ This is the durable project log. Read it before starting each follow-up task, up
 
 **Milestone 0 — Repository audit and Phase 1 plan: complete.**  
 **Milestone 1 — Generalized, backward-compatible project/site model: core foundation complete (commit `4e34770`).**
-**Milestone 2 — Phase 2 site-boundary geometry/editor: interactive polygon editing and explicit edge labels/derived lengths are implemented; user-set north, road/access, setbacks and deterministic multi-building overlap checks remain.**
+**Milestone 2 — Phase 2 site planning: interactive polygon editing, edge labels/derived lengths, user-set north, a north-aware compass, per-edge setbacks, setback-aware assistant siting, deterministic footprint validation, boundary access points, user-drawn road/path links, conceptual parking bays, and entrance markers on explicit building footprints are implemented locally and under regression test. Richer adjacent-road context, route networks, parking manoeuvre geometry, and site-element integration remain. Earlier site slices are in local commits `9c83325`, `78dac02`, `aac4d06`, and `eaec41f`; route/parking is in local commit `4fb643c` and remains unpublished.**
 **Milestone 3 — Real asset library: 24 CC0 Poly Haven models and 6 PBR packages are integrated; the latest work fixes interior GLTF rendering and adds real model previews to the editor drawer and Properties panel. Remaining content/style gaps are listed in `ARCHNOVA_REAL_ASSET_MILESTONE.md`.**
 **Milestone 4 — AI planning: proposal/approval, clarification, validation and recovery flows exist; the current work improves exact named-asset resolution and gives the model bounded asset dimensions/style metadata.**
 
-The codebase has assistant commits (`9035e2b`, `df13735`), the Phase 1 foundation (`4e34770`), Phase 2 site/mobile work (`be8071e`, `f7b3de4`), Groq recovery (`7d87b99`, `b538a11`), site-edge labels (`d93dc4f`), and assistant diagnostics (`3af56c2`) on `main`. The diagnostics code was pushed to `main` and the build to `gh-pages` (`6cc63a3`). GitHub Pages reports that build as successful, and cache-busted requests to the hosted URL now serve `assets/index-BZOM6Ewe.js` and `assets/index-DqppRJBW.css`. No `.github/workflows` deployment workflow exists; deployment is via the `gh-pages` branch. Do not put credentials in this file or in chat.
+The published source and Pages refs last verified before the current local site-planning edits are `main` at `04e946703a71e4187647aae474909f875b65f644` and `gh-pages` at `c34753fa58038a010d55d15b5e966375a4dc373e`. Cache-busted requests to the hosted URL served `assets/index-CDiS3FAz.js` and `assets/index-Bnp7tBGl.css`. Earlier milestone SHAs and asset history remain recorded below as historical checkpoints. No `.github/workflows` deployment workflow exists; deployment is via the `gh-pages` branch. Do not put credentials in this file or in chat.
 
 **Mobile project-opening finding:** saved projects remain in each browser's `localStorage`; no cross-device API/authentication was introduced. The valid mobile dashboard-to-workspace flow is covered by tests, and the user confirmed mobile project opening now works. The missing-project explanation remains as a fallback. Per the user's scope decision, leave storage device-local and do not pursue cross-device sync unless requested.
 
@@ -64,7 +64,7 @@ Extend existing domain types instead of replacing them:
 
 First slice is implemented locally: an interactive 2D boundary editor adds vertices by canvas tap/click, drags vertices, computes polygon area and edge lengths, rejects too-few/duplicate/out-of-envelope/self-crossing/zero-area boundaries, and persists actual points with provenance. The same persisted polygon is drawn in the existing 2D and Three.js views. Unknown irregular boundaries remain an explicitly labeled dimensions envelope until points are provided.
 
-Remaining Phase 2 work: user-set north; entrances and adjacent roads; configurable setbacks; multi-structure site placement; deterministic building-boundary/setback/overlap checks; vehicle/pedestrian access, parking, roads, fences/gates, landscaping and full 2D/3D site synchronization. Stable directed edge records now support explicit standard/custom names; segment lengths remain derived from editable vertices. Use actual polygon geometry and explicit assumptions; no local regulations are invented.
+Remaining Phase 2 work: fuller adjacent-road context, connected route networks, turning/parking manoeuvre geometry, and richer synchronization of fences, gates, and landscaping. Boundary access points and building entrance markers are user-designated; road/path routes connect chosen anchors and can be bent by clicking the plan. Conceptual parking bays render in 2D/3D and plan checks flag boundary overflow, building overlap, and bay-to-bay overlap. None of these markers or geometry infer legal access, regulation compliance, or professional approval. Setbacks and building footprints are checked deterministically; edge lengths remain derived from editable vertices. Use actual polygon geometry and explicit assumptions; no local regulations are invented.
 
 ### Phase 3 — expanded asset library
 
@@ -123,7 +123,15 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [x] Extend Phase 2 boundary editing with optional per-edge standard labels (Front/Rear/Left/Right/Road-facing), custom names, explicit Unknown, and perimeter lengths derived from vertices. Labels persist on vertex-pair metadata and appear with lengths in the 2D site view; no directions are inferred.
 - [x] Save the Groq action-recovery fix, regression coverage, and roadmap correction in local commit `7d87b99` (`fix: recover Groq design actions`).
 - [x] Save standard/custom site-edge labels and vertex-derived edge lengths in local commit `d93dc4f` (`feat: add site edge labels`).
-- [ ] Add user-set north orientation, access points, setbacks, and site/building overlap checks.
+- [x] Add user-set north orientation with normalization and a user-controlled 2D compass; unknown north remains visibly unknown.
+- [x] Add per-edge setbacks to site-edge labels, editor controls and 2D labels; preserve setbacks through plot-unit conversion and make assistant-generated building siting respect those clearances. Regression tests cover compass state, unit conversion, automatic setback-aware placement, and an explicit setback conflict.
+- [x] Add deterministic `Check plan` diagnostics for saved building footprints: recorded-boundary overflow, configured setback violations, and pairwise building overlap. Footprints and boundaries are compared in plot units; assistant placement continues to pre-check new recommendations.
+- [x] Add edge-referenced vehicle, pedestrian, and service access points to the site model and boundary editor. Save them only with the boundary edit; display matching markers in the 2D plan and 3D massing view; preserve them across unit conversion and include them in bounded assistant context. These do not create road geometry or claims of legal access.
+- [x] Add entrance metadata and controls for edges of explicitly recorded building footprints; show corresponding 2D/3D markers and include the data in project/assistant context. Do not fabricate a footprint for buildings without one; the primary building continues to use its existing wall/opening model.
+- [x] Add connected conceptual road/path routes between explicit boundary access points and building entrances; direct segments are user-created, bends can be added on the plan, disconnections/out-of-boundary routes/routes through other buildings are checked, and widths/waypoints convert with project units.
+- [x] Add editable conceptual parking-bay site objects in 2D/3D and deterministic plan checks for boundary overflow, building overlap, and bay-to-bay overlap. Default dimensions are editable and make no regulatory claim.
+- [x] Verify the route/parking slice: 89 tests across 12 files, typecheck, production build, Pages build, and `git diff --check` pass. Node builds use `--max-old-space-size=640` in this memory-constrained workspace; the existing large-chunk warning remains.
+- [ ] Improve full campus circulation/turning geometry and richer fence/gate/landscape/site integration.
 - [x] Per user decision, leave project storage browser-local and do not pursue a shared cross-device sync API unless requested.
 - [x] Save the Phase 2 site editor and mobile-message work in local milestone commit `be8071e` (`feat: add interactive plot boundary editing`).
 - [x] Push `main` with the Groq recovery, Phase 2 edge-label work, and publication-status checkpoints; GitHub accepted the updates.
@@ -142,9 +150,10 @@ Configurable priced inputs with source/date/confidence, history/undo, comparison
 - [x] Improve assistant catalog context with dimensions/style metadata and exact name/ID resolution before generic furniture fallback; keep unknown-ID rejection and the user approval gate.
 - [x] Verify local work: 69 tests/12 files, typecheck, all 24 GLTF scenes/six PBR sets and 74.4 MB checksum/loader verification; production and Pages builds plus `git diff --check` pass. Builds retain the >500 kB JavaScript chunk warning.
 - [ ] Browser-level WebGL visual acceptance of interior model rendering and tool-drawer previews (automation/browser is not available in this workspace); retain as outstanding until manually viewed.
-- [ ] Complete remaining non-model catalogue thumbnails (notably the parametric gate and selected room/opening variants), then continue with user-set north/access, setbacks, and site/building overlap validation.
+- [ ] Complete remaining non-model catalogue thumbnails (notably the parametric gate and selected room/opening variants); separately complete browser/WebGL visual acceptance for the asset milestone.
 - [x] Save the asset/AI/docs update as a local milestone commit (`feat: expand curated real asset library and room previews`).
-- [ ] Push `main` and publish the Pages build. The local asset/AI/docs source commit is not yet pushed. A temporary browser-side authorization page is running for this session; it sends a user-entered token directly to GitHub and does not send it to the workspace server. Use a fresh, repository-scoped token; the token previously pasted in chat remains exposed and should not be reused.
+- [x] Publish the prior source update and Pages build: remote `main` is `04e946703a71e4187647aae474909f875b65f644`, remote `gh-pages` is `c34753fa58038a010d55d15b5e966375a4dc373e`, and live requests serve `assets/index-CDiS3FAz.js` plus `assets/index-Bnp7tBGl.css`.
+- [ ] Publish the Phase 2 site-planning commits `9c83325` (north/setbacks), `78dac02` (saved-footprint validation), `aac4d06` (access points), `eaec41f` (building entrances), and `4fb643c` (routes and parking). Use the existing browser-based client-side authorization flow only; require a fresh token entered by the user directly in the browser page, never send it to the workspace server, and retain the push page's base-tree safety check.
 
 ## Working rules
 

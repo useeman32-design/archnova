@@ -2,7 +2,7 @@
 
 **Status date:** 2026-10-31
 **Scope:** small, quality-screened acquisition and end-to-end renderer/catalog/project integration. This is not the full target collection.
-**Repository:** implementation saved locally in a milestone commit; GitHub push and Pages publish are pending safe authentication.
+**Repository:** the asset milestone is included in the previously verified remote `main` ref `04e946703a71e4187647aae474909f875b65f644` and published Pages ref `c34753fa58038a010d55d15b5e966375a4dc373e`. The current Phase 2 north/setback edits are in local commit `9c83325`, saved-footprint validation is in `78dac02`, access-point markers are in `aac4d06`, conceptual building entrances are in `eaec41f`, and editable site routes/parking are in `4fb643c`. None is included in those published refs.
 
 ## Result
 

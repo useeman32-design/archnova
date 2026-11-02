@@ -1,5 +1,5 @@
 import { useLayoutEffect, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import type { PlacedItem, Room, RoomCategory, SiteBoundary, SiteEdgeLabel, SiteVertex, Units, Vec2 } from '@/types'
+import type { BuildingEntrance, PlacedItem, Room, RoomCategory, SiteAccessPoint, SiteBoundary, SiteEdgeLabel, SiteRouteKind, SiteVertex, Units, Vec2 } from '@/types'
 import { formatArea } from '@/lib/format'
 import { roomArea } from '@/lib/floorPlan'
 import { canonicalFurnitureKey, getFurnitureDimensions } from '@/lib/furniture'
@@ -44,7 +44,9 @@ export interface FloorPlanDiagramProps {
   /** Plot extents keep an empty, start-from-scratch project drawable. */
   plot?: { width: number; length: number }
   siteBoundary?: SiteBoundary
-  buildingFootprints?: { id: string; name: string; role: string; footprint: SiteBoundary }[]
+  siteAccessPoints?: SiteAccessPoint[]
+  siteRoutes?: { id: string; kind: SiteRouteKind; width: number; points: Vec2[] }[]
+  buildingFootprints?: { id: string; name: string; role: string; footprint: SiteBoundary; entrances?: BuildingEntrance[] }[]
   boundaryEditMode?: boolean
   boundaryDraft?: SiteVertex[]
   boundaryDraftEdgeLabels?: SiteEdgeLabel[]
@@ -57,6 +59,7 @@ export interface FloorPlanDiagramProps {
   onSelectRoom?: (room: Room, point?: Vec2) => void
   showBoundary?: boolean
   showCompass?: boolean
+  northDirectionDegrees?: number | null
   showAreas?: boolean
   /** Measure mode: click two points to read a distance; click again to restart. */
   measure?: boolean
@@ -89,6 +92,8 @@ export function FloorPlanDiagram({
   wallThicknesses,
   plot,
   siteBoundary,
+  siteAccessPoints = [],
+  siteRoutes = [],
   buildingFootprints = [],
   boundaryEditMode = false,
   boundaryDraft = [],
@@ -102,6 +107,7 @@ export function FloorPlanDiagram({
   onSelectRoom,
   showBoundary = true,
   showCompass = false,
+  northDirectionDegrees,
   showAreas = false,
   measure = false,
   onCanvasClick,
@@ -396,6 +402,12 @@ export function FloorPlanDiagram({
           opacity="0.7"
         />
       ) : null}
+      {siteRoutes.map((route) => route.points.length >= 2 ? <g key={route.id} aria-label={`${route.kind} route`} pointerEvents="none">
+        <polyline points={route.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke={route.kind === 'road' ? '#4b5563' : '#b8a98a'} strokeWidth={u(route.width)} strokeLinecap="round" strokeLinejoin="round">
+          <title>{`User-connected conceptual ${route.kind}, width ${route.width} ${units}`}</title>
+        </polyline>
+        {route.kind === 'road' ? <polyline points={route.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="#e6d89e" strokeWidth={u(0.22)} strokeDasharray={`${u(1.8)} ${u(1.5)}`} strokeLinecap="round" /> : null}
+      </g> : null)}
       {buildingFootprints.map((building) => {
         const vertices = building.footprint.vertices
         if (vertices.length < 3) return null
@@ -411,13 +423,28 @@ export function FloorPlanDiagram({
             <title>{`${building.name} · ${building.role} building${overflow ? ' · outside plot boundary' : ''}`}</title>
           </polygon>
           <text x={center.x} y={center.y} textAnchor="middle" dominantBaseline="middle" fontSize={u(7)} fontWeight={700} fill={overflow ? '#b91c1c' : stroke} stroke="white" strokeWidth={u(2.5)} paintOrder="stroke" pointerEvents="none">{building.name}{overflow ? ' · OUTSIDE' : ''}</text>
+          {(building.entrances ?? []).map((entrance) => {
+            const start = vertices.find((point) => point.id === entrance.fromVertexId)
+            const end = vertices.find((point) => point.id === entrance.toVertexId)
+            if (!start || !end) return null
+            const fraction = Math.max(0, Math.min(1, entrance.fraction))
+            const x = start.x + (end.x - start.x) * fraction
+            const y = start.y + (end.y - start.y) * fraction
+            return <g key={entrance.id} transform={`translate(${x} ${y})`}>
+              <title>{`${entrance.type[0].toUpperCase()}${entrance.type.slice(1)} building entrance, designated by user`}</title>
+              <rect x={-u(2.4)} y={-u(1.2)} width={u(4.8)} height={u(2.4)} rx={u(0.4)} fill="#c2410c" stroke="white" strokeWidth={u(0.65)} />
+              <text x={0} y={u(0.3)} textAnchor="middle" dominantBaseline="middle" fontSize={u(2.6)} fontWeight={700} fill="white">E</text>
+            </g>
+          })}
         </g>
       })}
       {canRenderEdgeLabels ? (
         <g aria-label="Plot edge labels" pointerEvents="none">
           {edgeLabelVertices.map((vertex, index) => {
             const next = edgeLabelVertices[(index + 1) % edgeLabelVertices.length]
-            const label = describeSiteEdgeLabel(findSiteEdgeLabel(edgeLabelRecords, vertex.id, next.id))
+            const edgeRecord = findSiteEdgeLabel(edgeLabelRecords, vertex.id, next.id)
+            const edgeName = describeSiteEdgeLabel(edgeRecord) ?? (edgeRecord?.setback ? 'Edge' : undefined)
+            const label = edgeName ? `${edgeName}${edgeRecord?.setback ? ` · ${edgeRecord.setback} setback` : ''}` : undefined
             if (!label) return null
             const midpointX = (vertex.x + next.x) / 2
             const midpointY = (vertex.y + next.y) / 2
@@ -426,6 +453,25 @@ export function FloorPlanDiagram({
             if (angle < -90) angle += 180
             const length = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(siteEdgeLength(vertex, next))
             return <text key={`${vertex.id}-${next.id}-label`} x={midpointX} y={midpointY - u(1.5)} textAnchor="middle" dominantBaseline="middle" transform={`rotate(${angle} ${midpointX} ${midpointY})`} fontSize={u(6.5)} fontWeight="600" fill="#0f4c45" stroke="white" strokeWidth={u(2.5)} paintOrder="stroke">{label} · {length} {boundaryEditMode ? units : siteBoundary?.units ?? units}</text>
+          })}
+        </g>
+      ) : null}
+      {showBoundary && edgeLabelVertices.length >= 3 && siteAccessPoints.length ? (
+        <g aria-label="User-designated site access points" pointerEvents="none">
+          {siteAccessPoints.map((accessPoint) => {
+            const start = edgeLabelVertices.find((vertex) => vertex.id === accessPoint.fromVertexId)
+            const end = edgeLabelVertices.find((vertex) => vertex.id === accessPoint.toVertexId)
+            if (!start || !end) return null
+            const fraction = Math.max(0, Math.min(1, accessPoint.fraction))
+            const x = start.x + (end.x - start.x) * fraction
+            const y = start.y + (end.y - start.y) * fraction
+            const shortLabel = accessPoint.type === 'vehicle' ? 'V' : accessPoint.type === 'pedestrian' ? 'P' : 'S'
+            const color = accessPoint.type === 'vehicle' ? '#1d4ed8' : accessPoint.type === 'pedestrian' ? '#15803d' : '#c2410c'
+            return <g key={accessPoint.id} transform={`translate(${x} ${y})`}>
+              <title>{`${accessPoint.type[0].toUpperCase()}${accessPoint.type.slice(1)} access point, designated by user`}</title>
+              <circle r={u(3.2)} fill={color} stroke="white" strokeWidth={u(1)} />
+              <text x={0} y={u(0.35)} textAnchor="middle" dominantBaseline="middle" fontSize={u(3.6)} fontWeight={700} fill="white">{shortLabel}</text>
+            </g>
           })}
         </g>
       ) : null}
@@ -731,7 +777,12 @@ export function FloorPlanDiagram({
         return (
           <g key={tree.id} style={{ cursor: selected ? 'move' : 'pointer' }} onClick={(event) => { event.stopPropagation(); onSelectTree?.(tree.id) }} onPointerDown={(event) => startTreeDrag(event, tree, 'move')} onPointerMove={moveTreeDrag} onPointerUp={endTreeDrag} onPointerCancel={endTreeDrag} aria-label={`Select ${tree.kind ?? 'landscape object'}`}>
             <g transform={`translate(${tree.x} ${tree.y}) rotate(${angle})`} opacity={0.96}>
-              {tree.kind === 'road' || tree.kind === 'path' ? <>
+              {tree.kind === 'parking-bay' ? <>
+                <rect x={-width / 2} y={-length / 2} width={width} height={length} fill="#59616a" stroke={selected ? '#1a56f5' : '#39414a'} strokeWidth={selected ? u(1.5) : u(0.55)} />
+                <line x1={-width / 2 + u(0.45)} y1={-length / 2} x2={-width / 2 + u(0.45)} y2={length / 2} stroke="#f1f1e9" strokeWidth={u(0.35)} />
+                <line x1={width / 2 - u(0.45)} y1={-length / 2} x2={width / 2 - u(0.45)} y2={length / 2} stroke="#f1f1e9" strokeWidth={u(0.35)} />
+                <text x={0} y={u(1)} textAnchor="middle" fontSize={u(2.5)} fontWeight={700} fill="#fff">P</text>
+              </> : tree.kind === 'road' || tree.kind === 'path' ? <>
                 <rect x={-width / 2} y={-length / 2} width={width} height={length} rx={tree.kind === 'path' ? u(0.4) : 0} fill={tree.kind === 'road' ? '#51565d' : '#c9c4b9'} stroke={selected ? '#1a56f5' : tree.kind === 'road' ? '#33383f' : '#938e83'} strokeWidth={selected ? u(1.5) : u(0.45)} />
                 {tree.kind === 'road' ? <line x1={0} y1={-length / 2} x2={0} y2={length / 2} stroke="#e5d8a2" strokeWidth={u(0.45)} strokeDasharray={`${u(2.3)} ${u(2)}`} /> : null}
                 {selected ? <rect x={-width / 2 - u(1)} y={-length / 2 - u(1)} width={width + u(2)} height={length + u(2)} fill="none" stroke="#1a56f5" strokeDasharray={`${u(1.5)} ${u(1)}`} /> : null}
@@ -822,7 +873,7 @@ export function FloorPlanDiagram({
       {showCompass ? (
         <g transform={`translate(${maxX - u(4)} ${minY + u(16)})`} pointerEvents="none">
           <circle r={u(11)} fill="#ffffff" stroke="#cbd5e1" strokeWidth={u(1)} opacity="0.95" />
-          <polygon points={`0,${-u(7)} ${u(4.5)},${u(4.5)} 0,${u(1.2)} ${-u(4.5)},${u(4.5)}`} fill="#1a56f5" />
+          {northDirectionDegrees != null ? <g transform={`rotate(${northDirectionDegrees})`}><polygon points={`0,${-u(7)} ${u(4.5)},${u(4.5)} 0,${u(1.2)} ${-u(4.5)},${u(4.5)}`} fill="#1a56f5" /></g> : <text x={0} y={u(3.2)} textAnchor="middle" fontSize={u(9)} fontWeight={700} fill="#94a3b8">?</text>}
           <text x={0} y={-u(13)} textAnchor="middle" fontSize={u(9)} fontWeight={700} fill="#475569">
             N
           </text>

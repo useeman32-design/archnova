@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Compass, Crosshair, Frame, Info, MapPin, Printer, Tag, X } from 'lucide-react'
-import type { PlotShape, Room, SiteBoundary, SiteEdgeLabel, SiteEdgeLabelType, SiteVertex, Vec2 } from '@/types'
+import type { BuildingEntranceKind, PlotShape, Room, SiteAccessKind, SiteAccessPoint, SiteBoundary, SiteEdgeLabel, SiteEdgeLabelType, SiteRoute, SiteRouteKind, SiteVertex, Vec2 } from '@/types'
 import { useWorkspace } from '@/pages/workspace/WorkspaceLayout'
 import { FloorPlanDiagram } from '@/components/floor-plan/FloorPlanDiagram'
 import { PlanCanvas, ZoomControls, useZoom } from '@/components/floor-plan/PlanCanvas'
@@ -8,7 +8,8 @@ import { SegmentedControl } from '@/components/ui/FormControls'
 import { NumberField } from '@/components/ui/Field'
 import type { PendingPlacement } from '@/data/toolLibrary'
 import { validatePlan } from '@/lib/planValidation'
-import { classifyBoundaryShape, findSiteEdgeLabel, polygonArea, siteEdgeLength, validateSiteBoundary } from '@/lib/siteGeometry'
+import { classifyBoundaryShape, findSiteEdgeLabel, polygonArea, resolveSiteRoutePoints, siteEdgeLength, validateSiteBoundary, validateSiteBuildingPlacement, validateSiteParkingBays, validateSiteRoutes } from '@/lib/siteGeometry'
+import { conversionFactor } from '@/lib/unitConversion'
 import { uid } from '@/lib/id'
 
 function IconToggle({
@@ -58,6 +59,12 @@ export function PlanEditor() {
   const [showDimensions, setShowDimensions] = useState(true)
   const [showAreas, setShowAreas] = useState(true)
   const [showCompass, setShowCompass] = useState(true)
+  const [northDirectionText, setNorthDirectionText] = useState(project.site?.northDirectionDegrees == null ? '' : String(project.site.northDirectionDegrees))
+  const [newRouteKind, setNewRouteKind] = useState<SiteRouteKind>('path')
+  const [newRouteWidth, setNewRouteWidth] = useState(project.plot.units === 'ft' ? '4' : '1.2')
+  const [newRouteAccessId, setNewRouteAccessId] = useState('')
+  const [newRouteTargetKey, setNewRouteTargetKey] = useState('')
+  const [routeDrawingId, setRouteDrawingId] = useState<string | null>(null)
   const [showPlanCheck, setShowPlanCheck] = useState(false)
   const planIssues = useMemo(() => {
     const roomIssues = validatePlan(
@@ -73,15 +80,26 @@ export function PlanEditor() {
       : boundary?.status === 'unknown'
         ? [{ code: 'site-boundary-unknown', severity: 'warning' as const, message: 'Actual plot boundary is unknown; the dashed rectangle is only a dimensions envelope.' }]
         : []
-    return [...roomIssues, ...siteIssues]
-  }, [rooms, project.plot.width, project.plot.length, units, project.site?.boundary, ctx.walls, ctx.openings, ctx.placed])
+    const siteBuildingIssues = validateSiteBuildingPlacement(project.buildings ?? [], project.site?.boundary, project.plot.units)
+    const siteRouteIssues = validateSiteRoutes(project.site?.routes ?? [], project.site, project.buildings ?? [], { width: project.plot.width, length: project.plot.length }, project.plot.units)
+    const parkingIssues = validateSiteParkingBays(ctx.ornaments, project.buildings ?? [], project.site?.boundary, { width: project.plot.width, length: project.plot.length }, project.plot.units)
+    return [...roomIssues, ...siteIssues, ...siteBuildingIssues, ...siteRouteIssues, ...parkingIssues]
+  }, [rooms, project.plot.width, project.plot.length, project.plot.units, units, project.site, project.buildings, ctx.walls, ctx.openings, ctx.placed, ctx.ornaments])
   const planErrorCount = planIssues.filter((issue) => issue.severity === 'error').length
+  const entranceBuildings = (project.buildings ?? []).filter((building) => building.footprint && building.footprint.status !== 'unknown' && building.footprint.vertices.length >= 3)
+  const routeTargets = entranceBuildings.flatMap((building) => (building.entrances ?? []).map((entrance) => ({ building, entrance, key: JSON.stringify([building.id, entrance.id]) })))
+  const resolvedSiteRoutes = useMemo(() => (project.site?.routes ?? []).flatMap((route) => {
+    const points = resolveSiteRoutePoints(route, project.site, project.buildings ?? [], project.plot.units)
+    if (!points) return []
+    return [{ id: route.id, kind: route.kind, width: route.width * conversionFactor(route.units, project.plot.units), points }]
+  }), [project.site, project.buildings, project.plot.units])
   const [plotWidth, setPlotWidth] = useState(String(project.plot.width))
   const [plotLength, setPlotLength] = useState(String(project.plot.length))
   const [plotModalOpen, setPlotModalOpen] = useState(false)
   const [boundaryEditMode, setBoundaryEditMode] = useState(false)
   const [boundaryDraft, setBoundaryDraft] = useState<SiteVertex[]>([])
   const [boundaryEdgeLabels, setBoundaryEdgeLabels] = useState<SiteEdgeLabel[]>([])
+  const [boundaryAccessPoints, setBoundaryAccessPoints] = useState<SiteAccessPoint[]>([])
   const savedBoundary = project.site?.boundary
   const boundaryIssues = useMemo(() => boundaryDraft.length
     ? validateSiteBoundary(boundaryDraft, { width: project.plot.width, length: project.plot.length })
@@ -96,11 +114,30 @@ export function PlanEditor() {
   useEffect(() => {
     setBoundaryEditMode(false)
     setBoundaryDraft([])
+    setRouteDrawingId(null)
+    setNewRouteAccessId('')
+    setNewRouteTargetKey('')
   }, [project.id])
   useEffect(() => {
     setPlotWidth(String(project.plot.width))
     setPlotLength(String(project.plot.length))
   }, [project.plot.width, project.plot.length])
+  useEffect(() => {
+    setNorthDirectionText(project.site?.northDirectionDegrees == null ? '' : String(project.site.northDirectionDegrees))
+  }, [project.id, project.site?.northDirectionDegrees])
+  useEffect(() => {
+    setNewRouteWidth(newRouteKind === 'road' ? (project.plot.units === 'ft' ? '16' : '4.8') : (project.plot.units === 'ft' ? '4' : '1.2'))
+  }, [project.plot.units, newRouteKind])
+  const applyNorthDirection = () => {
+    const value = northDirectionText.trim()
+    if (!value) {
+      ctx.setNorthDirection(null)
+      return
+    }
+    const degrees = Number(value)
+    if (Number.isFinite(degrees)) ctx.setNorthDirection(degrees)
+    else setNorthDirectionText(project.site?.northDirectionDegrees == null ? '' : String(project.site.northDirectionDegrees))
+  }
   const applyPlotSize = () => {
     const width = Number(plotWidth)
     const length = Number(plotLength)
@@ -111,14 +148,67 @@ export function PlanEditor() {
     }
   }
   const startBoundaryEdit = () => {
+    setRouteDrawingId(null)
     setBoundaryDraft(savedBoundary && savedBoundary.status !== 'unknown' ? savedBoundary.vertices.map((point) => ({ ...point })) : [])
     setBoundaryEdgeLabels(savedBoundary?.edgeLabels?.map((edge) => ({ ...edge })) ?? [])
+    setBoundaryAccessPoints(project.site?.accessPoints?.map((point) => ({ ...point })) ?? [])
     setBoundaryEditMode(true)
   }
-  const updateBoundaryEdgeLabel = (fromVertexId: string, toVertexId: string, type: SiteEdgeLabelType, customName?: string) => {
+  const updateBoundaryAccessPoint = (fromVertexId: string, toVertexId: string, type: SiteAccessKind | 'none', percent?: number) => {
+    setBoundaryAccessPoints((previous) => {
+      const existing = previous.find((point) => point.fromVertexId === fromVertexId && point.toVertexId === toVertexId)
+      const next = previous.filter((point) => !(point.fromVertexId === fromVertexId && point.toVertexId === toVertexId))
+      if (type === 'none') return next
+      const fraction = Math.max(0, Math.min(100, percent ?? (existing?.fraction ?? 0.5) * 100)) / 100
+      next.push({ id: existing?.id ?? uid('site-access'), fromVertexId, toVertexId, fraction, type })
+      return next
+    })
+  }
+  const updateBuildingEntrance = (buildingId: string, fromVertexId: string, toVertexId: string, type: BuildingEntranceKind | 'none', percent?: number) => {
+    const building = project.buildings?.find((item) => item.id === buildingId)
+    if (!building) return
+    const existing = building.entrances?.find((entrance) => entrance.fromVertexId === fromVertexId && entrance.toVertexId === toVertexId)
+    const next = (building.entrances ?? []).filter((entrance) => !(entrance.fromVertexId === fromVertexId && entrance.toVertexId === toVertexId))
+    if (type !== 'none') {
+      const fraction = Math.max(0, Math.min(100, percent ?? (existing?.fraction ?? 0.5) * 100)) / 100
+      next.push({ id: existing?.id ?? uid('building-entrance'), fromVertexId, toVertexId, fraction, type })
+    }
+    ctx.updateBuildingEntrances(buildingId, next)
+  }
+  const patchSiteRoute = (routeId: string, patch: Partial<SiteRoute>) => {
+    const routes = project.site?.routes ?? []
+    ctx.updateSiteRoutes(routes.map((route) => {
+      if (route.id !== routeId) return route
+      const factor = conversionFactor(route.units, project.plot.units)
+      return { ...route, units: project.plot.units, width: route.width * factor, waypoints: route.waypoints.map((point) => ({ x: point.x * factor, y: point.y * factor })), ...patch }
+    }))
+  }
+  const createSiteRoute = () => {
+    const accessPoint = project.site?.accessPoints?.find((point) => point.id === newRouteAccessId)
+    const target = routeTargets.find((item) => item.key === newRouteTargetKey)
+    const width = Number(newRouteWidth)
+    if (!accessPoint || !target || !Number.isFinite(width) || width <= 0) return
+    const route: SiteRoute = {
+      id: uid('site-route'), kind: newRouteKind, fromAccessPointId: accessPoint.id,
+      toBuildingId: target.building.id, toEntranceId: target.entrance.id,
+      width, units: project.plot.units, waypoints: [],
+    }
+    ctx.updateSiteRoutes([...(project.site?.routes ?? []), route])
+  }
+  const updateBoundaryEdgeLabel = (fromVertexId: string, toVertexId: string, type: SiteEdgeLabelType, customName?: string, setback?: number | null) => {
     setBoundaryEdgeLabels((previous) => {
+      const existing = previous.find((edge) => edge.fromVertexId === fromVertexId && edge.toVertexId === toVertexId)
       const next = previous.filter((edge) => !(edge.fromVertexId === fromVertexId && edge.toVertexId === toVertexId))
-      if (type !== 'unknown') next.push({ fromVertexId, toVertexId, type, ...(customName !== undefined ? { customName } : {}) })
+      const resolvedSetback = setback === null ? undefined : setback ?? existing?.setback
+      const resolvedName = type === 'custom' ? customName ?? existing?.customName : undefined
+      const value: SiteEdgeLabel = {
+        fromVertexId,
+        toVertexId,
+        type,
+        ...(resolvedName !== undefined ? { customName: resolvedName } : {}),
+        ...(resolvedSetback !== undefined ? { setback: resolvedSetback } : {}),
+      }
+      if (type !== 'unknown' || (value.setback !== undefined && value.setback > 0)) next.push(value)
       return next
     })
   }
@@ -141,7 +231,7 @@ export function PlanEditor() {
     const edgeLabels = boundaryDraft.flatMap((vertex, index) => {
       const next = boundaryDraft[(index + 1) % boundaryDraft.length]
       const edge = findSiteEdgeLabel(boundaryEdgeLabels, vertex.id, next.id)
-      if (!edge || edge.type === 'unknown') return []
+      if (!edge || (edge.type === 'unknown' && !(edge.setback && edge.setback > 0))) return []
       return [{ ...edge, ...(edge.type === 'custom' ? { customName: edge.customName?.trim() } : {}) }]
     })
     const boundary: SiteBoundary = {
@@ -155,7 +245,9 @@ export function PlanEditor() {
       edgeLabels,
       assumptions: [],
     }
-    ctx.updateSiteBoundary(boundary, shape as PlotShape)
+    const validEdgeKeys = new Set(boundaryDraft.map((vertex, index) => `${vertex.id}:${boundaryDraft[(index + 1) % boundaryDraft.length].id}`))
+    const accessPoints = boundaryAccessPoints.filter((point) => validEdgeKeys.has(`${point.fromVertexId}:${point.toVertexId}`)).map((point) => ({ ...point, fraction: Math.max(0, Math.min(1, point.fraction)) }))
+    ctx.updateSiteBoundary(boundary, shape as PlotShape, accessPoints)
     setBoundaryEditMode(false)
   }
   const useDimensionRectangle = () => {
@@ -176,8 +268,9 @@ export function PlanEditor() {
       edgeLabels: [],
       assumptions: ['Rectangular boundary derived from dimensions; edge labels and north direction remain unspecified unless explicitly set by the user.'],
     }
-    ctx.updateSiteBoundary(boundary, shape)
+    ctx.updateSiteBoundary(boundary, shape, [])
     setBoundaryEdgeLabels([])
+    setBoundaryAccessPoints([])
     setBoundaryDraft(boundary.vertices)
     setBoundaryEditMode(false)
   }
@@ -225,6 +318,15 @@ export function PlanEditor() {
   }
 
   const handleCanvasClick = (point: Vec2) => {
+    if (routeDrawingId) {
+      const route = project.site?.routes?.find((item) => item.id === routeDrawingId)
+      if (!route) return
+      const toProjectUnits = conversionFactor(route.units, project.plot.units)
+      const waypoints = route.waypoints.map((item) => ({ x: item.x * toProjectUnits, y: item.y * toProjectUnits }))
+      const waypoint = { x: roundSite(Math.max(0, Math.min(project.plot.width, point.x))), y: roundSite(Math.max(0, Math.min(project.plot.length, point.y))) }
+      patchSiteRoute(route.id, { waypoints: [...waypoints, waypoint] })
+      return
+    }
     if (ctx.pending) applyPlacement(ctx.pending, point)
   }
 
@@ -276,7 +378,11 @@ export function PlanEditor() {
           <IconToggle active={showLabels} onClick={() => setShowLabels((v) => !v)} label="Labels" icon={<Tag className="h-3.5 w-3.5" />} />
           <IconToggle active={showDimensions} onClick={() => setShowDimensions((v) => !v)} label="Dims" icon={<Frame className="h-3.5 w-3.5" />} />
           <IconToggle active={showAreas} onClick={() => setShowAreas((v) => !v)} label="Areas" icon={<Info className="h-3.5 w-3.5" />} />
-          <IconToggle active={showCompass} onClick={() => setShowCompass((v) => !v)} label="North" icon={<Compass className="h-3.5 w-3.5" />} />
+          <IconToggle active={showCompass} onClick={() => setShowCompass((v) => !v)} label="Compass" icon={<Compass className="h-3.5 w-3.5" />} />
+          <label className="flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-[10px] text-muted" title="Set north clockwise from drawing-up; leave blank when unknown">
+            <span>North°</span>
+            <input aria-label="North direction clockwise from drawing-up in degrees" type="number" min="0" max="359.9" step="1" value={northDirectionText} placeholder="?" onChange={(event) => setNorthDirectionText(event.target.value)} onBlur={applyNorthDirection} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} className="w-12 bg-transparent text-[11px] text-ink-text outline-none placeholder:text-faint" />
+          </label>
           <button type="button" onClick={() => setShowPlanCheck((value) => !value)} aria-expanded={showPlanCheck} className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium ${planErrorCount ? 'border-red-200 bg-red-50 text-red-700' : 'border-line bg-surface text-muted hover:bg-canvas-soft'}`}>
             <AlertTriangle className="h-3.5 w-3.5" /> Check plan <span className="rounded-full bg-white/70 px-1.5 text-[10px]">{planIssues.length}</span>
           </button>
@@ -292,7 +398,7 @@ export function PlanEditor() {
             <div className="min-w-0">
               <h3 className="text-[12.5px] font-semibold text-teal-950">Edit actual plot boundary</h3>
               <p className="mt-1 text-[11.5px] leading-relaxed text-teal-900">
-                Tap inside the plot envelope to add points; drag the handles to adjust them. The outline is not treated as a real boundary until you save at least three valid vertices.
+                Tap inside the plot envelope to add points; drag the handles to adjust them. The outline is not treated as a real boundary until you save at least three valid vertices. Label edges, set optional conceptual building clearances, and designate vehicle, pedestrian, or service access points.
               </p>
               <p className="mt-1 text-[11px] font-medium text-teal-900" aria-live="polite">
                 {boundaryDraft.length} vertices · area {boundaryDraft.length >= 3 ? formatSiteArea(draftBoundaryArea, units) : '—'}
@@ -303,6 +409,7 @@ export function PlanEditor() {
                     const next = boundaryDraft[(index + 1) % boundaryDraft.length]
                     const edgeLabel = findSiteEdgeLabel(boundaryEdgeLabels, vertex.id, next.id)
                     const edgeType = edgeLabel?.type ?? 'unknown'
+                    const accessPoint = boundaryAccessPoints.find((point) => point.fromVertexId === vertex.id && point.toVertexId === next.id)
                     return <div key={`${vertex.id}-${next.id}`} className="flex flex-wrap items-center gap-2 text-[10.5px] text-teal-950">
                       <span className="min-w-28 font-medium">Edge {index + 1}: {formatSiteLength(siteEdgeLength(vertex, next))} {units}</span>
                       <label className="flex items-center gap-1.5">
@@ -312,9 +419,21 @@ export function PlanEditor() {
                         </select>
                       </label>
                       {edgeType === 'custom' ? <input aria-label={`Custom name for plot edge ${index + 1}`} value={edgeLabel?.customName ?? ''} onChange={(event) => updateBoundaryEdgeLabel(vertex.id, next.id, 'custom', event.target.value)} placeholder="Enter edge name" className="w-36 rounded-md border border-teal-300 bg-white px-2 py-1 text-[10.5px]" /> : null}
+                      <label className="flex items-center gap-1.5">
+                        <span>Setback</span>
+                        <input aria-label={`Building setback for plot edge ${index + 1} in ${units}`} type="number" min="0" max="1000" step="0.5" value={edgeLabel?.setback ?? ''} onChange={(event) => { const value = event.target.value; const parsed = Number(value); updateBoundaryEdgeLabel(vertex.id, next.id, edgeType, edgeLabel?.customName, value === '' || !Number.isFinite(parsed) ? null : Math.min(1000, Math.max(0, parsed))) }} placeholder="0" className="w-16 rounded-md border border-teal-300 bg-white px-2 py-1 text-[10.5px]" />
+                        <span>{units}</span>
+                      </label>
+                      <label className="flex items-center gap-1.5">
+                        <span>Access</span>
+                        <select aria-label={`Access type at plot edge ${index + 1}`} value={accessPoint?.type ?? 'none'} onChange={(event) => updateBoundaryAccessPoint(vertex.id, next.id, event.target.value as SiteAccessKind | 'none')} className="rounded-md border border-teal-300 bg-white px-2 py-1 text-[10.5px]">
+                          <option value="none">None</option><option value="vehicle">Vehicle</option><option value="pedestrian">Pedestrian</option><option value="service">Service</option>
+                        </select>
+                      </label>
+                      {accessPoint ? <label className="flex items-center gap-1.5"><span>Position %</span><input aria-label={`Position of ${accessPoint.type} access on plot edge ${index + 1}`} type="number" min="0" max="100" step="1" value={Math.round(accessPoint.fraction * 100)} onChange={(event) => updateBoundaryAccessPoint(vertex.id, next.id, accessPoint.type, Number(event.target.value))} className="w-14 rounded-md border border-teal-300 bg-white px-2 py-1 text-[10.5px]" /></label> : null}
                     </div>
                   })}
-                  <p className="text-[10px] text-teal-800">Lengths are derived from the vertices; labels are user-assigned. No frontage or compass direction is assumed.</p>
+                  <p className="text-[10px] text-teal-800">Lengths are derived from the vertices; labels and access points are user-assigned. Access markers do not infer road geometry, legal access, or approval.</p>
                 </div>
               ) : null}
               {boundaryErrors.length || missingCustomEdgeName ? (
@@ -333,6 +452,55 @@ export function PlanEditor() {
           </div>
         </section>
       ) : null}
+
+      <details className="shrink-0 border-b border-line bg-surface px-4 py-2">
+        <summary className="cursor-pointer text-[12px] font-semibold text-ink-text">Building entrances ({entranceBuildings.reduce((count, building) => count + (building.entrances?.length ?? 0), 0)})</summary>
+        <p className="mt-1 text-[10.5px] text-muted">Designate an entrance on an explicitly recorded building-footprint edge. These are conceptual markers, not code-compliance or door-construction checks.</p>
+        {entranceBuildings.length ? <div className="mt-2 space-y-2">
+          {entranceBuildings.map((building) => <div key={building.id} className="rounded-lg border border-line-soft bg-canvas-soft/50 p-2">
+            <div className="mb-1 text-[11px] font-semibold text-ink-text">{building.name} · {building.role}</div>
+            <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-3">
+              {building.footprint!.vertices.map((vertex, index) => {
+                const next = building.footprint!.vertices[(index + 1) % building.footprint!.vertices.length]
+                const entrance = building.entrances?.find((item) => item.fromVertexId === vertex.id && item.toVertexId === next.id)
+                return <div key={`${vertex.id}-${next.id}`} className="flex items-center gap-1.5 text-[10px] text-muted">
+                  <span className="w-16 shrink-0">Edge {index + 1} · {formatSiteLength(siteEdgeLength(vertex, next))} {building.footprint!.units}</span>
+                  <select aria-label={`${building.name} entrance type on edge ${index + 1}`} value={entrance?.type ?? 'none'} onChange={(event) => updateBuildingEntrance(building.id, vertex.id, next.id, event.target.value as BuildingEntranceKind | 'none')} className="min-w-0 rounded-md border border-line bg-white px-1.5 py-1 text-[10px]">
+                    <option value="none">None</option><option value="main">Main</option><option value="pedestrian">Pedestrian</option><option value="service">Service</option>
+                  </select>
+                  {entrance ? <label className="flex items-center gap-1"><span className="sr-only">Position along edge percent</span><input aria-label={`${building.name} entrance position on edge ${index + 1} percent`} type="number" min="0" max="100" step="1" value={Math.round(entrance.fraction * 100)} onChange={(event) => updateBuildingEntrance(building.id, vertex.id, next.id, entrance.type, Number(event.target.value))} className="w-12 rounded-md border border-line bg-white px-1.5 py-1 text-[10px]" /><span>%</span></label> : null}
+                </div>
+              })}
+            </div>
+          </div>)}
+        </div> : <p className="mt-2 text-[10.5px] text-muted">No explicit building footprints are available to place an entrance marker. Existing room doors remain defined by the architectural wall/opening model; no building outline is fabricated.</p>}
+      </details>
+
+      <details className="shrink-0 border-b border-line bg-surface px-4 py-2">
+        <summary className="cursor-pointer text-[12px] font-semibold text-ink-text">Site circulation routes ({project.site?.routes?.length ?? 0})</summary>
+        <p className="mt-1 text-[10.5px] text-muted">Create a conceptual connection between a chosen plot access point and an explicitly marked entrance. The initial segment is direct; add user-drawn bends on the plan. This is not survey geometry, a legal-access check, or code compliance.</p>
+        {project.site?.accessPoints?.length && routeTargets.length ? <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-line-soft bg-canvas-soft/50 p-2">
+          <label className="grid gap-1 text-[10px] text-muted"><span>From access</span><select aria-label="Route starting access point" value={newRouteAccessId} onChange={(event) => setNewRouteAccessId(event.target.value)} className="rounded-md border border-line bg-white px-2 py-1.5 text-[11px]"><option value="">Choose access point</option>{project.site.accessPoints.map((point) => { const edgeIndex = project.site?.boundary?.vertices.findIndex((vertex) => vertex.id === point.fromVertexId) ?? -1; return <option key={point.id} value={point.id}>{point.type} · {edgeIndex >= 0 ? `edge ${edgeIndex + 1}` : point.id} · {Math.round(point.fraction * 100)}%</option> })}</select></label>
+          <label className="grid gap-1 text-[10px] text-muted"><span>To entrance</span><select aria-label="Route target building entrance" value={newRouteTargetKey} onChange={(event) => setNewRouteTargetKey(event.target.value)} className="rounded-md border border-line bg-white px-2 py-1.5 text-[11px]"><option value="">Choose building entrance</option>{routeTargets.map((item) => { const edgeIndex = item.building.footprint!.vertices.findIndex((vertex) => vertex.id === item.entrance.fromVertexId); return <option key={item.key} value={item.key}>{item.building.name} · {item.entrance.type} · edge {edgeIndex + 1} · {Math.round(item.entrance.fraction * 100)}%</option> })}</select></label>
+          <label className="grid gap-1 text-[10px] text-muted"><span>Route type</span><select aria-label="New route type" value={newRouteKind} onChange={(event) => { const kind = event.target.value as SiteRouteKind; setNewRouteKind(kind); setNewRouteWidth(kind === 'road' ? (project.plot.units === 'ft' ? '16' : '4.8') : (project.plot.units === 'ft' ? '4' : '1.2')) }} className="rounded-md border border-line bg-white px-2 py-1.5 text-[11px]"><option value="path">Pedestrian path</option><option value="road">Vehicle road</option></select></label>
+          <label className="grid gap-1 text-[10px] text-muted"><span>Width ({project.plot.units})</span><input aria-label="New route width" type="number" min="0.1" step="0.1" value={newRouteWidth} onChange={(event) => setNewRouteWidth(event.target.value)} className="w-20 rounded-md border border-line bg-white px-2 py-1.5 text-[11px]" /></label>
+          <button type="button" disabled={!newRouteAccessId || !newRouteTargetKey || !Number.isFinite(Number(newRouteWidth)) || Number(newRouteWidth) <= 0} onClick={createSiteRoute} className="rounded-md bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">Connect</button>
+        </div> : <p className="mt-2 text-[10.5px] text-muted">Add a boundary access point and mark an entrance on a recorded building footprint before connecting a route.</p>}
+        {project.site?.routes?.length ? <div className="mt-2 space-y-1.5">{project.site.routes.map((route) => {
+          const width = route.width * conversionFactor(route.units, project.plot.units)
+          const target = (project.buildings ?? []).find((building) => building.id === route.toBuildingId)
+          const drawing = routeDrawingId === route.id
+          return <div key={route.id} className={`flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5 text-[10.5px] ${drawing ? 'border-brand-300 bg-brand-50' : 'border-line-soft bg-white'}`}>
+            <span className="min-w-32 font-medium text-ink-text">{route.kind === 'road' ? 'Vehicle road' : 'Pedestrian path'} → {target?.name ?? 'missing building'} · {width.toFixed(1)} {project.plot.units}</span>
+            <label className="flex items-center gap-1 text-muted"><span>Width</span><input aria-label={`${route.kind} route width`} type="number" min="0.1" step="0.1" value={width} onChange={(event) => patchSiteRoute(route.id, { width: Number(event.target.value) })} className="w-16 rounded border border-line px-1.5 py-1" /><span>{project.plot.units}</span></label>
+            <button type="button" aria-pressed={drawing} onClick={() => setRouteDrawingId(drawing ? null : route.id)} className="rounded border border-line px-2 py-1 text-muted hover:bg-canvas-soft">{drawing ? 'Stop adding bends' : 'Add bends on plan'}</button>
+            <button type="button" disabled={!route.waypoints.length} onClick={() => { const factor = conversionFactor(route.units, project.plot.units); patchSiteRoute(route.id, { waypoints: route.waypoints.slice(0, -1).map((point) => ({ x: point.x * factor, y: point.y * factor })) }) }} className="rounded border border-line px-2 py-1 text-muted disabled:opacity-40">Undo bend</button>
+            <button type="button" disabled={!route.waypoints.length} onClick={() => patchSiteRoute(route.id, { waypoints: [] })} className="rounded border border-line px-2 py-1 text-muted disabled:opacity-40">Clear bends</button>
+            <button type="button" onClick={() => { ctx.updateSiteRoutes(project.site!.routes!.filter((item) => item.id !== route.id)); if (drawing) setRouteDrawingId(null) }} className="rounded border border-red-200 px-2 py-1 text-red-700">Remove</button>
+            {drawing ? <span className="w-full text-brand-700">Click inside the plan to add route bends. Finish by clicking “Stop adding bends”.</span> : null}
+          </div>
+        })}</div> : null}
+      </details>
 
       {showPlanCheck ? (
         <section aria-label="Plan checks" className="max-h-44 shrink-0 overflow-y-auto border-b border-line bg-white px-4 py-2.5">
@@ -365,7 +533,9 @@ export function PlanEditor() {
             wallThicknesses={wallThicknesses}
             plot={{ width: project.plot.width, length: project.plot.length }}
             siteBoundary={project.site?.boundary}
-            buildingFootprints={(project.buildings ?? []).filter((building) => building.role !== 'primary' && Boolean(building.footprint)).map((building) => ({ id: building.id, name: building.name, role: building.role, footprint: building.footprint! }))}
+            siteAccessPoints={boundaryEditMode ? boundaryAccessPoints : project.site?.accessPoints}
+            siteRoutes={resolvedSiteRoutes}
+            buildingFootprints={(project.buildings ?? []).filter((building) => building.role !== 'primary' && Boolean(building.footprint)).map((building) => ({ id: building.id, name: building.name, role: building.role, footprint: building.footprint!, entrances: building.entrances ?? [] }))}
             boundaryEditMode={boundaryEditMode}
             boundaryDraft={boundaryDraft}
             boundaryDraftEdgeLabels={boundaryEdgeLabels}
@@ -375,6 +545,7 @@ export function PlanEditor() {
             showDimensions={showDimensions}
             showAreas={showAreas}
             showCompass={showCompass}
+            northDirectionDegrees={project.site?.northDirectionDegrees}
             showBoundary
             measure={measure}
             trees={ctx.ornaments}

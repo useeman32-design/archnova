@@ -11,7 +11,7 @@ import {
   SlidersHorizontal,
   Sparkles,
 } from 'lucide-react'
-import type { ArchitecturalWall, Element, FinishOption, LandscapeItem, PlacedItem, PlotShape, Project, Room, RoomShape, SiteBoundary, Units, Vec2, WallOpening } from '@/types'
+import type { ArchitecturalWall, BuildingEntrance, Element, FinishOption, LandscapeItem, PlacedItem, PlotShape, Project, Room, RoomShape, SiteAccessPoint, SiteBoundary, SiteRoute, Units, Vec2, WallOpening } from '@/types'
 import { useProjects } from '@/hooks/useProjects'
 import { uid } from '@/lib/id'
 import { ROOM_FURNITURE } from '@/data/catalog'
@@ -91,7 +91,10 @@ export interface WorkspaceContext {
   wallThicknesses: { exterior: number; interior: number }
   setWallThickness: (kind: 'exterior' | 'interior', value: number) => void
   setPlotDimensions: (width: number, length: number) => void
-  updateSiteBoundary: (boundary: SiteBoundary, plotShape: PlotShape) => void
+  updateSiteBoundary: (boundary: SiteBoundary, plotShape: PlotShape, accessPoints?: SiteAccessPoint[]) => void
+  updateBuildingEntrances: (buildingId: string, entrances: BuildingEntrance[]) => void
+  updateSiteRoutes: (routes: SiteRoute[]) => void
+  setNorthDirection: (degrees: number | null) => void
   assistantOpen: boolean
   setAssistantOpen: (open: boolean) => void
   propsOpen: boolean
@@ -614,6 +617,7 @@ export function WorkspaceLayout() {
         fence: { width: ft ? 0.35 : 0.1, length: ft ? 10 : 3 },
         gate: { width: ft ? 12 : 3.6, length: ft ? 0.5 : 0.15 },
         road: { width: ft ? 16 : 5, length: ft ? 60 : 18 },
+        'parking-bay': { width: ft ? 9 : 2.7, length: ft ? 18 : 5.5 },
         path: { width: ft ? 4 : 1.2, length: ft ? 24 : 7.2 },
         person: { width: ft ? 1 : 0.3, length: ft ? 1 : 0.3 },
       }
@@ -633,7 +637,7 @@ export function WorkspaceLayout() {
       else setPlacementWarning(null)
       commit((state) => ({
         ...state,
-        ornaments: [...state.ornaments, { id: uid('site'), ...(sourceAsset ? { assetId: sourceAsset.id } : {}), x: round1(x), y: round1(y), kind, rotation: 0, scale: 1, color: kind === 'car' ? '#53677e' : kind === 'person' ? '#455f87' : kind === 'road' ? '#555b62' : kind === 'path' ? '#c9c4b9' : kind === 'fence' || kind === 'gate' ? '#6c6254' : '#4f8a3f', width, length }],
+        ornaments: [...state.ornaments, { id: uid('site'), ...(sourceAsset ? { assetId: sourceAsset.id } : {}), x: round1(x), y: round1(y), kind, rotation: 0, scale: 1, color: kind === 'car' ? '#53677e' : kind === 'person' ? '#455f87' : kind === 'road' || kind === 'parking-bay' ? '#555b62' : kind === 'path' ? '#c9c4b9' : kind === 'fence' || kind === 'gate' ? '#6c6254' : '#4f8a3f', width, length }],
       }))
     },
     [commit, project, setPlacementWarning, units],
@@ -718,17 +722,44 @@ export function WorkspaceLayout() {
     void updateProject(project.id, { plot: { ...project.plot, width, length }, floors, landscape: ornaments })
   }, [commit, editor.ornaments, editor.rooms, project, updateProject])
 
-  const updateSiteBoundary = useCallback((boundary: SiteBoundary, plotShape: PlotShape) => {
+  const updateSiteBoundary = useCallback((boundary: SiteBoundary, plotShape: PlotShape, accessPoints?: SiteAccessPoint[]) => {
     if (!project) return
     const previousSite = project.site ?? { northDirectionDegrees: null, orientationSource: 'unknown' as const, assumptions: [] }
     const site = {
       ...previousSite,
+      ...(accessPoints !== undefined ? { accessPoints } : {}),
       assumptions: boundary.source === 'user-drawn'
         ? previousSite.assumptions.filter((assumption) => !assumption.includes('no polygon has been fabricated'))
         : previousSite.assumptions,
       boundary,
     }
     void updateProject(project.id, { site, plot: { ...project.plot, shape: plotShape } })
+    setSaved(true)
+    window.setTimeout(() => setSaved(false), 1800)
+  }, [project, updateProject])
+
+  const updateSiteRoutes = useCallback((routes: SiteRoute[]) => {
+    if (!project) return
+    const previousSite = project.site ?? { northDirectionDegrees: null, orientationSource: 'unknown' as const, assumptions: [] }
+    void updateProject(project.id, { site: { ...previousSite, routes } })
+    setSaved(true)
+    window.setTimeout(() => setSaved(false), 1800)
+  }, [project, updateProject])
+
+  const updateBuildingEntrances = useCallback((buildingId: string, entrances: BuildingEntrance[]) => {
+    if (!project) return
+    const buildings = (project.buildings ?? []).map((building) => building.id === buildingId ? { ...building, entrances } : building)
+    void updateProject(project.id, { buildings })
+    setSaved(true)
+    window.setTimeout(() => setSaved(false), 1800)
+  }, [project, updateProject])
+
+  const setNorthDirection = useCallback((degrees: number | null) => {
+    if (!project) return
+    const previousSite = project.site ?? { northDirectionDegrees: null, orientationSource: 'unknown' as const, assumptions: [] }
+    const normalized = degrees === null ? null : ((Math.round(degrees * 10) / 10) % 360 + 360) % 360
+    const site = { ...previousSite, northDirectionDegrees: normalized, orientationSource: normalized === null ? 'unknown' as const : 'user-specified' as const }
+    void updateProject(project.id, { site })
     setSaved(true)
     window.setTimeout(() => setSaved(false), 1800)
   }, [project, updateProject])
@@ -1036,6 +1067,9 @@ export function WorkspaceLayout() {
     setWallThickness,
     setPlotDimensions,
     updateSiteBoundary,
+    updateBuildingEntrances,
+    updateSiteRoutes,
+    setNorthDirection,
     assistantOpen,
     setAssistantOpen,
     propsOpen,
